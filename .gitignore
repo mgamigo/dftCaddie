@@ -1,0 +1,9 @@
+#GITIGNORE FILE
+#
+build/
+dist/
+*.swp
+*egg-info/
+.ipynb_check*
+__pycache__/
+install.log
