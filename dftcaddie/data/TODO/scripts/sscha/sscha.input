@@ -1,0 +1,35 @@
+# Home made input file for SSCHA calculations
+
+temperature=50
+gap_file=GAP/GAP.xml
+
+#Minimization
+meaningful_factor = 1e-6  #gradient / error, considers if the minimization is converged (1e-12 is a typical value)
+minim_struct = True #Minimization of the structure (fixed struc of no)
+min_step_struc = 0.1
+min_step_dyn = 0.2
+kong_liu_ratio = 0.5 # Setup the threshold for the ensemble wasting
+pop_configs = 100 #Number of configs for the population (ignored in auto relax)
+
+#Relax
+relax_configs = 4000 #Number of configs per population
+max_pop = 5000 #Maximum number of populations
+max_steps = 1000000 #Maximum number of steps
+
+#Hessian
+include_v4 = False
+#hessian_configs = 300 #Number of configs used for the hessian (if not defined, the maximum)
+hessian_evo = False
+min_configs = 100
+max_configs = 100
+step_configs = 50
+
+#Spectral_function
+KGRID = 2 2 2     #Support grid to which we are interpolating.
+FC3_GRID = 2 2 2  #If not introduced is assumed to be the same one as for the second order force constants (this allows for mixing).
+static_limit = False
+no_mode_mixing = True
+#POINTS (in 2pi/alat units)
+0.000000000000    -0.577350269000     0.000000000000 #M
+0.000000000000    -0.577350269000    -0.295154966000 #L
+#END_POINTS

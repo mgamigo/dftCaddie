@@ -1,0 +1,19 @@
+#!/bin/bash
+
+$TEMPLATES/SBATCH_headings/load_sbatch_preamble.sh > master.sh
+cat $TEMPLATES/qe/master.sh >> master.sh
+JOBS_LINE=`grep -n "#Actual JOBS" master.sh | cut -f1 -d:`
+
+STEPS=(
+    scf.sh
+    bands.sh
+    project_bands.sh
+    pp_bands.sh
+)
+
+for S in ${STEPS[@]}; do
+    cp -v "$TEMPLATES/qe/$S" ./
+	Insert $JOBS_LINE "bash $S" master.sh
+	((JOBS_LINE+=1))
+done
+chmod +x master.sh
