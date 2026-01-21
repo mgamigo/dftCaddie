@@ -23,6 +23,8 @@ _resolve_user_input(user_input, options)
 
 import sys
 import argparse
+import socket
+from types import SimpleNamespace
 
 from dftcaddie import file_management as files
 from dftcaddie.config import cases
@@ -31,8 +33,11 @@ _all__ = [
     "main",
 ]
 
+affirmation2bool = {"yes": True, "no": False}
+bool2affirmation = {True: "yes", False: "no"}
 
-def _format_options(options: list[str], brackets: bool = False) -> str:
+
+def _format_options(options: list[str] | list[bool], brackets: bool = False) -> str:
     """
     Formats a list of strings into a comma-separated string, with optional
     bracket notation for the first character of each string.
@@ -51,12 +56,14 @@ def _format_options(options: list[str], brackets: bool = False) -> str:
     str
         A formatted, comma-separated string of options.
     """
+    if isinstance(options[0], bool):
+        options = [bool2affirmation[key] for key in options]
     if brackets:
         options = [f"[{x[0].upper()}]{x[1:]}" for x in options]
     return ", ".join(options)
 
 
-def _resolve_user_input(user_input: str, options: list[str]) -> int:
+def _resolve_user_input(user_input: str, options: list[str] | list[bool]) -> int:
     """
     Resolve user input to find its index in a list of options first by
     full match, then by partial match.
@@ -79,6 +86,10 @@ def _resolve_user_input(user_input: str, options: list[str]) -> int:
     If no match is found, an error message is printed and execution is
     terminated.
     """
+    # Change if options are booleans.
+    if isinstance(options[0], bool):
+        options = [bool2affirmation[key] for key in options]
+
     # Try full match first
     if user_input in options:
         return options.index(user_input)
@@ -125,51 +136,75 @@ def main(args=None):
         action="store_true",
         help="Overwrite existing files if necessary",
     )
-    args = parser.parse_args(args if isinstance(args, list) else None)
+    parser.add_argument(
+        "--kind",
+        required=False,
+        metavar="CALC",
+        help="Calculation kind (e.g., bands, relax)",
+    )
+    parser.add_argument(
+        "--code",
+        required=False,
+        metavar="CODE",
+        help="DFT code to use (e.g., vasp, quantum espresso)",
+    )
+    parser.add_argument(
+        "--hostname",
+        required=False,
+        metavar="HOST",
+        help="Hostname for automatic SBATCH heading.",
+    )
+
+    parsed_args = parser.parse_args(args if isinstance(args, list) else None)
+    calculation = SimpleNamespace(**vars(parsed_args))
+
+    if calculation.hostname is None:
+        calculation.hostname = socket.gethostname()
 
     # Select calculation type
-    options = list(cases.keys())
-    option_strings = [cases[key]["name"] for key in options]
-    print(f"Available Calculation Types:\n{_format_options(option_strings)}")
-    user_input = input("Choose a calculation type: ").strip().lower()
-    calc_type = options[_resolve_user_input(user_input, options)]
+    if calculation.kind is None:
+        options = list(cases.keys())
+        option_strings = [cases[key]["name"] for key in options]
+        print(f"Available Calculation Types:\n{_format_options(option_strings)}")
+        user_input = input("Choose a calculation type: ").strip().lower()
+        calculation.kind = options[_resolve_user_input(user_input, options)]
 
     # Select code
-    options = cases[calc_type]["codes"]
-    if len(options) > 1:
-        print(f"\nAvailable Codes for {calc_type.title()}:")
-        print(_format_options(options, brackets=True))
-        user_input = input("Choose a code: ").strip().lower()
-        code = options[_resolve_user_input(user_input, options)]
-    else:
-        code = options[1]
+    if calculation.code is None:
+        options = cases[calculation.kind]["codes"]
+        if len(options) > 1:
+            print(f"\nAvailable Codes for {calculation.kind.title()}:")
+            print(_format_options(options, brackets=True))
+            user_input = input("Choose a code: ").strip().lower()
+            calculation.code = options[_resolve_user_input(user_input, options)]
+        else:
+            calculation.code = options[1]
 
     # Additional options
-    selections = []
-    if "additional" in cases[calc_type].keys():
-        additional = cases[calc_type]["additional"]
-        for a in additional:
-            print(f"\n{a['question']}")
-            options = a["options"]
+    if "additional" in cases[calculation.kind].keys():
+        settings = cases[calculation.kind]["additional"]
+        for x in settings:
+            print(f"\n{x['question']}")
+            options = x["options"]
             print(_format_options(options, brackets=True))
             user_input = input("Select: ").strip().lower()
-            selections.append(options[_resolve_user_input(user_input, options)])
+            answer = options[_resolve_user_input(user_input, options)]
+            calculation.__setattr__(x["name"], answer)
 
     # Proceed with the operation using the user's selected options
     print(f"\nSummary\n=======")
-    print(f"Selected Calculation Type: {calc_type.title()}")
-    print(f"Selected Code: {code.title()}")
-    if len(selections) != 0:
-        for i in range(len(additional)):
-            print(f'{additional[i]["name"].title()}: {selections[i].title()}')
+    print(f"Calculation Type: {calculation.kind.title()}")
+    print(f"Code: {calculation.code.title()}")
+    keys = list(calculation.__dict__.keys())
+    for x in ["code", "kind"]:
+        keys.remove(x)
+    for key in keys:
+        print(f"{key}: {calculation.__getattribute__(key)}")
     print(f"-------\n")
 
     # Utilize the mapping to get the list of files
-    files_to_copy = cases[calc_type]["files"][code]
-    if args.scratch and code == "quantum espresso":
-        files_to_copy.append("SYSTEM.INFO")
-    files_to_copy.append("master.sh")
-    files.copy_input_files(code, files_to_copy, overwrite=args.overwrite)
-    files.populate_master_script("master.sh", files_to_copy)
+    copied_files = files.copy_input_files(calculation)
+    files.populate_master_script("master.sh", copied_files)
+    files.set_master_preamble("master.sh", hostname=calculation.hostname)
 
     print(f"\nFinished! ⛳")

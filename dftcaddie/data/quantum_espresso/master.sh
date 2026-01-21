@@ -1,3 +1,5 @@
+#!/bin/bash
+
 node=`hostname`
 echo "******************"
 echo "job run at node " $node
