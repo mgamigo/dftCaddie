@@ -2,69 +2,82 @@
 dftCaddie | dftcaddie.cli
 =========================
 
-This module provides a command-line client interface for ...
+This module provides a command-line client interface for dftCaddie, a tool
+to assist in the preparation of DFT calculations. It allows users to choose
+calculation types and corresponding codes, configure calculation options,
+and prepare the necessary input files.
 
 Functions
 ---------
 main(...)
-    Command-line client for ...
+    Command-line client for dftCaddie that facilitates the setup of DFT calculations.
+
+Private Utilities
+-----------------
+_format_options(options)
+    Formats a list of strings into a comma-separated string.
+
+_resolve_user_input(user_input, options)
+    Resolve user input to find its index in a list of options.
 """
 
 import sys
 import argparse
 
 from dftcaddie import file_management as files
+from dftcaddie.config import cases
 
-__all__ = [
+_all__ = [
     "main",
 ]
 
-cases = {
-    "bands": {
-        "name": "[B]ands",
-        "codes": ["quantum espresso", "vasp"],
-        "files": {
-            "quantum espresso": ["scf.sh", "bands.sh", "project_bands.sh"],
-            "vasp": ["INCAR.SCC", "INCAR.BS", "KPOINTS.SCC"],
-        },
-    },
-    "relax": {
-        "name": "[R]elax",
-        "codes": ["quantum espresso", "vasp"],
-        "additional": [
-            {
-                "name": "cell relaxation",
-                "question": "Do you want also a cell relaxation?",
-                "options": ["yes", "no"],
-            }
-        ],
-        "files": {
-            "quantum espresso": ["relax.sh"],
-            "vasp": ["INCAR.RELAX", "KPOINTS.SCC"],
-        },
-    },
-}
 
-
-def _format_options(options, brackets=False):
+def _format_options(options: list[str], brackets: bool = False) -> str:
     """
-    Format a list of options into a comma-separated string.
+    Formats a list of strings into a comma-separated string, with optional
+    bracket notation for the first character of each string.
 
-    :param options: List of options to format
-    :return: A formatted string
+    Parameters
+    ----------
+    options : list[str]
+        A list of strings representing options to be formatted.
+
+    brackets : bool, optional
+        If True, encloses the first character of each option in brackets
+        (default is False).
+
+    Returns
+    -------
+    str
+        A formatted, comma-separated string of options.
     """
     if brackets:
         options = [f"[{x[0].upper()}]{x[1:]}" for x in options]
     return ", ".join(options)
 
 
-def _resolve_user_input(user_input, options):
+def _resolve_user_input(user_input: str, options: list[str]) -> int:
     """
-    Resolve user input to find its index in a list of options first by full match, then by partial match.
+    Resolve user input to find its index in a list of options first by
+    full match, then by partial match.
 
-    :param user_input: The user's input (string)
-    :param options: List of options to match against
-    :return: Index of matched option or None if no match is found
+    Parameters
+    ----------
+    user_input : str
+        The user's input string to match against the list of options.
+
+    options : list[str]
+        A list of strings representing possible options to match.
+
+    Returns
+    -------
+    int
+        Index of the matched option.
+
+    Notes
+    -----
+    If no match is found, an error message is printed and execution is
+    terminated.
     """
     # Try full match first
     if user_input in options:
@@ -78,15 +91,23 @@ def _resolve_user_input(user_input, options):
     if partial_matches:
         return partial_matches[0]  # Return the index of the first partial match
 
-    # If no match is found, return None or a specific value (-1)
-    return None
+    # Print error and terminate process if no match is found
+    print(f"Error: No match found for input: '{user_input}'. Exiting the process.")
+    sys.exit(1)  # Exit with a status code indicating an error
 
 
 def main(args=None):
     """
-    Command-line client for dftCaddie.
+    Command-line client for dftCaddie that facilitates the setup of DFT
+    calculations. It allows users to select calculation types and codes,
+    offers additional configuration options, and prepares necessary input
+    files for execution.
 
-    Longer description
+    Parameters
+    ----------
+    args : list, optional
+        A list of command-line arguments. Defaults to None, in which case
+        system-provided command-line arguments are used.
     """
     if args is None:
         args = sys.argv[1:]  # Default to command-line arguments
@@ -96,10 +117,13 @@ def main(args=None):
         epilog="Example: caddie use example",
     )
     parser.add_argument(
-        "-s",
-        "--scratch",
-        action='store_true',
-        help="Start calculation from scratch"
+        "-s", "--scratch", action="store_true", help="Start calculation from scratch"
+    )
+    parser.add_argument(
+        "-o",
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing files if necessary",
     )
     args = parser.parse_args(args if isinstance(args, list) else None)
 
@@ -143,8 +167,9 @@ def main(args=None):
     # Utilize the mapping to get the list of files
     files_to_copy = cases[calc_type]["files"][code]
     if args.scratch and code == "quantum espresso":
-        files_to_copy.append('SYSTEM.INFO')
-    files_to_copy.append('master.sh')
-    files.copy_input_files(code, files_to_copy)
+        files_to_copy.append("SYSTEM.INFO")
+    files_to_copy.append("master.sh")
+    files.copy_input_files(code, files_to_copy, overwrite=args.overwrite)
+    files.populate_master_script("master.sh", files_to_copy)
 
-    print(f"\nFinished!")
+    print(f"\nFinished! ⛳")

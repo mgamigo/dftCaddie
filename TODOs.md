@@ -13,5 +13,6 @@ dftCaddie/
 ├── file_management.py     # Functions to copy and modify input files
 ├── script_generation.py   # Generate sbatch or other setup scripts (without submission logic)
 ├── utils.py               # Utility functions for string formatting, option resolution, etc.
+├── config.py              # Store `cases` dictionary here
 └── examples/              # Example workflows and demos
     └── example_workflow.py
