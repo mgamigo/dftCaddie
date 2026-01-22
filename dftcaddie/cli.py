@@ -27,7 +27,7 @@ import socket
 from types import SimpleNamespace
 
 from dftcaddie import file_management as files
-from dftcaddie.config import cases
+from dftcaddie.config import cases, clusters
 
 _all__ = [
     "main",
@@ -107,6 +107,16 @@ def _resolve_user_input(user_input: str, options: list[str] | list[bool]) -> int
     sys.exit(1)  # Exit with a status code indicating an error
 
 
+def _resolver_cluster():
+    hostname = socket.gethostname()
+    # Solve the appropiate heading:
+    keys = list(clusters.keys())
+    keys.remove(None)
+    for k in keys:
+        if clusters[k]["hostname"] in hostname:
+            return k
+
+
 def main(args=None):
     """
     Command-line client for dftCaddie that facilitates the setup of DFT
@@ -149,17 +159,18 @@ def main(args=None):
         help="DFT code to use (e.g., vasp, quantum espresso)",
     )
     parser.add_argument(
-        "--hostname",
+        "--cluster",
         required=False,
-        metavar="HOST",
-        help="Hostname for automatic SBATCH heading.",
+        metavar="CLUSTER",
+        help="Cluster for automatic SBATCH heading.",
     )
 
     parsed_args = parser.parse_args(args if isinstance(args, list) else None)
     calculation = SimpleNamespace(**vars(parsed_args))
 
-    if calculation.hostname is None:
-        calculation.hostname = socket.gethostname()
+    if calculation.cluster is None:
+        # calculation.hostname = socket.gethostname()
+        calculation.cluster = _resolver_cluster()
 
     # Select calculation type
     if calculation.kind is None:
@@ -169,27 +180,17 @@ def main(args=None):
         user_input = input("Choose a calculation type: ").strip().lower()
         calculation.kind = options[_resolve_user_input(user_input, options)]
 
-    # Select code
-    if calculation.code is None:
-        options = cases[calculation.kind]["codes"]
-        if len(options) > 1:
-            print(f"\nAvailable Codes for {calculation.kind.title()}:")
-            print(_format_options(options, brackets=True))
-            user_input = input("Choose a code: ").strip().lower()
-            calculation.code = options[_resolve_user_input(user_input, options)]
-        else:
-            calculation.code = options[1]
-
     # Additional options
-    if "additional" in cases[calculation.kind].keys():
-        settings = cases[calculation.kind]["additional"]
+    if "config" in cases[calculation.kind].keys():
+        settings = cases[calculation.kind]["config"]
         for x in settings:
-            print(f"\n{x['question']}")
-            options = x["options"]
-            print(_format_options(options, brackets=True))
-            user_input = input("Select: ").strip().lower()
-            answer = options[_resolve_user_input(user_input, options)]
-            calculation.__setattr__(x["name"], answer)
+            if calculation.__getattribute__(x["name"]) is None:
+                print(f"\n{x['question']}")
+                options = x["options"]
+                print(_format_options(options, brackets=True))
+                user_input = input("Select: ").strip().lower()
+                answer = options[_resolve_user_input(user_input, options)]
+                calculation.__setattr__(x["name"], answer)
 
     # Proceed with the operation using the user's selected options
     print(f"\nSummary\n=======")
@@ -199,12 +200,14 @@ def main(args=None):
     for x in ["code", "kind"]:
         keys.remove(x)
     for key in keys:
-        print(f"{key}: {calculation.__getattribute__(key)}")
+        print(f"{key.title()}: {calculation.__getattribute__(key)}")
     print(f"-------\n")
 
-    # Utilize the mapping to get the list of files
+    # Copy files and update them
     copied_files = files.copy_input_files(calculation)
-    files.populate_master_script("master.sh", copied_files)
-    files.set_master_preamble("master.sh", hostname=calculation.hostname)
+    scripts = files.populate_master_script("master.sh", copied_files)
+    files.set_master_preamble("master.sh", cluster=calculation.cluster)
+    for file in scripts:
+        files.set_mpi_command(file, calculation.cluster)
 
     print(f"\nFinished! ⛳")

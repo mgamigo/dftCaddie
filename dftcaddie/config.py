@@ -7,11 +7,17 @@ application, providing flexible support for different calculation types,
 DFT codes, and necessary input files.
 """
 
-#Files located in data/code
+# Files located in data/code
 cases = {
     "bands": {
         "name": "[B]ands",
-        "codes": ["quantum_espresso", "vasp"],
+        "config": [
+            {
+                "name": "code",
+                "question": "Available codes:",
+                "options": ["quantum_espresso", "vasp"],
+            },
+        ],
         "files": {
             "quantum_espresso": ["scf.sh", "bands.sh", "project_bands.sh"],
             "vasp": ["INCAR.SCC", "INCAR.BS", "KPOINTS.SCC"],
@@ -19,13 +25,17 @@ cases = {
     },
     "relax": {
         "name": "[R]elax",
-        "codes": ["quantum_espresso", "vasp"],
-        "additional": [
+        "config": [
+            {
+                "name": "code",
+                "question": "Available codes:",
+                "options": ["quantum_espresso", "vasp"],
+            },
             {
                 "name": "cell_relaxation",
                 "question": "Do you want also a cell relaxation?",
                 "options": [True, False],
-            }
+            },
         ],
         "files": {
             "quantum_espresso": ["relax.sh"],
@@ -34,11 +44,27 @@ cases = {
     },
 }
 
-#Headings located in data/sbatch_headings
-sbatch_headings = {
-    "ekhi": "ekhi",
-    "login": "planck",
-    "triton": "triton",
-    "puthi": "puhti_mahti",
-    "mahti": "puhti_mahti",
+# Cluster configuartion
+clusters = {
+    None: {
+        "hostname": None,
+        "heading": "default",
+        "mpi_command": "mpiexec -np 2",
+    },
+    "ekhi": {
+        "hostname": "ekhi",
+        "heading": "ekhi",
+        "mpi_command": "mpiexec -np $NPROCS",
+    },
+    "planck": {
+        "hostname": "login",
+        "heading": "planck",
+        "mpi_command": "srun --mpi=pmi2",
+    },
+    "triton": {"hostname": "triton", "heading": "trion", "mpi_command": "srun"},
+    "puhti": {"hostname": "puhti", "heading": "puhti_mahti", "mpi_command": "srun"},
+    "mahti": {"hostname": "mahti", "heading": "puhti_mahti", "mpi_command": "srun"},
 }
+
+# Executables over which mpi_command should be added
+executables = ["pw.x", "projwfc.x", "ph.x"]

@@ -5,3 +5,7 @@
 #SBATCH --time=240:00:00
 #SBATCH --partition=intelnodes
 #SBATCH --job-name="NONAME"
+
+export NPROCS=$SLURM_NTASKS
+NPOOLS=`python3 -c "print($NPROCS / 4)"`
+export NPOOLS

@@ -1,9 +1,9 @@
-PREFIX=`pwd`
+PREFIX=$(pwd)
 TMP_DIR=$PREFIX/tmp
 PSEUDO_DIR=$PSLIBRARY/$EXCHANGE/PSEUDOPOTENTIALS
 
-for DIR in "$TMP_DIR" "$PREFIX/results_relax" ; do
-    if test ! -d $DIR ; then
+for DIR in "$TMP_DIR" "$PREFIX/results_relax"; do
+    if test ! -d $DIR; then
         mkdir $DIR
     fi
 done
@@ -11,7 +11,7 @@ done
 rm -r results_relax/*
 cd $PREFIX/results_relax
 
-cat > $NAME.relax.pwi << EOF
+cat >$NAME.relax.pwi <<EOF
 &CONTROL
   calculation='vc-relax'
   restart_mode='from_scratch',
@@ -60,9 +60,6 @@ $LATTICE
 EOF
 
 echo "running the relax calculation"
-srun $QE_PATH/pw.x -npool $NPOOLS < $NAME.relax.pwi > $NAME.relax.pwo
-#srun --mpi=pmi2 $QE_PATH/pw.x -npool $NPOOLS < $NAME.relax.pwi > $NAME.relax.pwo
-#mpiexec -np $NPROCS $QE_PATH/pw.x -npool $NPOOLS < $NAME.relax.pwi > $NAME.relax.pwo
+$QE_PATH/pw.x -npool $NPOOLS <$NAME.relax.pwi >$NAME.relax.pwo
 rm input_tmp.in
 echo "done"
-

@@ -18,54 +18,50 @@ import os
 import shutil
 from types import SimpleNamespace
 
-from dftcaddie.config import sbatch_headings, cases
+from dftcaddie.config import cases, clusters, executables
 
 _all__ = [
     "copy_input_files",
 ]
 
 
-def copy_input_files_old(code: str, files_to_copy: list[str], overwrite: bool = False):
+def _insert_lines(file_path: str, lines_to_insert: list[str], match_string: str):
     """
-    Copies specified input files for a given DFT code into the current
-    working directory. Prompts users to confirm overwriting if files
-    already exist at the destination.
+    Inserts the specified lines into the file right after a line
+    containing the specified match_string.
 
     Parameters
     ----------
-    code : str
-        The DFT code identifier (e.g., "vasp", "quantum espresso").
-    files_to_copy : list[str]
-        Filenames to copy from the code-specific directory in the library's
-        `data` directory.
-    overwrite : bool, optional
-        Overwrite existing files if necessary. Default is False.
-
-    Notes
-    -----
-    - User confirmation is required if files exist at the destination.
+    file_path : str
+        Path to the file in which lines are to be inserted.
+    lines_to_insert : list[str]
+        List of strings representing lines to insert.
+    match_string : str
+        String to match in the file to determine the insertion point.
     """
-    source_dir = os.path.join(os.path.dirname(__file__), "data", code)
+    with open(file_path, "r") as file:
+        lines = file.readlines()
 
-    for file_name in files_to_copy:
-        source_path = os.path.join(source_dir, file_name)
-        destination_path = os.path.join(os.getcwd(), file_name)
+    # Initialize index to insert after
+    insert_index = None
 
-        if os.path.exists(source_path):
-            if os.path.exists(destination_path) and not overwrite:
-                # Prompt for overwrite confirmation
-                confirmation = input(
-                    f"The file '{file_name}' already exists. Do you want to overwrite it? (yes/no): "
-                )
-                if confirmation.strip().lower() not in ["yes", "y"]:
-                    print(f"Skipped overwriting '{file_name}'.")
-                    continue
-            shutil.copy(source_path, destination_path)
-            print(f"Copied '{file_name}'.")
-        else:
-            print(
-                f"Error: The input file '{file_name}' does not exist in the library:\n{source_path}."
-            )
+    # Find the first line that contains the match_string
+    for index, line in enumerate(lines):
+        if match_string in line:
+            insert_index = index + 1
+            break
+
+    # Check if the match_string was found
+    if insert_index is None:
+        print(f"Error: No line containing '{match_string}' was found in {file_path}.")
+        return
+
+    # Insert specified lines into the list
+    updated_lines = lines[:insert_index] + lines_to_insert + lines[insert_index:]
+
+    # Write the updated lines back into the file
+    with open(file_path, "w") as file:
+        file.writelines(updated_lines)
 
 
 def copy_input_files(calculation: SimpleNamespace) -> list[str]:
@@ -154,38 +150,51 @@ def populate_master_script(master_script_path: str, sub_scripts: list[str]):
     sub_scripts.remove(os.path.basename(master_script_path))
     sub_scripts = [script for script in sub_scripts if script.endswith(".sh")]
 
-    # Read the current content of master.sh
-    with open(master_script_path, "r") as file:
-        lines = file.readlines()
-
     # Prepare lines to append
     script_lines = [f"bash {script}\n" for script in sub_scripts]
 
-    # Find the index where "#Actual JOBS" occurs
-    try:
-        actual_jobs_index = lines.index("#Actual JOBS\n") + 1
-    except ValueError:
-        print("Error: '#Actual JOBS' not found in the master.sh script.")
-        return
-
-    # Insert sub_script sources after "#Actual JOBS"
-    updated_lines = lines[:actual_jobs_index] + script_lines + lines[actual_jobs_index:]
-
-    # Write the updated lines back to master.sh
-    with open(master_script_path, "w") as file:
-        file.writelines(updated_lines)
+    # Insert lines
+    _insert_lines(master_script_path, script_lines, "#Actual JOBS")
 
     print(f"Successfully populated '{master_script_path}' with sub-scripts.")
+    return sub_scripts
 
 
-def set_master_preamble(master_script_path: str, hostname: str):
+def set_master_preamble(master_script_path: str, cluster: str):
     """
     DOCU
     """
-    options = sbatch_headings.keys()
-    print(options)
-
     source_dir = os.path.join(os.path.dirname(__file__), "data/sbatch_headings")
-    print(source_dir)
 
-    pass
+    file_path = os.path.join(source_dir, clusters[cluster]["heading"])
+    with open(file_path, "r") as file:
+        preamble = file.readlines()
+    with open(master_script_path, "r") as file:
+        master = file.readlines()
+
+    updated_lines = preamble + master
+
+    # Write the updated lines back into the file
+    with open(master_script_path, "w") as file:
+        file.writelines(updated_lines)
+
+    print(f"Successfully added the '{cluster}' heading for '{master_script_path}'.")
+
+
+def set_mpi_command(file_path: str, cluster: str):
+    mpi_command = clusters[cluster]["mpi_command"]
+    commands = [clusters[key]["mpi_command"] for key in clusters.keys()]
+    commands = sorted(list(set(commands)), key=len, reverse=True)
+
+    with open(file_path, "r") as file:
+        lines = file.readlines()
+
+    for i, line in enumerate(lines):
+        for exe in executables:
+            if exe in line:
+                for c in commands:
+                    line.replace(c, "")
+                lines[i] = f"{mpi_command} {line}"
+
+    with open(file_path, "w") as file:
+        file.writelines(lines)

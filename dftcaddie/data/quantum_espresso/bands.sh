@@ -1,9 +1,9 @@
-PREFIX=`pwd`
+PREFIX=$(pwd)
 TMP_DIR=$PREFIX/tmp
 PSEUDO_DIR=$PSLIBRARY/$EXCHANGE/PSEUDOPOTENTIALS
 
-for DIR in "$TMP_DIR" "$PREFIX/results_bands" ; do
-    if test ! -d $DIR ; then
+for DIR in "$TMP_DIR" "$PREFIX/results_bands"; do
+    if test ! -d $DIR; then
         mkdir $DIR
     fi
 done
@@ -11,7 +11,7 @@ done
 rm -r results_bands/*
 cd $PREFIX/results_bands
 
-cat > $NAME.bands.pwi << EOF
+cat >$NAME.bands.pwi <<EOF
 &CONTROL
   calculation='bands'
   restart_mode='from_scratch',
@@ -47,9 +47,6 @@ $LATTICE
 EOF
 
 echo "running the bands calculation"
-srun $QE_PATH/pw.x -npool $NPOOLS < $NAME.bands.pwi > $NAME.bands.pwo
-#srun --mpi=pmi2 $QE_PATH/pw.x -npool $NPOOLS < $NAME.bands.pwi > $NAME.bands.pwo
-#mpiexec -np $NPROCS $QE_PATH/pw.x -npool $NPOOLS < $NAME.bands.pwi > $NAME.bands.pwo
+$QE_PATH/pw.x -npool $NPOOLS <$NAME.bands.pwi >$NAME.bands.pwo
 rm input_tmp.in
 echo "done"
-
