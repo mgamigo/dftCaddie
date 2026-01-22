@@ -1,8 +1,8 @@
-PREFIX=`pwd`
+PREFIX=$(pwd)
 TMP_DIR=$PREFIX/tmp
 
-for DIR in "$TMP_DIR" "$PREFIX/results_matdyn" ; do
-    if test ! -d $DIR ; then
+for DIR in "$TMP_DIR" "$PREFIX/results_matdyn"; do
+    if test ! -d $DIR; then
         mkdir $DIR
     fi
 done
@@ -10,7 +10,7 @@ done
 rm -r results_matdyn/*
 cd $PREFIX/results_matdyn
 
-cat > q2r.in << EOF
+cat >q2r.in <<EOF
 &INPUT
   fildyn='../results_ph/$NAME.dyn',
   zasr='no',
@@ -19,14 +19,14 @@ cat > q2r.in << EOF
 EOF
 
 echo "running q2r"
-mpiexec -np $NPROCS q2r.x < q2r.in > q2r.out
+mpiexec -np $NPROCS q2r.x <q2r.in >q2r.out
 rm input_tmp.in
 echo "done"
 
-cat > matdyn.in <<EOF
+cat >matdyn.in <<EOF
 &INPUT
   flfrc='$NAME.fc',
-  asr='no', 
+  asr='no',
   flfrq='$NAME.freq',
   q_in_band_form=.true.,
   q_in_cryst_coord=.true.,
@@ -35,8 +35,6 @@ cat > matdyn.in <<EOF
 EOF
 
 echo "running matdyn"
-srun $QE_PATH/matdyn.x < matdyn.in > matdyn.out
-#srun --mpi=pmi2 $QE_PATH/matdyn.x < matdyn.in > matdyn.out
-#mpiexec -np $NPROCS $QE_PATH/matdyn.x < matdyn.in > matdyn.out
+$QE_PATH/matdyn.x <matdyn.in >matdyn.out
 rm input_tmp.in
 echo "done"

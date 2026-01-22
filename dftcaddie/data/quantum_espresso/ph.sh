@@ -1,15 +1,16 @@
-PREFIX=`pwd`
+PREFIX=$(pwd)
 TMP_DIR=$PREFIX/tmp
 
-for DIR in "$TMP_DIR" "$PREFIX/results_ph" ; do
-    if test ! -d $DIR ; then
+for DIR in "$TMP_DIR" "$PREFIX/results_ph"; do
+    if test ! -d $DIR; then
         mkdir $DIR
     fi
-done 
+done
+
 rm -r results_ph/*
 cd $PREFIX/results_ph
 
-cat > $NAME.ph.pwi << EOF
+cat >$NAME.ph.pwi <<EOF
 
 &INPUTPH
   prefix='$NAME',
@@ -25,8 +26,6 @@ cat > $NAME.ph.pwi << EOF
 EOF
 
 echo "running the phonons calculation"
-srun $QE_PATH/ph.x -npool $NPOOLS < $NAME.ph.pwi > $NAME.ph.pwo
-#srun --mpi=pmi2 $QE_PATH/ph.x -npool $NPOOLS < $NAME.ph.pwi > $NAME.ph.pwo
-#mpiexec -np $NPROCS $QE_PATH/ph.x -npool $NPOOLS < $NAME.ph.pwi > $NAME.ph.pwo
+$QE_PATH/ph.x -npool $NPOOLS <$NAME.ph.pwi >$NAME.ph.pwo
 rm input_tmp.in
 echo "done"

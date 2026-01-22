@@ -91,7 +91,7 @@ def copy_input_files(calculation: SimpleNamespace) -> list[str]:
         A Namespace with all the relevant details.
 
     Returns
-    -------j
+    -------
     files : list[str]
         List of files that were copied for the calculation.
 
@@ -101,7 +101,7 @@ def copy_input_files(calculation: SimpleNamespace) -> list[str]:
     """
     # Resolve needed files.
     files_to_copy = cases[calculation.kind]["files"][calculation.code]
-    if calculation.scratch and code == "quantum_espresso":
+    if calculation.scratch and calculation.code == "quantum_espresso":
         files_to_copy.append("SYSTEM.INFO")
     files_to_copy.append("master.sh")
 
@@ -129,7 +129,9 @@ def copy_input_files(calculation: SimpleNamespace) -> list[str]:
     return files_to_copy
 
 
-def populate_master_script(master_script_path: str, sub_scripts: list[str]):
+def populate_master_script(
+    master_script_path: str, sub_scripts: list[str]
+) -> list[str]:
     """
     Integrates sub-scripts into the master.sh script, modifying its content
     to include references or execution commands for the specified scripts.
@@ -151,10 +153,10 @@ def populate_master_script(master_script_path: str, sub_scripts: list[str]):
     sub_scripts = [script for script in sub_scripts if script.endswith(".sh")]
 
     # Prepare lines to append
-    script_lines = [f"bash {script}\n" for script in sub_scripts]
-
-    # Insert lines
-    _insert_lines(master_script_path, script_lines, "#Actual JOBS")
+    if len(sub_scripts) > 1:
+        script_lines = [f"bash {script}\n" for script in sub_scripts]
+        # Insert lines
+        _insert_lines(master_script_path, script_lines, "#Actual JOBS")
 
     print(f"Successfully populated '{master_script_path}' with sub-scripts.")
     return sub_scripts
@@ -172,7 +174,7 @@ def set_master_preamble(master_script_path: str, cluster: str):
     with open(master_script_path, "r") as file:
         master = file.readlines()
 
-    updated_lines = preamble + master
+    updated_lines = preamble + ["\n"] + master
 
     # Write the updated lines back into the file
     with open(master_script_path, "w") as file:
@@ -181,7 +183,8 @@ def set_master_preamble(master_script_path: str, cluster: str):
     print(f"Successfully added the '{cluster}' heading for '{master_script_path}'.")
 
 
-def set_mpi_command(file_path: str, cluster: str):
+def change_mpi_command(file_path: str, cluster: str):
+    changes = False
     mpi_command = clusters[cluster]["mpi_command"]
     commands = [clusters[key]["mpi_command"] for key in clusters.keys()]
     commands = sorted(list(set(commands)), key=len, reverse=True)
@@ -192,9 +195,15 @@ def set_mpi_command(file_path: str, cluster: str):
     for i, line in enumerate(lines):
         for exe in executables:
             if exe in line:
+                changes = True
                 for c in commands:
                     line.replace(c, "")
                 lines[i] = f"{mpi_command} {line}"
 
+    if not changes:
+        return
+
     with open(file_path, "w") as file:
         file.writelines(lines)
+
+    print(f"Successfully added the '{mpi_command}' prefix in '{file_path}'.")

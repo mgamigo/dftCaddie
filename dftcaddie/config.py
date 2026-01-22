@@ -42,6 +42,19 @@ cases = {
             "vasp": ["INCAR.RELAX", "KPOINTS.SCC"],
         },
     },
+    "phonons": {
+        "name": "[P]honons",
+        "config": [
+            {
+                "name": "code",
+                "question": "Available codes:",
+                "options": ["quantum_espresso"],
+            },
+        ],
+        "files": {
+            "quantum_espresso": ["scf.sh", "ph.sh", "matdyn.sh"],
+        },
+    },
 }
 
 # Cluster configuartion

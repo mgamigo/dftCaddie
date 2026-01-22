@@ -180,16 +180,19 @@ def main(args=None):
         user_input = input("Choose a calculation type: ").strip().lower()
         calculation.kind = options[_resolve_user_input(user_input, options)]
 
-    # Additional options
+    # Additional configuration
     if "config" in cases[calculation.kind].keys():
         settings = cases[calculation.kind]["config"]
         for x in settings:
             if calculation.__getattribute__(x["name"]) is None:
-                print(f"\n{x['question']}")
                 options = x["options"]
-                print(_format_options(options, brackets=True))
-                user_input = input("Select: ").strip().lower()
-                answer = options[_resolve_user_input(user_input, options)]
+                if len(options) > 1:
+                    print(f"\n{x['question']}")
+                    print(_format_options(options, brackets=True))
+                    user_input = input("Select: ").strip().lower()
+                    answer = options[_resolve_user_input(user_input, options)]
+                else:
+                    answer = options[0]
                 calculation.__setattr__(x["name"], answer)
 
     # Proceed with the operation using the user's selected options
@@ -208,6 +211,6 @@ def main(args=None):
     scripts = files.populate_master_script("master.sh", copied_files)
     files.set_master_preamble("master.sh", cluster=calculation.cluster)
     for file in scripts:
-        files.set_mpi_command(file, calculation.cluster)
+        files.change_mpi_command(file, calculation.cluster)
 
     print(f"\nFinished! ⛳")
