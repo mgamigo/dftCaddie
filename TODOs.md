@@ -16,3 +16,5 @@ dftCaddie/
 ├── config.py              # Store `cases` dictionary here
 └── examples/              # Example workflows and demos
     └── example_workflow.py
+
+Turn the key variablles -> cases, clusters, executables... into a json file that is easy to edit and that the initialization process reads.

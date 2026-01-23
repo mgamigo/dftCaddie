@@ -34,7 +34,7 @@ cat >$NAME.relax.pwi <<EOF
   occupations='smearing',
   smearing='mp',
   degauss=$SMEAR,
-!  vdw_corr='DFT-D' !van der waals correction (works with ph.x)
+!  vdw_corr='DFT-D' !van der waals correction (works with phonons)
  /
 &ELECTRONS
   conv_thr =  1d-10

@@ -1,0 +1,180 @@
+"""
+dftCaddie | dftcaddie.utils
+=================================
+
+TODO
+
+This module provides a command-line client interface for dftCaddie, a tool
+to assist in the preparation of DFT calculations. It allows users to choose
+calculation types and corresponding codes, configure calculation options,
+and prepare the necessary input files.
+
+Functions
+---------
+main(...)
+    Command-line client for dftCaddie that facilitates the setup of DFT calculations.
+
+Private Utilities
+-----------------
+_resolve_cluster(clusters)
+    Identifies the cluster key based on the machine's hostname.
+
+_format_options(options)
+    Formats a list of strings into a comma-separated string.
+
+_resolve_user_input(user_input, options)
+    Resolve user input to find its index in a list of options.
+
+_check_option_exists(value, options)
+    Checks if a value exists within a list of options.
+"""
+
+import sys
+import argparse
+import socket
+from types import SimpleNamespace
+
+from dftcaddie import file_management as files
+from dftcaddie.config import cases, clusters
+
+_all__ = [
+    "main",
+]
+
+affirmation2bool = {"yes": True, "no": False}
+bool2affirmation = {True: "yes", False: "no"}
+
+
+def _resolve_cluster(clusters: dict) -> str:
+    """
+    Identifies the cluster key based on the machine's hostname.
+
+    Parameters
+    ----------
+    clusters : dict
+        A mapping of cluster keys to configurations containing a "hostname" entry.
+
+    Returns
+    -------
+    str
+        The cluster key that matches the current hostname, or None if no match is found.
+    """
+    hostname = socket.gethostname()
+    # Solve the appropiate heading:
+    keys = list(clusters.keys())
+    keys.remove(None)
+    for k in keys:
+        if clusters[k]["hostname"] in hostname:
+            return k
+
+
+def _format_options(options: list[str] | list[bool], brackets: bool = False) -> str:
+    """
+    Formats a list of strings into a comma-separated string, with optional
+    bracket notation for the first character of each string.
+
+    Parameters
+    ---------
+    options : list[str]
+        A list of strings representing options to be formatted.
+
+    brackets : bool, optional
+        If True, encloses the first character of each option in brackets
+        (default is False).
+
+    Returns
+    -------
+    str
+        A formatted, comma-separated string of options.
+
+    Notes
+    -----
+    - If options are booleans, they are written as "Yes/No"
+    """
+    if isinstance(options[0], bool):
+        options = [bool2affirmation[key] for key in options]
+    if brackets:
+        options = [f"[{x[0].upper()}]{x[1:]}" for x in options]
+    return ", ".join(options)
+
+
+def _resolve_user_input(user_input: str, options: list[str] | list[bool]) -> str | bool:
+    """
+    Resolve user input to find its index in a list of options first by
+    full match, then by partial match.
+
+    Parameters
+    ----------
+    user_input : str
+        The user's input string to match against the list of options.
+
+    options : list[str]
+        A list of strings representing possible options to match.
+
+    Returns
+    -------
+    str | bool
+        The matched option itself.
+
+    Notes
+    -----
+    - If no match is found, an error message is printed and execution is
+    terminated.
+    - If options are booleans, yes/no user input is read as True/False.
+    """
+    boolean = False
+    # Handle boolean options
+    if isinstance(options[0], bool):
+        boolean = True
+        options = [bool2affirmation[key] for key in options]
+
+    # Try full match first
+    if user_input in options:
+        matched_option = user_input
+    else:
+        # Try partial match (based on starting characters)
+        partial_matches = [
+            option for option in options if option.startswith(user_input)
+        ]
+
+        if len(partial_matches) >= 1:
+            matched_option = partial_matches[0]  # Return the first partial match
+        else:
+            # Print error and terminate process if no match is found
+            print(
+                f"Error: No match found for input: '{user_input}'. Exiting the process."
+            )
+            sys.exit(1)  # Exit with a status code indicating an error
+    if boolean:
+        return affirmation2bool[matched_option]
+    else:
+        return matched_option
+
+
+def _check_option_exists(
+    value: str | bool, options: list[str] | list[bool], name: str = None
+):
+    """
+    Checks if a value exists within a list of options, printing an error
+    and exiting if not.
+
+    Parameters
+    ----------
+    value : str | bool
+        The value to check against the list of options.
+    options : list[str] | list[bool]
+        The list of valid options.
+    name : str, optional
+        The name of the parameter being validated, included in the error
+        message if provided.
+    """
+    if value not in options:
+        if name is None:
+            print(f"Error: No match found for '{value}'. Supported values are:")
+        else:
+            print(
+                f"Error: No match found for '{name}' = '{value}'. Supported values are:"
+            )
+        print(f"{list(options)}")
+        print(f"Exiting the process.")
+        sys.exit(1)  # Exit with a status code indicating an error
