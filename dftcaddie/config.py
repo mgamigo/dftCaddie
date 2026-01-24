@@ -7,8 +7,21 @@ application, providing flexible support for different calculation types,
 DFT codes, and necessary input files.
 """
 
+
+# Kinds of calculations
 # Files located in data/code
-cases = {
+def _config_soc(default: bool = None):
+    config = {
+        "name": "soc",
+        "question": "Spin orbit coupling:",
+        "options": [True, False],
+    }
+    if isinstance(default, bool):
+        config["default"] = default
+    return config
+
+
+calculations = {
     "bands": {
         "name": "[B]ands",
         "config": [
@@ -17,12 +30,7 @@ cases = {
                 "question": "Available codes:",
                 "options": ["quantum_espresso", "vasp"],
             },
-            {
-                "name": "soc",
-                "question": "Spin orbit coupling:",
-                "options": [True, False],
-                "default": True,
-            },
+            _config_soc(True),
         ],
         "files": {
             "quantum_espresso": ["scf.sh", "bands.sh", "project_bands.sh"],
@@ -42,12 +50,7 @@ cases = {
                 "question": "Do you want also a cell relaxation?",
                 "options": [True, False],
             },
-            {
-                "name": "soc",
-                "question": "Spin orbit coupling:",
-                "options": [True, False],
-                "default": False,
-            },
+            _config_soc(False),
         ],
         "files": {
             "quantum_espresso": ["relax.sh"],
@@ -62,6 +65,7 @@ cases = {
                 "question": "Available codes:",
                 "options": ["quantum_espresso"],
             },
+            _config_soc(False),
         ],
         "files": {
             "quantum_espresso": ["scf.sh", "ph.sh", "matdyn.sh"],
@@ -92,7 +96,7 @@ clusters = {
 }
 
 # Executables over which mpi_command should be added
-executables = ["pw.x", "projwfc.x", "ph.x"]
+mpi_executables = ["pw.x", "projwfc.x", "ph.x"]
 
 # Pseudopotentials (first one being the default one).
 pseudopotentials = ["pbe", "pbesol", "pz"]

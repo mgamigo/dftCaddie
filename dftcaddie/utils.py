@@ -1,6 +1,6 @@
 """
 dftCaddie | dftcaddie.utils
-=================================
+===========================
 
 TODO
 
@@ -11,41 +11,42 @@ and prepare the necessary input files.
 
 Functions
 ---------
-main(...)
-    Command-line client for dftCaddie that facilitates the setup of DFT calculations.
-
-Private Utilities
------------------
-_resolve_cluster(clusters)
+resolve_cluster(clusters)
     Identifies the cluster key based on the machine's hostname.
 
-_format_options(options)
+format_options(options)
     Formats a list of strings into a comma-separated string.
 
-_resolve_user_input(user_input, options)
+resolve_user_input(user_input, options)
     Resolve user input to find its index in a list of options.
 
-_check_option_exists(value, options)
+check_option_exists(value, options)
     Checks if a value exists within a list of options.
 """
 
 import sys
-import argparse
 import socket
+import os
 from types import SimpleNamespace
 
-from dftcaddie import file_management as files
-from dftcaddie.config import cases, clusters
+import numpy as np
+import spglib as spg
+from yaiv.cell import Cell
+
+from dftcaddie.config import calculations
 
 _all__ = [
-    "main",
+    "resolve_cluster",
+    "format_options",
+    "resolve_user_input",
+    "check_option_exists",
 ]
 
 affirmation2bool = {"yes": True, "no": False}
 bool2affirmation = {True: "yes", False: "no"}
 
 
-def _resolve_cluster(clusters: dict) -> str:
+def resolve_cluster(clusters: dict) -> str:
     """
     Identifies the cluster key based on the machine's hostname.
 
@@ -68,7 +69,7 @@ def _resolve_cluster(clusters: dict) -> str:
             return k
 
 
-def _format_options(options: list[str] | list[bool], brackets: bool = False) -> str:
+def format_options(options: list[str] | list[bool], brackets: bool = False) -> str:
     """
     Formats a list of strings into a comma-separated string, with optional
     bracket notation for the first character of each string.
@@ -98,7 +99,7 @@ def _format_options(options: list[str] | list[bool], brackets: bool = False) -> 
     return ", ".join(options)
 
 
-def _resolve_user_input(user_input: str, options: list[str] | list[bool]) -> str | bool:
+def resolve_user_input(user_input: str, options: list[str] | list[bool]) -> str | bool:
     """
     Resolve user input to find its index in a list of options first by
     full match, then by partial match.
@@ -151,7 +152,7 @@ def _resolve_user_input(user_input: str, options: list[str] | list[bool]) -> str
         return matched_option
 
 
-def _check_option_exists(
+def check_option_exists(
     value: str | bool, options: list[str] | list[bool], name: str = None
 ):
     """
@@ -178,3 +179,74 @@ def _check_option_exists(
         print(f"{list(options)}")
         print(f"Exiting the process.")
         sys.exit(1)  # Exit with a status code indicating an error
+
+
+def resolve_calc_current_dir():
+    """
+    Infer calculation kind and code from files in the current directory.
+
+    Returns
+    -------
+    tuple[str, str]
+        (kind, code)
+
+    Raises
+    ------
+    RuntimeError
+        If no matching calculation setup is found or if the match is ambiguous.
+    """
+    present_files = set(f for f in os.listdir(".") if os.path.isfile(f))
+
+    matches = []
+
+    for kind, kind_data in calculations.items():
+        for code, expected_files in kind_data["files"].items():
+            expected = set(expected_files)
+            overlap = expected & present_files
+
+            if overlap:
+                matches.append(
+                    {
+                        "kind": kind,
+                        "code": code,
+                        "score": len(overlap),
+                        "expected": len(expected),
+                    }
+                )
+
+    if not matches:
+        raise RuntimeError(
+            "Could not infer calculation kind/code from directory contents."
+        )
+
+    # Prefer full matches, otherwise best overlap
+    matches.sort(key=lambda x: (x["score"] == x["expected"], x["score"]), reverse=True)
+    best = matches[0]
+
+    # Ambiguity check
+    equally_good = [
+        m
+        for m in matches
+        if m["score"] == best["score"] and m["expected"] == best["expected"]
+    ]
+    if len(equally_good) > 1:
+        raise RuntimeError(f"Ambiguous calculation setup detected: {equally_good}")
+
+    return best["kind"], best["code"]
+
+
+def get_structure(file):
+    C = Cell.from_file(file)
+    formula = C.atoms.get_chemical_formula()
+    lattice = np.asarray(C.atoms.get_cell())
+    symbols = C.atoms.get_chemical_symbols()
+    positions = np.asarray(C.atoms.get_scaled_positions())
+    space_group = spg.get_spacegroup(C).split("(")[1].split(")")[0]
+    data = SimpleNamespace(
+        formula=formula,
+        lattice=lattice,
+        symbols=symbols,
+        positions=positions,
+        space_group=space_group,
+    )
+    return data

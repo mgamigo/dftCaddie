@@ -17,7 +17,9 @@ copy_input_files(...)
 import os
 import shutil
 import glob
+import logging
 from types import SimpleNamespace
+from typing import Iterable
 
 import numpy as np
 import spglib as spg
@@ -26,19 +28,20 @@ from yaiv.cell import Cell
 from yaiv.utils import auto_kgrid
 
 from dftcaddie.config import (
-    cases,
+    calculations,
     clusters,
-    executables,
-    pseudopotentials,
+    mpi_executables,
     suggested_qe_pseudos,
 )
+
+log = logging.getLogger(__name__)
 
 _all__ = [
     "copy_input_files",
 ]
 
 
-def _replace_setting(file_path: str, partial_match: str, new_line: str):
+def _replace_setting(file_path: str, partial_match: str, new_line: str) -> None:
     """
     Replace the first line starting with a specific substring, ignoring
     leading spaces, with a new line preserving the original line's
@@ -55,23 +58,40 @@ def _replace_setting(file_path: str, partial_match: str, new_line: str):
         The new line content to use as a replacement, including preserved
         indentation.
     """
+
     # Read the file's contents
     with open(file_path, "r") as file:
         lines = file.readlines()
 
     # Replace the desired line with a partial match
+    replaced = False
     for i, line in enumerate(lines):
         if line.lstrip().startswith(partial_match):
             leading_spaces = len(line) - len(line.lstrip(" "))
-            lines[i] = (" " * leading_spaces) + new_line + "\n"  # Preserve indentation
-            break  # Stop after the replacement
+            lines[i] = (" " * leading_spaces) + new_line + "\n"
+            replaced = True
+            log.debug(
+                "Replaced line starting with '%s' in '%s'",
+                partial_match,
+                file_path,
+            )
+            break
+
+    if not replaced:
+        log.debug(
+            "No line starting with '%s' found in '%s'",
+            partial_match,
+            file_path,
+        )
 
     # Write the modified contents back to the file
     with open(file_path, "w") as file:
         file.writelines(lines)
 
 
-def _insert_lines(file_path: str, lines_to_insert: list[str], match_string: str):
+def _insert_lines(
+    file_path: str, lines_to_insert: list[str], match_string: str
+) -> None:
     """
     Inserts the specified lines into the file right after a line
     containing the specified match_string.
@@ -85,13 +105,17 @@ def _insert_lines(file_path: str, lines_to_insert: list[str], match_string: str)
     match_string : str
         String to match in the file to determine the insertion point.
     """
+    log.debug(
+        "Inserting lines into '%s' after match '%s'",
+        file_path,
+        match_string,
+    )
+
     with open(file_path, "r") as file:
         lines = file.readlines()
 
     # Initialize index to insert after
     insert_index = None
-
-    # Find the first line that contains the match_string
     for index, line in enumerate(lines):
         if match_string in line:
             insert_index = index + 1
@@ -99,7 +123,11 @@ def _insert_lines(file_path: str, lines_to_insert: list[str], match_string: str)
 
     # Check if the match_string was found
     if insert_index is None:
-        print(f"Error: No line containing '{match_string}' was found in {file_path}.")
+        log.error(
+            "No line containing '%s' found in '%s'",
+            match_string,
+            file_path,
+        )
         return
 
     # Insert specified lines into the list
@@ -109,10 +137,18 @@ def _insert_lines(file_path: str, lines_to_insert: list[str], match_string: str)
     with open(file_path, "w") as file:
         file.writelines(updated_lines)
 
+    log.info(
+        "Inserted %d lines into '%s'",
+        len(lines_to_insert),
+        file_path,
+    )
+
 
 def _remove_lines(
-    file_path: str, starting_partial_match: str, finishing_partial_match: str
-):
+    file_path: str,
+    starting_partial_match: str,
+    finishing_partial_match: str,
+) -> None:
     """
     Remove lines between those containing the start and finish partial matches, excluded.
 
@@ -125,7 +161,13 @@ def _remove_lines(
     finishing_partial_match : str
         The substring indicating the end of lines to be removed.
     """
-    # Read the file's contents
+    log.debug(
+        "Removing lines in '%s' between '%s' and '%s'",
+        file_path,
+        starting_partial_match,
+        finishing_partial_match,
+    )
+
     with open(file_path, "r") as file:
         lines = file.readlines()
 
@@ -138,22 +180,28 @@ def _remove_lines(
             start_index = i
         elif finishing_partial_match in line and start_index is not None:
             end_index = i
-            break  # Stop after finding the first finish match following the start match
+            break
 
-    # Ensure both start and end indices are found
-    if start_index is not None and end_index is not None:
-        # Remove lines between start_index and end_index inclusive
-        del lines[start_index + 1 : end_index]
-    else:
-        # Print error message if matches are not found correctly
-        print(
-            f"Error: Could not find "
-            f"start '{starting_partial_match}' or finish '{finishing_partial_match}' in '{file_path}'."
+    if start_index is None or end_index is None:
+        log.error(
+            "Could not find start '%s' or finish '%s' in '%s'",
+            starting_partial_match,
+            finishing_partial_match,
+            file_path,
         )
+        return
 
-    # Write the modified contents back to the file
+    del lines[start_index + 1 : end_index]
+
     with open(file_path, "w") as file:
         file.writelines(lines)
+
+    log.info(
+        "Removed lines between '%s' and '%s' in '%s'",
+        starting_partial_match,
+        finishing_partial_match,
+        file_path,
+    )
 
 
 def copy_input_files(calculation: SimpleNamespace) -> list[str]:
@@ -170,39 +218,44 @@ def copy_input_files(calculation: SimpleNamespace) -> list[str]:
     Returns
     -------
     files : list[str]
-        List of files that were copied for the calculation.
+        List of files that relevant for the calculation.
 
     Notes
     -----
     - User confirmation is required if files exist at the destination.
     """
     # Resolve needed files.
-    files_to_copy = cases[calculation.kind]["files"][calculation.code]
-    if calculation.scratch and calculation.code == "quantum_espresso":
-        files_to_copy.append("SYSTEM.INFO")
+    log.info("\nWriting input files:")
+    files_to_copy = calculations[calculation.kind]["files"][calculation.code]
     files_to_copy.append("master.sh")
 
     # Copy the files
     source_dir = os.path.join(os.path.dirname(__file__), "data", calculation.code)
+    copied = []
     for file_name in files_to_copy:
         source_path = os.path.join(source_dir, file_name)
         destination_path = os.path.join(os.getcwd(), file_name)
 
-        if os.path.exists(source_path):
-            if os.path.exists(destination_path) and not calculation.overwrite:
-                # Prompt for overwrite confirmation
-                confirmation = input(
-                    f"The file '{file_name}' already exists. Do you want to overwrite it? (yes/no): "
-                )
-                if confirmation.strip().lower() not in ["yes", "y"]:
-                    print(f"Skipped overwriting '{file_name}'.")
-                    continue
-            shutil.copy(source_path, destination_path)
-            print(f"Copied '{file_name}'.")
-        else:
-            print(
-                f"Error: The input file '{file_name}' does not exist in the library:\n{source_path}."
+        if not os.path.exists(source_path):
+            log.error(
+                "Input file '%s' does not exist in the library: %s",
+                file_name,
+                source_path,
             )
+            continue
+
+        if os.path.exists(destination_path) and not calculation.overwrite:
+            confirmation = input(
+                f"The file '{file_name}' already exists. Do you want to overwrite it? (yes/no): "
+            )
+            if confirmation.strip().lower() not in ("yes", "y"):
+                log.info("Skipped overwriting '%s'", file_name)
+                continue
+
+        shutil.copy(source_path, destination_path)
+        copied.append(file_name)
+        log.info("Copied '%s'", file_name)
+
     return files_to_copy
 
 
@@ -229,21 +282,34 @@ def populate_master_script(
     -----
     - It will ignore all files that are not `.sh` files.
     """
+    log.debug("Populating master script: %s", master_script_path)
+
+    # Remove master script itself and non-.sh files
+    master_name = os.path.basename(master_script_path)
+    if master_name in sub_scripts:
+        sub_scripts.remove(master_name)
+
     # Remove non-valid scripts
-    sub_scripts.remove(os.path.basename(master_script_path))
     sub_scripts = [script for script in sub_scripts if script.endswith(".sh")]
+
+    log.debug("Sub-scripts to add: %s", sub_scripts)
 
     # Prepare lines to append
     if len(sub_scripts) > 1:
         script_lines = [f"bash {script}\n" for script in sub_scripts]
-        # Insert lines
         _insert_lines(master_script_path, script_lines, "#Actual JOBS")
+        log.info(
+            "Added %d sub-scripts to '%s'",
+            len(sub_scripts),
+            master_script_path,
+        )
+    else:
+        log.info("No sub-scripts to add to '%s'", master_script_path)
 
-    print(f"Successfully populated '{master_script_path}' with sub-scripts.")
     return sub_scripts
 
 
-def set_master_preamble(master_script_path: str, cluster: str):
+def set_master_preamble(master_script_path: str, cluster: str) -> None:
     """
     Prepends cluster-specific preamble to a master script file.
 
@@ -259,25 +325,37 @@ def set_master_preamble(master_script_path: str, cluster: str):
         The name of the cluster whose preamble should be added to the master
         script.
     """
-    source_dir = os.path.join(os.path.dirname(__file__), "data/sbatch_headings")
+    log.info(
+        "Adding cluster preamble for '%s' to '%s'",
+        cluster,
+        master_script_path,
+    )
 
+    source_dir = os.path.join(os.path.dirname(__file__), "data", "sbatch_headings")
     heading = clusters[cluster]["heading"]
     file_path = os.path.join(source_dir, heading)
+
+    log.debug("Using preamble file: %s", file_path)
+
     with open(file_path, "r") as file:
         preamble = file.readlines()
+
     with open(master_script_path, "r") as file:
         master = file.readlines()
 
     updated_lines = preamble + ["\n"] + master
 
-    # Write the updated lines back into the file
     with open(master_script_path, "w") as file:
         file.writelines(updated_lines)
 
-    print(f"Successfully added the '{heading}' heading for '{master_script_path}'.")
+    log.info(
+        "Successfully added heading '%s' to '%s'",
+        heading,
+        master_script_path,
+    )
 
 
-def change_mpi_command(file_path: str, cluster: str):
+def change_mpi_command(file_path: str | list, cluster: str) -> None:
     """
     Modifies a script by replacing existing MPI commands with a cluster-specific command.
 
@@ -287,42 +365,68 @@ def change_mpi_command(file_path: str, cluster: str):
 
     Parameters
     ----------
-    file_path : str
-        Path to the script file that requires MPI command modification.
+    file_path : str | list
+        Path (or list of paths) to the script file that requires MPI command modification.
     cluster : str
         The name of the cluster whose MPI command should be used in the script.
     """
-    changes = False
+    log.info("\nChanging mpi commands:")
     mpi_command = clusters[cluster]["mpi_command"]
-    commands = [clusters[key]["mpi_command"] for key in clusters.keys()]
-    commands = sorted(list(set(commands)), key=len, reverse=True)
+    commands = {clusters[key]["mpi_command"] for key in clusters}
+    commands = sorted(commands, key=len, reverse=True)
 
-    with open(file_path, "r") as file:
-        lines = file.readlines()
+    if not isinstance(file_path, list):
+        file_path = [file_path]
 
-    for i, line in enumerate(lines):
-        for exe in executables:
-            if exe in line:
-                changes = True
-                for c in commands:
-                    line.replace(c, "")
-                lines[i] = f"{mpi_command} {line}"
+    for file in file_path:
+        with open(file, "r") as f:
+            lines = f.readlines()
 
-    if not changes:
-        return
+        changes = False
 
-    with open(file_path, "w") as file:
-        file.writelines(lines)
+        for i, line in enumerate(lines):
+            for exe in mpi_executables:
+                if exe in line:
+                    changes = True
+                    for c in commands:
+                        if c in line:
+                            line = line.replace(c, "")
+                            log.debug("Removed existing MPI command '%s'", c)
 
-    print(f"Successfully added the '{mpi_command}' prefix in '{file_path}'.")
+                    lines[i] = f"{mpi_command} {line}"
+
+        if not changes:
+            log.info("No MPI commands found in '%s'", file)
+            return
+
+        with open(file, "w") as f:
+            f.writelines(lines)
+
+        log.info(
+            "Applied MPI command '%s' to '%s'",
+            mpi_command,
+            file,
+        )
 
 
-def set_spin_orbit_coupling(calculation):
-    files = cases[calculation.kind]["files"][calculation.code]
-    if calculation.code == "quantum_espresso":
+def set_spin_orbit_coupling(kind: str, code: str, soc: bool) -> None:
+    """
+    Enable or disable spin-orbit coupling settings in input scripts.
+
+    Parameters
+    ----------
+    calculation : SimpleNamespace
+        Calculation options container.
+    """
+    files = calculations[kind]["files"][code]
+
+    if code == "quantum_espresso":
+
         scripts = [file for file in files if file.endswith(".sh")]
+        log.info("\nConfiguring for SOC : %s", soc)
+
         for script in scripts:
-            if calculation.soc:
+            if soc:
                 _replace_setting(script, "noncolin=", "noncolin=.true.")
                 _replace_setting(script, "lspinorb=", "lspinorb=.true.")
             else:
@@ -330,150 +434,379 @@ def set_spin_orbit_coupling(calculation):
                 _replace_setting(script, "lspinorb=", "lspinorb=.false.")
 
 
-def set_cell_relaxation(calculation):
+def set_cell_relaxation(calculation: SimpleNamespace) -> None:
+    """
+    Configure relaxation mode for Quantum ESPRESSO relax workflows.
+
+    Parameters
+    ----------
+    calculation : SimpleNamespace
+        Calculation options container.
+    """
+    log.info("Configuring for cell_relaxation : %s", calculation.cell_relaxation)
     if calculation.code == "quantum_espresso":
-        if not calculation.cell_relaxation:
+        if calculation.cell_relaxation:
+            _replace_setting("relax.sh", "calculation=", "calculation='vc-relax'")
+        else:
             _replace_setting("relax.sh", "calculation=", "calculation='relax'")
 
 
-def configure_files(calculation):
-    options = list(calculation.__dict__.keys())
+def configure_files(calculation: SimpleNamespace) -> None:
+    """
+    Apply calculation-dependent configuration edits to input files.
+
+    This function dispatches to specific configuration helpers (e.g. SOC,
+    cell relaxation) based on the attributes present in `calculation`.
+
+    Parameters
+    ----------
+    calculation : SimpleNamespace
+        Calculation options container.
+    """
+    options = set(calculation.__dict__.keys())
+    log.info("\nConfiguring scripts according to options:")
+
     # Spin-orbit coupling
     if "soc" in options:
         set_spin_orbit_coupling(calculation)
+
     # Cell relaxation
     if calculation.kind == "relax":
         set_cell_relaxation(calculation)
 
-
-def set_crystal_structure(calculation):
-    if calculation.structure is None:
-        return
-    C = Cell.from_file(calculation.structure)
-
-    formula = C.atoms.get_chemical_formula()
-    cell = np.asarray(C.atoms.get_cell())
-    positions = np.asarray(C.atoms.get_scaled_positions())
-    symbols = C.atoms.get_chemical_symbols()
-
-    if calculation.code == "quantum_espresso":
-        _replace_setting("SYSTEM.INFO", "NAME='NoName'", f"NAME='{formula}'")
-        _replace_setting("SYSTEM.INFO", "ATM_NUM=", f"ATM_NUM={len(positions)}")
-        _replace_setting("SYSTEM.INFO", "ATM_TYPES=", f"ATM_TYPES={len(set(symbols))}")
-        # Atomic positions
-        _remove_lines("SYSTEM.INFO", "ATOMIC_CRYST_POSITIONS=", "EOL")
-        lines = []
-        for s, (x, y, z) in zip(symbols, positions):
-            lines.append(f"{s:<2} {x:14.9f} {y:14.9f} {z:14.9f}\n")
-        _insert_lines("SYSTEM.INFO", lines, "ATOMIC_CRYST_POSITIONS=")
-        # Lattice
-        _remove_lines("SYSTEM.INFO", "LATTICE=", "EOL")
-        lines = []
-        for x, y, z in cell:
-            lines.append(f"{x:14.9f} {y:14.9f} {z:14.9f}\n")
-        _insert_lines("SYSTEM.INFO", lines, "LATTICE=")
-        if calculation.scratch:
-            # More changes beyond just crystal structure
-            pass
+    log.info("File configuration completed")
 
 
-def get_pseudo(
-    calculation, exchange: str = None, kind: str = None, relativistic: bool = False
-):
-    if calculation.structure is None:
+def set_crystal_structure(structure: SimpleNamespace, code: str) -> None:
+    """
+    Write structure-dependent quantities into input templates.
+
+    For Quantum ESPRESSO, this function updates ``SYSTEM.INFO`` with the
+    system name, number of atoms, number of atomic types, fractional atomic
+    positions, and lattice vectors.
+
+    Parameters
+    ----------
+    structure : SimpleNamespace
+        Structure container with at least the attributes ``formula``,
+        ``lattice`` (3x3), ``positions`` (Nx3 fractional), and ``symbols`` (N).
+    code : str
+        DFT code identifier.
+    """
+    if code != "quantum_espresso":
+        log.debug("set_crystal_structure skipped (code=%s)", code)
         return
 
-    C = Cell.from_file(calculation.structure)
-    symbols = set(C.atoms.get_chemical_symbols())
+    formula = structure.formula
+    lattice = structure.lattice
+    positions = structure.positions
+    symbols = structure.symbols
 
-    # Get pseudos
+    nat = len(positions)
+    ntyp = len(set(symbols))
+
+    log.info(
+        "\nUpdating crystal structure in SYSTEM.INFO (NAME=%s, NAT=%d, NTYP=%d)",
+        formula,
+        nat,
+        ntyp,
+    )
+
+    _replace_setting("SYSTEM.INFO", "NAME='NoName'", f"NAME='{formula}'")
+    _replace_setting("SYSTEM.INFO", "ATM_NUM=", f"ATM_NUM={nat}")
+    _replace_setting("SYSTEM.INFO", "ATM_TYPES=", f"ATM_TYPES={ntyp}")
+
+    # Atomic positions (fractional)
+    log.debug("Writing %d atomic positions", nat)
+    _remove_lines("SYSTEM.INFO", "ATOMIC_CRYST_POSITIONS=", "EOL")
+    pos_lines = [
+        f"{s:<2} {x:14.9f} {y:14.9f} {z:14.9f}\n"
+        for s, (x, y, z) in zip(symbols, positions)
+    ]
+    _insert_lines("SYSTEM.INFO", pos_lines, "ATOMIC_CRYST_POSITIONS=")
+
+    # Lattice vectors
+    log.debug("Writing lattice vectors")
+    _remove_lines("SYSTEM.INFO", "LATTICE=", "EOL")
+    lat_lines = [f"{x:14.9f} {y:14.9f} {z:14.9f}\n" for x, y, z in lattice]
+    _insert_lines("SYSTEM.INFO", lat_lines, "LATTICE=")
+
+
+def get_qe_pseudo_paths(
+    symbols: Iterable[str],
+    exchange: str = "pbe",
+    kind: str = "kjpaw",
+    relativistic: bool = False,
+) -> list[str]:
+    """
+    Resolve Quantum ESPRESSO pseudopotential file paths from PSLibrary.
+
+    Parameters
+    ----------
+    symbols : Iterable[str]
+        Chemical symbols present in the structure (e.g., `["Si", "O"]`).
+    exchange : str, optional
+        Exchange/correlation label used to locate pseudos (e.g., `"pbe"`),
+        by default "pbe".
+    kind : str, optional
+        Pseudopotential kind/wildcard (e.g., `"kjpaw"`, `"us"`),
+        by default "kjpaw".
+    relativistic : bool, optional
+        If True, use the relativistic exchange folder (prefix `"rel-"`),
+        by default False.
+
+    Returns
+    -------
+    pseudos : list[str]
+        Absolute pseudo paths.
+
+    Raises
+    ------
+    EnvironmentError
+        If ``PSLIBRARY`` is not set.
+    FileNotFoundError
+        If no pseudopotential is found for a symbol.
+    RuntimeError
+        If multiple candidates are found for a symbol.
+    """
+    symbols = set(symbols)
+
     ps_library = os.environ.get("PSLIBRARY")
-    if exchange is None:
-        exchange = pseudopotentials[0]
-    if kind is None:
-        kind = "kjpaw"
-    if relativistic:
-        exchange = "rel-" + exchange
-    source_path = os.path.join(ps_library, exchange, "PSEUDOPOTENTIALS")
+    if not ps_library:
+        raise EnvironmentError("PSLIBRARY environment variable is not set.")
+
+    exchange_folder = f"rel-{exchange}" if relativistic else exchange
+    source_path = os.path.join(ps_library, exchange_folder, "PSEUDOPOTENTIALS")
+
+    log.info(
+        "\nResolving QE pseudos (exchange=%s, kind=%s, relativistic=%s) from %s",
+        exchange,
+        kind,
+        relativistic,
+        source_path,
+    )
+
     pseudos = []
     for sym in symbols:
         target = suggested_qe_pseudos[sym]
-        target = target.replace("$fct", exchange).replace("*", kind)[:-6]
-        search = glob.glob(f"{source_path}/{target}*")
-        if len(search) == 1:
-            pseudo = search[0]
-        elif len(search) > 1:
-            print(
-                "Error: More than one option.. etc, requiere manual intervention.. etc (complete this)"
+        target = target.replace("$fct", exchange_folder).replace("*", kind)[:-6]
+        matches = glob.glob(f"{source_path}/{target}*")
+
+        if len(matches) == 1:
+            pseudos.append(matches[0])
+            log.debug("Selected pseudo for %s: %s", sym, os.path.basename(matches[0]))
+        elif len(matches) == 0:
+            raise FileNotFoundError(
+                f"No pseudopotential found for {sym!r} under {source_path!r} with pattern {target!r}."
             )
-        elif len(search) == 0:
-            print("Error: No pseudos found... etc (complete this)")
-        pseudos.append(pseudo)
+        else:
+            raise RuntimeError(
+                f"Multiple pseudopotentials found for {sym!r}: {matches}. "
+                "Please refine your pattern or choose manually."
+            )
 
-    # Get masses
-    masses = []
-    for sym in symbols:
-        atomic_mass = atomic_masses[atomic_numbers[sym]]
-        masses.append(atomic_mass)
+    return pseudos
 
-    # Prepare lines
-    lines = []
-    for s, m, p in zip(symbols, masses, pseudos):
-        lines.append(f"{s:<2} {m:11.6f}   {os.path.basename(p)}\n")
 
-    # Put the pseudo
-    _remove_lines("SYSTEM.INFO", "ATOMIC_SPECIES=", "EOL")
-    _insert_lines("SYSTEM.INFO", lines, "ATOMIC_SPECIES=")
-    _replace_setting("SYSTEM.INFO", "EXCHANGE=", f"EXCHANGE='{exchange}'")
+def write_pseudos_to_system_info(
+    system_info_path: str,
+    pseudos: list[str],
+) -> None:
+    """
+    Update ``SYSTEM.INFO`` with ATOMIC_SPECIES and EXCHANGE for Quantum ESPRESSO.
 
-    # Get appropaite cutoff and ecutrho
-    cutoff, ecutrho = [], []
+    Parameters
+    ----------
+    system_info_path : str
+        Path to the ``SYSTEM.INFO`` file to edit.
+    pseudos : list[str]
+        Pseudopotential paths aligned with ``symbols``.
+    """
+    symbols = [os.path.basename(p).split(".")[0] for p in pseudos]
+    masses = [atomic_masses[atomic_numbers[sym]] for sym in symbols]
+    exchange_folder = pseudos[0]
+
+    lines = [
+        f"{s:<2} {m:11.6f}   {os.path.basename(p)}\n"
+        for s, m, p in zip(symbols, masses, pseudos)
+    ]
+
+    log.info("\nUpdating %s: ATOMIC_SPECIES and EXCHANGE", system_info_path)
+
+    _remove_lines(system_info_path, "ATOMIC_SPECIES=", "EOL")
+    _insert_lines(system_info_path, lines, "ATOMIC_SPECIES=")
+    _replace_setting(system_info_path, "EXCHANGE=", f"EXCHANGE='{exchange_folder}'")
+
+
+def configure_qe_cutoffs_from_pseudos(
+    system_info_path: str,
+    pseudos: list[str],
+    ratio: float = 1.5,
+) -> tuple[int, int]:
+    """
+    Read suggested cutoffs from QE pseudopotential headers and update ``SYSTEM.INFO``.
+
+    Parameters
+    ----------
+    system_info_path : str
+        Path to the ``SYSTEM.INFO`` file to edit.
+    pseudos : list[str]
+        Pseudopotential file paths to read.
+    ratio : float, optional
+        Safety factor applied to the maximum suggested values, by default 1.5.
+
+    Returns
+    -------
+    cutoff : int
+        Wavefunction cutoff used (after applying ``ratio``).
+    ecutrho : int
+        Charge density cutoff used (after applying ``ratio``).
+
+    Raises
+    ------
+    RuntimeError
+        If suggested values cannot be read for all pseudos.
+    """
+    log.info("\nConfiguring cutoffs from pseudo headers (ratio=%s)", ratio)
+
+    cutoff_vals: list[float] = []
+    ecutrho_vals: list[float] = []
+
     for pseudo in pseudos:
-        with open(pseudo, "r") as file:
-            lines = file.readlines()
-        for line in lines:
-            if "Suggested minimum cutoff for wavefunctions" in line:
-                cutoff.append(float(line.split()[-2]))
-            elif "Suggested minimum cutoff for charge density:" in line:
-                ecutrho.append(float(line.split()[-2]))
-    if len(cutoff) != len(pseudos) or len(ecutrho) != len(pseudos):
-        print(
-            "Error: Either the minimum suggested values for cutoff and ecutrho could not be read."
-        )
-    ratio = 1.5
-    cutoff = int(np.max(cutoff) * ratio)
-    ecutrho = int(np.max(ecutrho) * ratio)
-    _replace_setting("SYSTEM.INFO", "CUTOFF=", f"CUTOFF={cutoff}")
-    _replace_setting("SYSTEM.INFO", "ECUTRHO=", f"ECUTRHO={ecutrho}")
+        with open(pseudo, "r") as f:
+            for line in f:
+                if "Suggested minimum cutoff for wavefunctions" in line:
+                    cutoff_vals.append(float(line.split()[-2]))
+                elif "Suggested minimum cutoff for charge density:" in line:
+                    ecutrho_vals.append(float(line.split()[-2]))
 
+    if len(cutoff_vals) != len(pseudos) or len(ecutrho_vals) != len(pseudos):
+        raise RuntimeError(
+            "Could not read suggested cutoff/ecutrho values for all pseudos."
+        )
+
+    cutoff = int(np.max(cutoff_vals) * ratio)
+    ecutrho = int(np.max(ecutrho_vals) * ratio)
+
+    log.info(
+        "Setting CUTOFF=%d and ECUTRHO=%d in %s", cutoff, ecutrho, system_info_path
+    )
+
+    _replace_setting(system_info_path, "CUTOFF=", f"CUTOFF={cutoff}")
+    _replace_setting(system_info_path, "ECUTRHO=", f"ECUTRHO={ecutrho}")
+
+    return cutoff, ecutrho
+
+
+def set_auto_kgrid(structure: SimpleNamespace, code: str):
+    """
+    [TODO:summary]
+
+    [TODO:description]
+
+    Parameters
+    ----------
+    structure : SimpleNamespace
+        [TODO:description]
+    code : str
+        [TODO:description]
+    """
     # Get appropaite KGRID
     kgrid = auto_kgrid(C[0], n_atoms=len(C[1]), kppra=9000)
     kgrid_str = " ".join(map(str, kgrid))
     _replace_setting("SYSTEM.INFO", "KGRID=", f"KGRID='{kgrid_str}'")
 
+
+def set_high_symmetry_path(structure: SimpleNamespace, code: str):
+    """
+    [TODO:summary]
+
+    [TODO:description]
+
+    Parameters
+    ----------
+    structure : SimpleNamespace
+        [TODO:description]
+    code : str
+        [TODO:description]
+    """
     # Change High-symmetry-path
-    space_group = spg.get_spacegroup(C).split("(")[1].split(")")[0]
-    source_dir = os.path.join(
-        os.path.dirname(__file__), "data", "kpaths", "quantum_espresso"
+    space_group = structure.space_group
+    source_dir = os.path.join(os.path.dirname(__file__), "data", "kpaths", code)
+    if code == "quantum_espresso":
+        with open(f"{source_dir}/SG{space_group}") as file:
+            lines = file.readlines()
+        _remove_lines("SYSTEM.INFO", "QE_CRYST_PATH=", "EOL")
+        _insert_lines("SYSTEM.INFO", lines, "QE_CRYST_PATH=")
+
+
+def set_auto_kgrid(structure: SimpleNamespace, code: str, kppra: int = 9000) -> None:
+    """
+    Set an automatic k-point grid in ``SYSTEM.INFO``.
+
+    This computes a Monkhorst-Pack-like k-grid from the structure and writes it
+    to the ``KGRID=`` entry in ``SYSTEM.INFO``.
+
+    Parameters
+    ----------
+    structure : SimpleNamespace
+        Structure container. Must provide lattice/cell information and the
+        number of atoms. The exact required fields depend on ``auto_kgrid``.
+    code : str
+        DFT code identifier. Currently only ``"quantum_espresso"`` is supported.
+    kppra : int, optional
+        Target number of k-points per reciprocal atom, by default 9000.
+    """
+    lattice = structure.lattice
+    n_atoms = len(structure.positions)
+
+    log.info("\nComputing automatic k-grid (kppra=%d, n_atoms=%d)", kppra, n_atoms)
+
+    if code != "quantum_espresso":
+        log.debug("set_auto_kgrid skipped (code=%s)", code)
+        return
+
+    kgrid = auto_kgrid(lattice, n_atoms=n_atoms, kppra=kppra)
+    kgrid_str = " ".join(map(str, kgrid))
+
+    log.info("Setting KGRID='%s' in SYSTEM.INFO", kgrid_str)
+    _replace_setting("SYSTEM.INFO", "KGRID=", f"KGRID='{kgrid_str}'")
+
+
+def set_high_symmetry_path(structure: SimpleNamespace, code: str) -> None:
+    """
+    Set the high-symmetry k-path in ``SYSTEM.INFO`` based on space group.
+
+    For Quantum ESPRESSO, this reads a template k-path file from the library
+    (keyed by the structure space group) and inserts it under ``QE_CRYST_PATH=``.
+
+    Parameters
+    ----------
+    structure : SimpleNamespace
+        Structure container. Must define ``space_group`` (int).
+    code : str
+        DFT code identifier. Currently only ``"quantum_espresso"`` is supported.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the k-path template for the given space group is not found.
+    """
+    log.info(
+        "\nSetting high-symmetry path for space group %s in SYSTEM.INFO",
+        structure.space_group,
     )
-    with open(f"{source_dir}/SG{space_group}") as file:
+
+    if code != "quantum_espresso":
+        log.debug("set_high_symmetry_path skipped (code=%s)", code)
+        return
+
+    source_dir = os.path.join(os.path.dirname(__file__), "data", "kpaths", code)
+    path_file = os.path.join(source_dir, f"SG{structure.space_group}")
+
+    log.debug("Reading k-path template: %s", path_file)
+    with open(path_file, "r") as file:
         lines = file.readlines()
+
     _remove_lines("SYSTEM.INFO", "QE_CRYST_PATH=", "EOL")
     _insert_lines("SYSTEM.INFO", lines, "QE_CRYST_PATH=")
-
-
-def prepare_calculation(calculation: SimpleNamespace):
-    # Copy files
-    copied_files = copy_input_files(calculation)
-    # Create default master.sh
-    scripts = populate_master_script("master.sh", copied_files)
-    set_master_preamble("master.sh", cluster=calculation.cluster)
-    # Change mpi prefix
-    for file in scripts:
-        change_mpi_command(file, calculation.cluster)
-    # Change scripts depending on calculation
-    configure_files(calculation)
-    # Modify SYSTEM.INFO
-    set_crystal_structure(calculation)
-    # Set pseudopotentials
-    get_pseudo(calculation)

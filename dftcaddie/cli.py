@@ -11,95 +11,99 @@ Functions
 ---------
 main(...)
     Command-line client for dftCaddie that facilitates the setup of DFT calculations.
+
+Private Utilities
+-----------------
+_configure_logging():
+    Configure root logging level for the CLI.
 """
 
 import sys
 import argparse
+import logging
+
+from dftcaddie import calc_client, setup_client, pseudo_client
+
+_all__ = [
+    "main",
+]
 
 
-def main(argv=None):
+def _configure_logging(verbose: int, quiet: bool) -> None:
+    """Configure root logging level for the CLI."""
+    if quiet:
+        level = logging.ERROR
+    elif verbose >= 2:
+        level = logging.DEBUG
+    elif verbose == 1:
+        level = logging.INFO
+    else:
+        level = logging.WARNING
+
+    logging.basicConfig(level=level, format="%(message)s")
+
+
+def main(argv: list[str] | None = None) -> int:
     """
-    Command-line client for dftCaddie that facilitates the setup of DFT
-    calculations.
+    Run the dftCaddie command-line interface.
 
     Parameters
     ----------
-    argv : list, optional
-        A list of command-line arguments. Defaults to None, in which case
-        system-provided command-line arguments are used.
+    argv : list[str] | None
+        Command-line arguments (excluding the program name). If ``None``,
+        arguments are taken from ``sys.argv[1:]``.
     """
-
-    print(f"dftCaddie 🏌️\n" f"============\n")
+    print("dftCaddie 🏌️\n============")
 
     if argv is None:
         argv = sys.argv[1:]
-        if len(argv) == 0:
-            argv = ["-h"]
 
     parser = argparse.ArgumentParser(
         prog="caddie",
         description="DFT Caddie - Your assistant for DFT calculations.",
     )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase verbosity (-v, -vv).",
+    )
     subparsers = parser.add_subparsers(title="Commands", dest="command")
 
-    # calc subcommand
-    calc_parser = subparsers.add_parser("calc", help="Create a new DFT calculation.")
-    calc_parser.add_argument(
-        "-s", "--scratch", action="store_true", help="Start calculation from scratch"
+    # --- calc subcommand ---
+    calc_parser = subparsers.add_parser(
+        "calc",
+        help="Create or prepare a new DFT calculation",
     )
-    calc_parser.add_argument(
-        "-o",
-        "--overwrite",
-        action="store_true",
-        help="Overwrite existing files if necessary",
+    calc_client.add_arguments(calc_parser)
+    # --- setup subcommand ---
+    setup_parser = subparsers.add_parser(
+        "setup",
+        help="Configure the calculation for a given system.",
     )
-    calc_parser.add_argument(
-        "-st",
-        "--structure",
-        required=False,
-        metavar="file",
-        help="File from which to read the crystal structure",
+    setup_client.add_arguments(setup_parser)
+    # --- calc subcommand ---
+    pseudo_parser = subparsers.add_parser(
+        "pseudo",
+        help="Configure the pseudopotential for a given system.",
     )
-    calc_parser.add_argument(
-        "-d",
-        "--details",
-        action="store_true",
-        help="Ask for details instead of going for default values",
-    )
-    calc_parser.add_argument(
-        "--kind",
-        required=False,
-        metavar="CALC",
-        help="Calculation kind (e.g., bands, relax)",
-    )
-    calc_parser.add_argument(
-        "--code",
-        required=False,
-        metavar="CODE",
-        help="DFT code to use (e.g., vasp, quantum espresso)",
-    )
-    calc_parser.add_argument(
-        "--cluster",
-        required=False,
-        metavar="CLUSTER",
-        help="Cluster for automatic SBATCH heading.",
-    )
+    pseudo_client.add_arguments(pseudo_parser)
 
-    # pseudo subcommand
-    pseudo_parser = subparsers.add_parser("pseudo", help="Change pseudopotentials.")
-    pseudo_parser.add_argument(
-        "--option2",
-        help="Option for changing pseudopotentials.",
-    )
-
+    # ---
     args = parser.parse_args(argv)
+    _configure_logging(args.verbose, quiet=False)
 
     # Dispatch
     if args.command == "calc":
-        print("Running calc with option")
-        print(args)
-        # create_calculation(args)
+        calc_client.run(args)
+        print(f"\nFinished! ⛳")
+    elif args.command == "setup":
+        setup_client.run(args)
+        print(f"\nFinished! ⛳")
     elif args.command == "pseudo":
-        print("Running pseudo")
-        print(args)
-        # change_pseudopotentials(args)
+        pseudo_client.run(args)
+        print(f"\nFinished! ⛳")
+    else:
+        parser.print_help()
+    return 0
