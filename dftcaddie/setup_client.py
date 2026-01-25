@@ -51,10 +51,10 @@ def add_arguments(parser):
         help="File from which to get/update the crystal structure.",
     )
     parser.add_argument(
-        "-s",
-        "--scratch",
+        "-i",
+        "--init",
         action="store_true",
-        help="Start setup from scratch",
+        help="Start setup from scratch.",
     )
     parser.add_argument(
         "-ak",
@@ -103,7 +103,7 @@ def run(args=None):
         structure_file=args.file,
         autokgrid=args.autokgrid,
         kppra=args.kppra,
-        scratch=args.scratch,
+        init=args.init,
         path=args.path,
         pseudo=args.pseudo,
     )
@@ -117,7 +117,7 @@ def apply_setup(
     kppra: int = 9000,
     path: bool = False,
     pseudo: bool = False,
-    scratch: bool = False,
+    init: bool = False,
     system_info_path: str = "SYSTEM.INFO",
 ) -> int:
     """
@@ -150,9 +150,9 @@ def apply_setup(
         group, by default False.
     pseudo : bool, optional
         If True, apply pseudopotential configuration during setup. When used
-        together with ``scratch``, pseudopotentials are initialized from
+        together with ``init``, pseudopotentials are initialized from
         defaults, by default False.
-    scratch : bool, optional
+    init : bool, optional
         If True, initialize ``SYSTEM.INFO`` from the template library before
         applying all possible modifications, by default False.
     system_info_path : str, optional
@@ -165,7 +165,7 @@ def apply_setup(
         Exit code (0 on successful completion).
     """
     if code == "quantum_espresso":
-        if scratch:
+        if init or not os.path.exists(system_info_path):
             source_dir = os.path.join(os.path.dirname(__file__), "data", code)
             source_path = os.path.join(source_dir, system_info_path)
             destination_path = os.path.join(os.getcwd(), system_info_path)
@@ -173,11 +173,11 @@ def apply_setup(
     if structure_file is not None:
         structure = ut.get_structure(structure_file)
         files.set_crystal_structure(structure, code)
-        if autokgrid or scratch:
+        if autokgrid or init:
             files.set_auto_kgrid(structure, code, kppra)
-        if path or scratch:
+        if path or init:
             files.set_high_symmetry_path(structure, code)
-        if pseudo and scratch:
+        if pseudo and init:
             setting = ut.get_config(kind=kind, config_name="soc")
             relativistic = setting.get("default", False)
             apply_pseudos(

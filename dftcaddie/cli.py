@@ -53,7 +53,8 @@ def main(argv: list[str] | None = None) -> int:
         Command-line arguments (excluding the program name). If ``None``,
         arguments are taken from ``sys.argv[1:]``.
     """
-    print("dftCaddie 🏌️\n============")
+    # print("dftCaddie 🏌️\n============")
+    _heading()
 
     if argv is None:
         argv = sys.argv[1:]
@@ -106,3 +107,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     print(f"\nFinished! ⛳")
     return 0
+
+
+def _heading():
+    print(
+        r"""
+   '\                   .  .                        |>>
+     \              .         ' .                   |
+    O>>         .                 'o                |
+     \       .                                      |
+     /\    .                                        |
+    / /  .'               DFT, but with a caddie 🏌️ |
+^^^^^^^`^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"""
+    )

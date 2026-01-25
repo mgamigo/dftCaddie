@@ -68,10 +68,10 @@ def add_arguments(parser):
         help="Ask for details instead of going for defaults",
     )
     parser.add_argument(
-        "-s",
-        "--scratch",
+        "-i",
+        "--init",
         action="store_true",
-        help="Start setup from scratch",
+        help="Initialize calculation from scratch by copying template input files.",
     )
     parser.add_argument(
         "-f",
@@ -114,7 +114,7 @@ def run(args=None):
     if calculation.kind is None:
         options = list(calculations.keys())
         option_strings = [calculations[key]["name"] for key in options]
-        print(f"Available Calculation Types:\n{ut.format_options(option_strings)}")
+        print(f"\nAvailable Calculation Types:\n{ut.format_options(option_strings)}")
         user_input = input("Choose a calculation type: ").strip().lower()
         calculation.kind = ut.resolve_user_input(user_input, options)
     ut.check_option_exists(calculation.kind, calculations.keys())
@@ -163,5 +163,5 @@ def run(args=None):
         kind=calculation.kind,
         code=calculation.code,
         structure_file=calculation.file,
-        scratch=calculation.scratch,
+        init=calculation.init,
     )
