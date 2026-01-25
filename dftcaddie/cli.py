@@ -16,6 +16,9 @@ Private Utilities
 -----------------
 _configure_logging():
     Configure root logging level for the CLI.
+
+_caddie_heading()
+    Heading for the client.
 """
 
 import sys
@@ -43,6 +46,19 @@ def _configure_logging(verbose: int, quiet: bool) -> None:
     logging.basicConfig(level=level, format="%(message)s")
 
 
+def _caddie_heading():
+    print(
+        r"""
+   '\                   .  .                        |>>
+     \              .         ' .                   |
+    O>>         .                 'o                |
+     \       .                                      |
+     /\    .                                        |
+    / /  .'                  DFT, but with a caddie |
+^^^^^^^`^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"""
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     """
     Run the dftCaddie command-line interface.
@@ -54,7 +70,7 @@ def main(argv: list[str] | None = None) -> int:
         arguments are taken from ``sys.argv[1:]``.
     """
     # print("dftCaddie 🏌️\n============")
-    _heading()
+    _caddie_heading()
 
     if argv is None:
         argv = sys.argv[1:]
@@ -76,18 +92,21 @@ def main(argv: list[str] | None = None) -> int:
     calc_parser = subparsers.add_parser(
         "calc",
         help="Create or prepare a new DFT calculation",
+        description="Create or prepare a new DFT calculation",
     )
     calc_client.add_arguments(calc_parser)
     # --- setup subcommand ---
     setup_parser = subparsers.add_parser(
         "setup",
         help="Configure the calculation for a given system.",
+        description="Configure the calculation for a given system.",
     )
     setup_client.add_arguments(setup_parser)
     # --- calc subcommand ---
     pseudo_parser = subparsers.add_parser(
         "pseudo",
-        help="Configure the pseudopotential for a given system.",
+        help="Get the desired pseudopotentials.",
+        description="Get the desired pseudopotentials.",
     )
     pseudo_client.add_arguments(pseudo_parser)
 
@@ -107,16 +126,3 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     print(f"\nFinished! ⛳")
     return 0
-
-
-def _heading():
-    print(
-        r"""
-   '\                   .  .                        |>>
-     \              .         ' .                   |
-    O>>         .                 'o                |
-     \       .                                      |
-     /\    .                                        |
-    / /  .'               DFT, but with a caddie 🏌️ |
-^^^^^^^`^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"""
-    )
