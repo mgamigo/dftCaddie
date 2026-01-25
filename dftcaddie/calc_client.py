@@ -22,6 +22,7 @@ from types import SimpleNamespace
 from dftcaddie import utils as ut
 from dftcaddie.config import calculations, clusters
 from dftcaddie import file_management as files
+from dftcaddie.setup_client import apply_setup
 
 log = logging.getLogger(__name__)
 
@@ -59,6 +60,25 @@ def add_arguments(parser):
         "--overwrite",
         action="store_true",
         help="Overwrite existing files if necessary",
+    )
+    parser.add_argument(
+        "-d",
+        "--details",
+        action="store_true",
+        help="Ask for details instead of going for defaults",
+    )
+    parser.add_argument(
+        "-s",
+        "--scratch",
+        action="store_true",
+        help="Start setup from scratch",
+    )
+    parser.add_argument(
+        "-f",
+        "--file",
+        metavar="FILE",
+        required=False,
+        help="File from which to get the crystal structure for setup.",
     )
     parser.add_argument(
         "--cluster",
@@ -108,7 +128,7 @@ def run(args=None):
             value = getattr(calculation, setting["name"], None)
             log.debug("Resolving setting: %s", setting["name"])
             if value is None:
-                if "default" in setting:
+                if "default" in setting and not details:
                     value = setting["default"]
                     log.debug("Using default value: %s", value)
                 elif len(options) == 1:
@@ -137,3 +157,11 @@ def run(args=None):
     files.set_master_preamble("master.sh", calculation.cluster)
 
     files.change_mpi_command(scripts, calculation.cluster)
+    files.configure_qe_cutoffs_from_pseudos
+    files.configure_input_files(calculation)
+    apply_setup(
+        kind=calculation.kind,
+        code=calculation.code,
+        structure_file=calculation.file,
+        scratch=calculation.scratch,
+    )

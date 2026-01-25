@@ -48,7 +48,7 @@ def add_arguments(parser):
         "--file",
         metavar="FILE",
         required=False,
-        help="File from which to get the crystal structure.",
+        help="File from which to get/update the crystal structure.",
     )
     parser.add_argument(
         "-s",
@@ -115,9 +115,9 @@ def apply_setup(
     structure_file: str = None,
     autokgrid: bool = False,
     kppra: int = 9000,
-    scratch: bool = False,
     path: bool = False,
     pseudo: bool = False,
+    scratch: bool = False,
     system_info_path: str = "SYSTEM.INFO",
 ) -> int:
     """
@@ -145,9 +145,6 @@ def apply_setup(
     kppra : int, optional
         Target number of k-points per reciprocal atom used for automatic
         k-grid generation, by default 9000.
-    scratch : bool, optional
-        If True, initialize ``SYSTEM.INFO`` from the template library before
-        applying any further modifications, by default False.
     path : bool, optional
         If True, insert a high-symmetry k-path based on the structure space
         group, by default False.
@@ -155,6 +152,9 @@ def apply_setup(
         If True, apply pseudopotential configuration during setup. When used
         together with ``scratch``, pseudopotentials are initialized from
         defaults, by default False.
+    scratch : bool, optional
+        If True, initialize ``SYSTEM.INFO`` from the template library before
+        applying all possible modifications, by default False.
     system_info_path : str, optional
         Path to the ``SYSTEM.INFO`` file to create or modify, by default
         "SYSTEM.INFO".

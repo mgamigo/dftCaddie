@@ -413,11 +413,22 @@ def set_spin_orbit_coupling(kind: str, code: str, soc: bool) -> None:
     """
     Enable or disable spin-orbit coupling settings in input scripts.
 
+    For Quantum ESPRESSO calculations, this updates the ``noncolin`` and
+    ``lspinorb`` flags in the relevant ``.sh`` scripts associated with the
+    selected calculation kind.
+
     Parameters
     ----------
-    calculation : SimpleNamespace
-        Calculation options container.
+    kind : str
+        Calculation kind key (e.g., ``"bands"``, ``"relax"``) used to select
+        which template scripts are modified.
+    code : str
+        DFT code identifier. Currently only ``"quantum_espresso"`` is supported.
+    soc : bool
+        If True, enable SOC (set ``noncolin=.true.`` and ``lspinorb=.true.``).
+        If False, disable SOC.
     """
+    ...
     files = calculations[kind]["files"][code]
 
     if code == "quantum_espresso":
@@ -434,29 +445,32 @@ def set_spin_orbit_coupling(kind: str, code: str, soc: bool) -> None:
                 _replace_setting(script, "lspinorb=", "lspinorb=.false.")
 
 
-def set_cell_relaxation(calculation: SimpleNamespace) -> None:
+def set_cell_relaxation(code: str, cell_relaxation: bool) -> None:
     """
-    Configure relaxation mode for Quantum ESPRESSO relax workflows.
+    Configure ionic vs variable-cell relaxation for Quantum ESPRESSO.
+
+    This edits ``relax.sh`` to use either ``calculation='vc-relax'`` (variable
+    cell) or ``calculation='relax'`` (ions only).
 
     Parameters
     ----------
-    calculation : SimpleNamespace
-        Calculation options container.
+    code : str
+        DFT code identifier. Currently only ``"quantum_espresso"`` is supported.
+    cell_relaxation : bool
+        If True, set variable-cell relaxation (``vc-relax``). If False, set
+        ionic relaxation only (``relax``).
     """
-    log.info("Configuring for cell_relaxation : %s", calculation.cell_relaxation)
-    if calculation.code == "quantum_espresso":
-        if calculation.cell_relaxation:
+    log.info("\nConfiguring for cell_relaxation : %s", cell_relaxation)
+    if code == "quantum_espresso":
+        if cell_relaxation:
             _replace_setting("relax.sh", "calculation=", "calculation='vc-relax'")
         else:
             _replace_setting("relax.sh", "calculation=", "calculation='relax'")
 
 
-def configure_files(calculation: SimpleNamespace) -> None:
+def configure_input_files(calculation: SimpleNamespace) -> None:
     """
     Apply calculation-dependent configuration edits to input files.
-
-    This function dispatches to specific configuration helpers (e.g. SOC,
-    cell relaxation) based on the attributes present in `calculation`.
 
     Parameters
     ----------
@@ -468,13 +482,17 @@ def configure_files(calculation: SimpleNamespace) -> None:
 
     # Spin-orbit coupling
     if "soc" in options:
-        set_spin_orbit_coupling(calculation)
+        set_spin_orbit_coupling(
+            kind=calculation.kind, code=calculation.code, soc=calculation.soc
+        )
 
     # Cell relaxation
     if calculation.kind == "relax":
-        set_cell_relaxation(calculation)
+        set_cell_relaxation(
+            code=calculation.code, cell_relaxation=calculation.cell_relaxation
+        )
 
-    log.info("File configuration completed")
+    log.info("\nFile configuration completed")
 
 
 def set_crystal_structure(structure: SimpleNamespace, code: str) -> None:
@@ -696,48 +714,6 @@ def configure_qe_cutoffs_from_pseudos(
     _replace_setting(system_info_path, "ECUTRHO=", f"ECUTRHO={ecutrho}")
 
     return cutoff, ecutrho
-
-
-def set_auto_kgrid(structure: SimpleNamespace, code: str):
-    """
-    [TODO:summary]
-
-    [TODO:description]
-
-    Parameters
-    ----------
-    structure : SimpleNamespace
-        [TODO:description]
-    code : str
-        [TODO:description]
-    """
-    # Get appropaite KGRID
-    kgrid = auto_kgrid(C[0], n_atoms=len(C[1]), kppra=9000)
-    kgrid_str = " ".join(map(str, kgrid))
-    _replace_setting("SYSTEM.INFO", "KGRID=", f"KGRID='{kgrid_str}'")
-
-
-def set_high_symmetry_path(structure: SimpleNamespace, code: str):
-    """
-    [TODO:summary]
-
-    [TODO:description]
-
-    Parameters
-    ----------
-    structure : SimpleNamespace
-        [TODO:description]
-    code : str
-        [TODO:description]
-    """
-    # Change High-symmetry-path
-    space_group = structure.space_group
-    source_dir = os.path.join(os.path.dirname(__file__), "data", "kpaths", code)
-    if code == "quantum_espresso":
-        with open(f"{source_dir}/SG{space_group}") as file:
-            lines = file.readlines()
-        _remove_lines("SYSTEM.INFO", "QE_CRYST_PATH=", "EOL")
-        _insert_lines("SYSTEM.INFO", lines, "QE_CRYST_PATH=")
 
 
 def set_auto_kgrid(structure: SimpleNamespace, code: str, kppra: int = 9000) -> None:
