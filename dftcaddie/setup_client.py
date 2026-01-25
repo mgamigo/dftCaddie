@@ -24,6 +24,7 @@ from types import SimpleNamespace
 from dftcaddie import utils as ut
 from dftcaddie.config import calculations, clusters
 from dftcaddie import file_management as files
+from dftcaddie.pseudo_client import apply_pseudos
 
 log = logging.getLogger(__name__)
 
@@ -96,18 +97,93 @@ def run(args=None):
         Parsed command-line arguments for the `calc` subcommand.
     """
     kind, code = ut.resolve_calc_current_dir()
+    apply_setup(
+        kind=kind,
+        code=code,
+        structure_file=args.file,
+        autokgrid=args.autokgrid,
+        kppra=args.kppra,
+        scratch=args.scratch,
+        path=args.path,
+        pseudo=args.pseudo,
+    )
+
+
+def apply_setup(
+    kind: str,
+    code: str,
+    structure_file: str = None,
+    autokgrid: bool = False,
+    kppra: int = 9000,
+    scratch: bool = False,
+    path: bool = False,
+    pseudo: bool = False,
+    system_info_path: str = "SYSTEM.INFO",
+) -> int:
+    """
+    Apply structure- and system-dependent setup steps to a calculation.
+
+    This function implements the ``caddie setup`` workflow. Depending on the
+    selected options, it initializes template input files, reads a structure
+    file, and applies structure-specific configuration such as lattice and
+    atomic positions, automatic k-point grids, high-symmetry k-paths, and
+    pseudopotential setup.
+
+    Parameters
+    ----------
+    kind : str
+        Calculation kind (e.g., ``"relax"``, ``"bands"``), used to select
+        kind-dependent configuration options.
+    code : str
+        DFT code identifier (e.g., ``"quantum_espresso"``).
+    structure_file : str or None, optional
+        Path to a structure file readable by ``get_structure``. If ``None``,
+        no structure-dependent setup is applied.
+    autokgrid : bool, optional
+        If True, compute and write an automatic k-point grid based on the
+        structure, by default False.
+    kppra : int, optional
+        Target number of k-points per reciprocal atom used for automatic
+        k-grid generation, by default 9000.
+    scratch : bool, optional
+        If True, initialize ``SYSTEM.INFO`` from the template library before
+        applying any further modifications, by default False.
+    path : bool, optional
+        If True, insert a high-symmetry k-path based on the structure space
+        group, by default False.
+    pseudo : bool, optional
+        If True, apply pseudopotential configuration during setup. When used
+        together with ``scratch``, pseudopotentials are initialized from
+        defaults, by default False.
+    system_info_path : str, optional
+        Path to the ``SYSTEM.INFO`` file to create or modify, by default
+        "SYSTEM.INFO".
+
+    Returns
+    -------
+    int
+        Exit code (0 on successful completion).
+    """
     if code == "quantum_espresso":
-        if args.scratch:
+        if scratch:
             source_dir = os.path.join(os.path.dirname(__file__), "data", code)
-            source_path = os.path.join(source_dir, "SYSTEM.INFO")
-            destination_path = os.path.join(os.getcwd(), "SYSTEM.INFO")
+            source_path = os.path.join(source_dir, system_info_path)
+            destination_path = os.path.join(os.getcwd(), system_info_path)
             shutil.copy(source_path, destination_path)
-    if args.file is not None:
-        structure = ut.get_structure(args.file)
+    if structure_file is not None:
+        structure = ut.get_structure(structure_file)
         files.set_crystal_structure(structure, code)
-    if args.autokgrid or args.file and args.scratch:
-        files.set_auto_kgrid(structure, code, args.kppra)
-    if args.path or args.file and args.scratch:
-        files.set_high_symmetry_path(structure, code)
-    if args.pseudo or args.file and args.scratch:
-        files.set_high_symmetry_path(structure, code)
+        if autokgrid or scratch:
+            files.set_auto_kgrid(structure, code, kppra)
+        if path or scratch:
+            files.set_high_symmetry_path(structure, code)
+        if pseudo and scratch:
+            setting = ut.get_config(kind=kind, config_name="soc")
+            relativistic = setting.get("default", False)
+            apply_pseudos(
+                kind_calc=kind,
+                code=code,
+                symbols=structure.symbols,
+                relativistic=relativistic,
+            )
+    return 0

@@ -97,13 +97,12 @@ def main(argv: list[str] | None = None) -> int:
     # Dispatch
     if args.command == "calc":
         calc_client.run(args)
-        print(f"\nFinished! ⛳")
     elif args.command == "setup":
         setup_client.run(args)
-        print(f"\nFinished! ⛳")
     elif args.command == "pseudo":
         pseudo_client.run(args)
-        print(f"\nFinished! ⛳")
     else:
         parser.print_help()
+        return 0
+    print(f"\nFinished! ⛳")
     return 0

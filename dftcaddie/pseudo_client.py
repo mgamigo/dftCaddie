@@ -92,12 +92,82 @@ def run(args=None):
     """
     kind, code = ut.resolve_calc_current_dir()
     structure = ut.get_structure(args.file)
-    if code == "quantum_espresso":
-        pseudos = files.get_qe_pseudo_paths(
-            structure.symbols, args.exchange, args.kind, args.relativistic
-        )
-        files.write_pseudos_to_system_info("SYSTEM.INFO", pseudos)
-        # SET SOC
-        files.set_spin_orbit_coupling(kind, code, args.relativistic)
-        if args.configure:
-            files.configure_qe_cutoffs_from_pseudos("SYSTEM.INFO", pseudos, ratio=1.5)
+    apply_pseudos(
+        kind_calc=kind,
+        code=code,
+        symbols=structure.symbols,
+        exchange=args.exchange,
+        kind_pseudo=args.kind,
+        relativistic=args.relativistic,
+        configure=args.configure,
+    )
+
+
+def apply_pseudos(
+    kind_calc: str,
+    code: str,
+    symbols: list[str],
+    relativistic: bool,
+    exchange: str = "pbe",
+    kind_pseudo: str = "kjpaw",
+    configure: bool = False,
+    system_info_path: str = "SYSTEM.INFO",
+    ratio: float = 1.5,
+) -> int:
+    """
+    Resolve and apply pseudopotentials for a structure and update input templates.
+
+    For Quantum ESPRESSO calculations, this function selects one pseudopotential
+    per element from the PSLibrary tree and updates ``SYSTEM.INFO`` accordingly.
+    Optionally, it reads suggested cutoffs from the pseudopotential headers and
+    writes CUTOFF/ECUTRHO into ``SYSTEM.INFO``.
+
+    Parameters
+    ----------
+    kind_calc : str
+        Calculation kind (e.g., ``"relax"``, ``"bands"``). Used to apply
+        kind-dependent edits (e.g., SOC-related settings).
+    code : str
+        DFT code identifier. Currently only ``"quantum_espresso"`` is supported.
+    symbols : list[str]
+        Chemical symbols present in the structure (e.g., ``["Si", "O"]``).
+    exchange : str
+        Exchange/correlation label used to locate pseudopotentials (e.g., ``"pbe"``).
+    kind_pseudo : str
+        Pseudopotential kind/wildcard used to resolve files (e.g., ``"kjpaw"``, ``"us"``).
+    relativistic : bool
+        If True, use the relativistic exchange folder variant (prefix ``"rel-"``).
+    configure : bool
+        If True, read suggested cutoff values from pseudo headers and update
+        CUTOFF/ECUTRHO in ``SYSTEM.INFO``.
+    system_info_path : str, optional
+        Path to the ``SYSTEM.INFO`` file to edit, by default "SYSTEM.INFO".
+    ratio : float, optional
+        Safety factor applied to suggested cutoff values, by default 1.5.
+
+    Returns
+    -------
+    int
+        Exit code (0 on success).
+
+    Raises
+    ------
+    NotImplementedError
+        If ``code`` is not supported.
+    """
+    if code != "quantum_espresso":
+        raise NotImplementedError("Only quantum_espresso supported for now.")
+
+    pseudos = files.get_qe_pseudo_paths(
+        symbols=symbols,
+        exchange=exchange,
+        kind=kind_pseudo,
+        relativistic=relativistic,
+    )
+    files.write_pseudos_to_system_info(system_info_path, pseudos)
+    files.set_spin_orbit_coupling(kind_calc, code, relativistic)
+
+    if configure:
+        files.configure_qe_cutoffs_from_pseudos(system_info_path, pseudos, ratio=ratio)
+
+    return 0

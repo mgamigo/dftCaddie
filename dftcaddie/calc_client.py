@@ -30,6 +30,7 @@ _all__ = [
     "run",
 ]
 
+
 def add_arguments(parser):
     """
     Add command-line arguments for the `calc` subcommand.

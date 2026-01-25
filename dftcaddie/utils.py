@@ -235,7 +235,37 @@ def resolve_calc_current_dir():
     return best["kind"], best["code"]
 
 
-def get_structure(file):
+def get_structure(file: str) -> SimpleNamespace:
+    """
+    Read a crystal structure file and extract basic structural information.
+
+    This function loads a structure from file, extracts lattice vectors,
+    atomic symbols, fractional atomic positions, chemical formula, and
+    space-group information, and returns them in a simple container.
+
+    Parameters
+    ----------
+    file : str
+        Path to a structure file readable by ``Cell.from_file`` (e.g. CIF,
+        POSCAR, or other supported formats).
+
+    Returns
+    -------
+    SimpleNamespace
+        Container with the following attributes:
+
+        - ``formula`` : str
+            Chemical formula of the structure.
+        - ``lattice`` : ndarray, shape (3, 3)
+            Lattice vectors.
+        - ``symbols`` : list[str]
+            Chemical symbols for each atom.
+        - ``positions`` : ndarray, shape (N, 3)
+            Fractional atomic positions.
+        - ``space_group`` : str
+            Space-group number extracted from spglib.
+    """
+    ...
     C = Cell.from_file(file)
     formula = C.atoms.get_chemical_formula()
     lattice = np.asarray(C.atoms.get_cell())
@@ -250,3 +280,38 @@ def get_structure(file):
         space_group=space_group,
     )
     return data
+
+
+def get_config(kind: str, config_name: str) -> dict:
+    """
+    Retrieve a configuration entry by name for a given calculation kind.
+
+    Parameters
+    ----------
+    kind : str
+        Calculation kind (e.g., "relax", "bands").
+    config_name : str
+        Name of the configuration entry to retrieve.
+
+    Returns
+    -------
+    dict
+        Configuration dictionary matching ``config_name``.
+
+    Raises
+    ------
+    KeyError
+        If the calculation kind or configuration name is not found.
+    """
+    try:
+        configs = calculations[kind]["config"]
+    except KeyError as exc:
+        raise KeyError(f"Unknown calculation kind: {kind!r}") from exc
+
+    for cfg in configs:
+        if cfg.get("name") == config_name:
+            return cfg
+
+    raise KeyError(
+        f"Configuration {config_name!r} not found for calculation kind {kind!r}"
+    )
