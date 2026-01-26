@@ -177,7 +177,7 @@ def apply_setup(
             files.set_auto_kgrid(structure, code, kppra)
         if path or init:
             files.set_high_symmetry_path(structure, code)
-        if pseudo and init:
+        if pseudo or init:
             setting = ut.get_config(kind=kind, config_name="soc")
             relativistic = setting.get("default", False)
             apply_pseudos(
