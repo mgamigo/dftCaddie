@@ -185,5 +185,6 @@ def apply_setup(
                 code=code,
                 symbols=structure.symbols,
                 relativistic=relativistic,
+                configure=True,
             )
     return 0
