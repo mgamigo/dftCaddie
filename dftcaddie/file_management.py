@@ -295,7 +295,7 @@ def populate_master_script(
     log.debug("Sub-scripts to add: %s", sub_scripts)
 
     # Prepare lines to append
-    if len(sub_scripts) > 1:
+    if len(sub_scripts) > 0:
         script_lines = [f"bash {script}\n" for script in sub_scripts]
         _insert_lines(master_script_path, script_lines, "#Actual JOBS")
         log.info(
