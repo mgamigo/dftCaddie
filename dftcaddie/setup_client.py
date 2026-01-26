@@ -65,6 +65,7 @@ def add_arguments(parser):
     parser.add_argument(
         "--kppra",
         metavar="INT",
+        type = int,
         default=9000,
         help="Target number of k-points per atom",
     )
