@@ -24,8 +24,8 @@ cat >$NAME.relax.pwi <<EOF
   forc_conv_thr = 1d-5
  /
 &SYSTEM
-  !noncolin=.true.
-  !lspinorb=.true.
+  noncolin=.true.
+  lspinorb=.true.
   ibrav=0,
   nat=$ATM_NUM,
   ntyp=$ATM_TYPES,
