@@ -85,14 +85,14 @@ clusters = {
         "heading": "ekhi",
         "mpi_command": "mpiexec -np $NPROCS",
     },
+    "triton": {"hostname": "triton", "heading": "triton", "mpi_command": "srun"},
+    "puhti": {"hostname": "puhti", "heading": "puhti_mahti", "mpi_command": "srun"},
+    "mahti": {"hostname": "mahti", "heading": "puhti_mahti", "mpi_command": "srun"},
     "planck": {
         "hostname": "login",
         "heading": "planck",
         "mpi_command": "srun --mpi=pmi2",
     },
-    "triton": {"hostname": "triton", "heading": "triton", "mpi_command": "srun"},
-    "puhti": {"hostname": "puhti", "heading": "puhti_mahti", "mpi_command": "srun"},
-    "mahti": {"hostname": "mahti", "heading": "puhti_mahti", "mpi_command": "srun"},
 }
 
 # Executables over which mpi_command should be added
