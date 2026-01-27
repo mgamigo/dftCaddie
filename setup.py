@@ -22,6 +22,7 @@ setuptools.setup(
     url="https://github.com/mgamigo/dftCaddie",
     packages=find_packages(exclude=("tests", "docs")),
     install_requires=[
+        "pyyaml",
         "yaiv",
     ],
     classifiers=[
