@@ -58,7 +58,7 @@ affirmation2bool = {"yes": True, "no": False}
 bool2affirmation = {True: "yes", False: "no"}
 
 
-def resolve_cluster(clusters: dict) -> str | None:
+def resolve_cluster(clusters: dict) -> str:
     """
     Identifies the cluster key based on the machine's hostname.
 
@@ -75,10 +75,11 @@ def resolve_cluster(clusters: dict) -> str | None:
     hostname = socket.gethostname()
     # Solve the appropiate heading:
     keys = list(clusters.keys())
-    keys.remove(None)
+    keys.remove("local")
     for k in keys:
         if clusters[k]["hostname"] in hostname:
             return k
+    return "local"
 
 
 def format_options(options: list[str] | list[bool], brackets: bool = False) -> str:

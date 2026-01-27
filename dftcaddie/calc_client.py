@@ -142,7 +142,7 @@ def run(args=None):
                     value = options[0]
                     log.debug("Single option available: %s", value)
                 else:
-                    print(f"\n{setting['question']}")
+                    print(f"\n{setting['prompt']}")
                     print(ut.format_options(options, brackets=True))
                     user_input = input("Select: ").strip().lower()
                     value = ut.resolve_user_input(user_input, options)
