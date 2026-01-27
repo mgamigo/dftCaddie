@@ -17,13 +17,6 @@ run()
 """
 
 import logging
-from types import SimpleNamespace
-
-from dftcaddie import utils as ut
-from dftcaddie.config import calculations, clusters
-from dftcaddie import file_management as files
-from dftcaddie.setup_client import apply_setup
-from dftcaddie.pseudo_client import apply_pseudos
 
 log = logging.getLogger(__name__)
 
@@ -109,6 +102,13 @@ def run(args=None):
     args : argparse.Namespace
         Parsed command-line arguments for the ``calc`` subcommand.
     """
+    from types import SimpleNamespace
+    from dftcaddie import utils as ut
+    from dftcaddie.config import calculations, clusters
+    from dftcaddie import file_management as files
+    from dftcaddie.setup_client import apply_setup
+    from dftcaddie.pseudo_client import apply_pseudos
+
     calculation = SimpleNamespace(**vars(args))
     details = calculation.details
     del calculation.details
@@ -173,7 +173,7 @@ def run(args=None):
             code=calculation.code,
             structure=structure,
             autokgrid=calculation.init,
-            path=calculation.init,
+            kpath=calculation.init,
         )
         if calculation.pseudo or calculation.init:
             apply_pseudos(

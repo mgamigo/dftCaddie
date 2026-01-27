@@ -16,11 +16,11 @@ setuptools.setup(
     version=get_version(),
     author="Martin Gutierrez-Amigo",
     author_email="<martin.gutierrez.amigo@gmail.com>",
-    description="A caddie for your dft calculations",
+    description="A caddie for your DFT calculations",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/mgamigo/dftCaddie",
-    packages=setuptools.find_packages(),
+    packages=find_packages(exclude=("tests", "docs")),
     install_requires=[
         "yaiv",
     ],
@@ -34,5 +34,9 @@ setuptools.setup(
             "caddie=dftcaddie.cli:main",
         ]
     },
-    python_requires=">=3.6",
+    python_requires=">=3.10",
+    include_package_data=True,
+    package_data={
+        "dftcaddie": ["data/**/*"],
+    },
 )

@@ -22,9 +22,6 @@ apply_pseudos()
 
 import logging
 
-from dftcaddie import utils as ut
-from dftcaddie import file_management as files
-
 log = logging.getLogger(__name__)
 
 _all__ = [
@@ -93,8 +90,18 @@ def run(args=None):
     args : argparse.Namespace
         Parsed command-line arguments for the ``pseudo`` subcommand.
     """
+
+    from dftcaddie import utils as ut
+
     kind, code = ut.resolve_calc_current_dir()
     structure = ut.get_structure(args.structure)
+
+    print(f"\nSummary\n-------")
+    keys = list(args.__dict__.keys())
+    for key, value in args.__dict__.items():
+        print(f"{key.title()}: {value}")
+    print(f"-------")
+
     apply_pseudos(
         kind_calc=kind,
         code=code,
@@ -158,6 +165,9 @@ def apply_pseudos(
     NotImplementedError
         If ``code`` is not supported.
     """
+
+    from dftcaddie import file_management as files
+
     if code != "quantum_espresso":
         raise NotImplementedError("Only quantum_espresso supported for now.")
 

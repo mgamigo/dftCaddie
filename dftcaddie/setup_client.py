@@ -23,10 +23,6 @@ apply_setup
 import logging
 from types import SimpleNamespace
 
-from dftcaddie import utils as ut
-from dftcaddie import file_management as files
-from dftcaddie.pseudo_client import apply_pseudos
-
 log = logging.getLogger(__name__)
 
 _all__ = [
@@ -67,7 +63,7 @@ def add_arguments(parser):
     )
     parser.add_argument(
         "-kp",
-        "--path",
+        "--kpath",
         action="store_true",
         help="Set up a high-symmetry k-path in reciprocal space.",
     )
@@ -93,8 +89,17 @@ def run(args=None):
     args : argparse.Namespace
         Parsed command-line arguments for the ``setup`` subcommand.
     """
+    from dftcaddie import utils as ut
+    from dftcaddie.pseudo_client import apply_pseudos
+
     kind, code = ut.resolve_calc_current_dir()
     structure = ut.get_structure(args.structure)
+
+    print(f"\nSummary\n-------")
+    keys = list(args.__dict__.keys())
+    for key, value in args.__dict__.items():
+        print(f"{key.title()}: {value}")
+    print(f"-------")
 
     apply_setup(
         kind=kind,
@@ -102,7 +107,7 @@ def run(args=None):
         structure=structure,
         autokgrid=args.autokgrid,
         kppra=args.kppra,
-        path=args.path,
+        kpath=args.kpath,
     )
     if args.pseudo:
         # Get default relativistic value for this calculation kind
@@ -123,7 +128,7 @@ def apply_setup(
     structure: SimpleNamespace,
     autokgrid: bool = False,
     kppra: int = 9000,
-    path: bool = False,
+    kpath: bool = False,
 ) -> int:
     """
     Apply structure-dependent setup steps to a calculation.
@@ -148,7 +153,7 @@ def apply_setup(
     kppra : int, optional
         Target number of k-points per reciprocal atom used for automatic
         k-grid generation, by default 9000.
-    path : bool, optional
+    kpath : bool, optional
         If True, insert a high-symmetry k-path based on the structure space
         group, by default False.
 
@@ -157,9 +162,11 @@ def apply_setup(
     int
         Exit code (0 on successful completion).
     """
+    from dftcaddie import file_management as files
+
     files.set_crystal_structure(structure, code)
     if autokgrid:
         files.set_auto_kgrid(structure, code, kppra)
-    if path:
+    if kpath:
         files.set_high_symmetry_path(structure, code)
     return 0
