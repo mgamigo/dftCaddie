@@ -21,12 +21,9 @@ apply_pseudos()
 """
 
 import logging
-import os
-from types import SimpleNamespace
 
 from dftcaddie import utils as ut
 from dftcaddie import file_management as files
-from dftcaddie.config import calculations
 
 log = logging.getLogger(__name__)
 

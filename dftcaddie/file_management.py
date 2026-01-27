@@ -2,16 +2,56 @@
 dftCaddie | dftcaddie.file_management
 =====================================
 
-This module provides functionality for managing and copying input files
-necessary for DFT calculations. It includes utilities to handle various
-file operations, ensuring users can prepare their calculation directories
-efficiently.
+File and template management utilities for dftCaddie.
+
+This module provides the low-level routines used to prepare and modify
+calculation input files in the working directory. It includes utilities to:
+
+- copy template input files for a selected calculation/code,
+- edit template files in-place (insert/remove/replace line blocks),
+- configure cluster and script settings (SBATCH preambles, MPI command),
+- apply calculation options (SOC, cell relaxation),
+- write structure-dependent data (lattice, positions),
+- set k-point grids and high-symmetry paths,
+- resolve and apply pseudopotentials and cutoffs.
 
 Functions
 ---------
-copy_input_files(...)
-    Copy necessary input files for specified DFT codes to the current
-    working directory, with options for overwriting existing files.
+copy_input_files()
+    Copy template input files for a given calculation into the working directory.
+populate_master_script()
+    Insert sub-script execution lines into ``master.sh``.
+set_master_preamble()
+    Prepend a cluster-specific SBATCH heading to ``master.sh``.
+change_mpi_command()
+    Replace MPI prefixes in scripts with the cluster-specific MPI command.
+set_spin_orbit_coupling()
+    Enable or disable spin-orbit coupling settings in input scripts.
+set_cell_relaxation()
+    Configure ionic vs variable-cell relaxation.
+configure_input_files()
+    Apply calculation-option-dependent edits to input scripts.
+set_crystal_structure()
+    Write lattice and fractional atomic positions.
+set_auto_kgrid()
+    Compute and write an automatic k-point grid.
+set_high_symmetry_path()
+    Insert a high-symmetry k-path.
+get_qe_pseudo_paths()
+    Resolve pseudopotential path.
+write_pseudos_to_system_info()
+    Write ATOMIC_SPECIES and EXCHANGE into ``SYSTEM.INFO`` (QE).
+configure_qe_cutoffs_from_pseudos()
+    Read suggested cutoffs from pseudo headers and update ``SYSTEM.INFO`` (QE).
+
+Private Utilities
+-----------------
+_replace_setting()
+    Replace a single setting line in a file while preserving indentation.
+_insert_lines()
+    Insert a block of lines after a matching line in a file.
+_remove_lines()
+    Remove a block of lines between two matching markers.
 """
 
 import os
@@ -36,8 +76,24 @@ from dftcaddie.config import (
 
 log = logging.getLogger(__name__)
 
-_all__ = [
+__all__ = [
+    # File copying / orchestration
     "copy_input_files",
+    "populate_master_script",
+    "set_master_preamble",
+    "change_mpi_command",
+    # Calculation options
+    "set_spin_orbit_coupling",
+    "set_cell_relaxation",
+    "configure_input_files",
+    # Structure & setup
+    "set_crystal_structure",
+    "set_auto_kgrid",
+    "set_high_symmetry_path",
+    # Pseudopotentials (QE)
+    "get_qe_pseudo_paths",
+    "write_pseudos_to_system_info",
+    "configure_qe_cutoffs_from_pseudos",
 ]
 
 
@@ -564,15 +620,15 @@ def get_qe_pseudo_paths(
     Parameters
     ----------
     symbols : Iterable[str]
-        Chemical symbols present in the structure (e.g., `["Si", "O"]`).
+        Chemical symbols present in the structure (e.g., ``["Si", "O"]``).
     exchange : str, optional
-        Exchange/correlation label used to locate pseudos (e.g., `"pbe"`),
+        Exchange/correlation label used to locate pseudos (e.g., ``"pbe"``),
         by default "pbe".
     kind : str, optional
-        Pseudopotential kind/wildcard (e.g., `"kjpaw"`, `"us"`),
+        Pseudopotential kind/wildcard (e.g., ``"kjpaw"``, ``"us"``),
         by default "kjpaw".
     relativistic : bool, optional
-        If True, use the relativistic exchange folder (prefix `"rel-"`),
+        If True, use the relativistic exchange folder (prefix ``"rel-"``),
         by default False.
 
     Returns
@@ -640,7 +696,7 @@ def write_pseudos_to_system_info(
     system_info_path : str
         Path to the ``SYSTEM.INFO`` file to edit.
     pseudos : list[str]
-        Pseudopotential paths aligned with ``symbols``.
+        Pseudopotential paths aligned with ``symbols`` inferred from filenames.
     """
     symbols = [os.path.basename(p).split(".")[0] for p in pseudos]
     masses = [atomic_masses[atomic_numbers[sym]] for sym in symbols]
@@ -787,6 +843,5 @@ def set_high_symmetry_path(structure: SimpleNamespace, code: str) -> None:
     log.debug("Reading k-path template: %s", path_file)
     with open(path_file, "r") as file:
         lines = file.readlines()
-
     _remove_lines("SYSTEM.INFO", "QE_CRYST_PATH=", "EOL")
     _insert_lines("SYSTEM.INFO", lines, "QE_CRYST_PATH=")

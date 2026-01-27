@@ -2,26 +2,33 @@
 dftCaddie | dftcaddie.utils
 ===========================
 
-TODO
+Utility functions for dftCaddie.
 
-This module provides a command-line client interface for dftCaddie, a tool
-to assist in the preparation of DFT calculations. It allows users to choose
-calculation types and corresponding codes, configure calculation options,
-and prepare the necessary input files.
+This module collects small helpers used across the CLI clients and file
+management routines, including:
+
+- resolving the target cluster from the hostname,
+- formatting and validating interactive option selections,
+- inferring the current calculation kind/code from a working directory,
+- reading basic structure data from a structure file,
+- retrieving calculation configuration entries.
 
 Functions
 ---------
-resolve_cluster(clusters)
-    Identifies the cluster key based on the machine's hostname.
-
-format_options(options)
-    Formats a list of strings into a comma-separated string.
-
-resolve_user_input(user_input, options)
-    Resolve user input to find its index in a list of options.
-
-check_option_exists(value, options)
-    Checks if a value exists within a list of options.
+resolve_cluster()
+    Identify the cluster key based on the machine hostname.
+format_options()
+    Format a list of options for CLI display.
+resolve_user_input()
+    Resolve a user selection against a list of allowed options.
+check_option_exists()
+    Validate that a value is contained in a list of allowed options.
+resolve_calc_current_dir()
+    Infer calculation kind and code from files in the current directory.
+get_structure()
+    Read a structure file and return basic structural information.
+get_config()
+    Retrieve a config entry by name for a given calculation kind.
 """
 
 import sys
@@ -35,18 +42,23 @@ from yaiv.cell import Cell
 
 from dftcaddie.config import calculations
 
-_all__ = [
+__all__ = [
     "resolve_cluster",
     "format_options",
     "resolve_user_input",
     "check_option_exists",
+    "resolve_calc_current_dir",
+    "get_structure",
+    "get_config",
+    "affirmation2bool",
+    "bool2affirmation",
 ]
 
 affirmation2bool = {"yes": True, "no": False}
 bool2affirmation = {True: "yes", False: "no"}
 
 
-def resolve_cluster(clusters: dict) -> str:
+def resolve_cluster(clusters: dict) -> str | None:
     """
     Identifies the cluster key based on the machine's hostname.
 
@@ -75,7 +87,7 @@ def format_options(options: list[str] | list[bool], brackets: bool = False) -> s
     bracket notation for the first character of each string.
 
     Parameters
-    ---------
+    ----------
     options : list[str]
         A list of strings representing options to be formatted.
 
@@ -101,7 +113,7 @@ def format_options(options: list[str] | list[bool], brackets: bool = False) -> s
 
 def resolve_user_input(user_input: str, options: list[str] | list[bool]) -> str | bool:
     """
-    Resolve user input to find its index in a list of options first by
+    Resolve user input to find its matched value in a list of options first by
     full match, then by partial match.
 
     Parameters
@@ -154,7 +166,7 @@ def resolve_user_input(user_input: str, options: list[str] | list[bool]) -> str 
 
 def check_option_exists(
     value: str | bool, options: list[str] | list[bool], name: str = None
-):
+) -> None:
     """
     Checks if a value exists within a list of options, printing an error
     and exiting if not.

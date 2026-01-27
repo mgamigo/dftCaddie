@@ -21,8 +21,6 @@ apply_setup
 """
 
 import logging
-import os
-import shutil
 from types import SimpleNamespace
 
 from dftcaddie import utils as ut
