@@ -2,7 +2,7 @@
 dftCaddie | dftcaddie.calc_client
 =================================
 
-CLI handler for the `caddie calc` command.
+CLI handler for the ``caddie calc`` command.
 
 This module registers calculation-preparation options and implements the
 interactive flow that resolves missing parameters, then writes DFT input
@@ -10,9 +10,9 @@ files to a folder via ``dftcaddie.file_management``.
 
 Functions
 ---------
-add_arguments
+add_arguments()
     Register command-line arguments for the ``calc`` subcommand.
-run
+run()
     Resolve calculation options and prepare DFT input files.
 """
 
@@ -34,17 +34,17 @@ _all__ = [
 
 def add_arguments(parser):
     """
-    Add command-line arguments for the `calc` subcommand.
+    Add command-line arguments for the ``calc`` subcommand.
 
     Parameters
     ----------
     parser : argparse.ArgumentParser
-        Subparser instance to which the `calc` arguments are added.
+        Subparser instance to which the ``calc`` arguments are added.
     """
     parser.add_argument(
         "-k",
         "--kind",
-        metavar="CALC",
+        metavar="KIND",
         required=False,
         help="Calculation kind (e.g., bands, relax)",
     )
@@ -74,17 +74,17 @@ def add_arguments(parser):
         help="Initialize calculation from scratch by copying template input files.",
     )
     parser.add_argument(
-        "-f",
-        "--file",
+        "-s",
+        "--structure",
         metavar="FILE",
         required=False,
-        help="File from which to get the crystal structure for setup.",
+        help="Structure file used to initialize the calculation (e.g. CIF, POSCAR).",
     )
     parser.add_argument(
         "--cluster",
         metavar="CLUSTER",
         required=False,
-        help="Cluster for automatic SBATCH heading.",
+        help="Cluster name used to generate an SBATCH header.",
     )
 
 
@@ -92,7 +92,7 @@ def run(args=None):
     """
     Resolve calculation options and prepare DFT input files.
 
-    This function implements the `caddie calc` workflow. It resolves
+    This function implements the ``caddie calc`` workflow. It resolves
     missing options interactively when needed, validates user selections,
     copies template input files, and applies code- and cluster-specific
     configuration edits.
@@ -100,7 +100,7 @@ def run(args=None):
     Parameters
     ----------
     args : argparse.Namespace
-        Parsed command-line arguments for the `calc` subcommand.
+        Parsed command-line arguments for the ``calc`` subcommand.
     """
     calculation = SimpleNamespace(**vars(args))
     details = calculation.details
@@ -162,7 +162,7 @@ def run(args=None):
     apply_setup(
         kind=calculation.kind,
         code=calculation.code,
-        structure_file=calculation.file,
+        structure_file=calculation.structure,
         init=calculation.init,
         relativistic=calculation.soc,
     )

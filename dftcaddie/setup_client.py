@@ -2,27 +2,29 @@
 dftCaddie | dftcaddie.setup_client
 ==================================
 
-CLI handler for the `caddie cofig` command.
+CLI handler for the ``caddie setup`` command.
 
-This module registers calculation-preparation options and implements the
-interactive flow that resolves missing parameters, then writes DFT input
-files to a folder via ``dftcaddie.file_management``.
+This module defines the workflow used to adapt a prepared calculation to a
+specific system. It can initialize template files (e.g. ``SYSTEM.INFO`` for
+Quantum ESPRESSO), read a structure file, and apply structure-dependent edits
+such as lattice vectors, fractional atomic positions, automatic k-point grids,
+high-symmetry k-paths, and pseudopotential configuration.
 
 Functions
 ---------
 add_arguments
-    Register command-line arguments for the `cofig` subcommand.
+    Register command-line arguments for the ``setup`` subcommand.
 run
-    Resolve calculation options and prepare DFT input files.
+    Dispatch the ``setup`` workflow using parsed CLI arguments.
+apply_setup
+    Apply setup steps (structure, k-grid, k-path, pseudos) to the working directory.
 """
 
 import logging
 import os
 import shutil
-from types import SimpleNamespace
 
 from dftcaddie import utils as ut
-from dftcaddie.config import calculations, clusters
 from dftcaddie import file_management as files
 from dftcaddie.pseudo_client import apply_pseudos
 
@@ -31,6 +33,7 @@ log = logging.getLogger(__name__)
 _all__ = [
     "add_arguments",
     "run",
+    "apply_setup",
 ]
 
 
@@ -44,69 +47,75 @@ def add_arguments(parser):
         Subparser instance to which the `config` arguments are added.
     """
     parser.add_argument(
-        "-f",
-        "--file",
+        "-s",
+        "--structure",
         metavar="FILE",
         required=False,
-        help="File from which to get/update the crystal structure.",
+        help="Structure file used to initialize the calculation (e.g. CIF, POSCAR).",
     )
     parser.add_argument(
         "-i",
         "--init",
         action="store_true",
-        help="Start setup from scratch.",
+        help="Initialize setup from templates before applying options.",
     )
     parser.add_argument(
         "-ak",
         "--autokgrid",
         action="store_true",
-        help="Setup an automatic kgrid",
+        help="Set up an automatic k-point grid.",
     )
     parser.add_argument(
         "--kppra",
         metavar="INT",
         type=int,
         default=9000,
-        help="Target number of k-points per atom",
+        help="Target number of k-points per atom (used with --autokgrid).",
     )
     parser.add_argument(
         "-kp",
         "--path",
         action="store_true",
-        help="Setup a high-symmetry path in reciprocal space",
+        help="Set up a high-symmetry k-path in reciprocal space.",
     )
     parser.add_argument(
         "-p",
         "--pseudo",
         action="store_true",
-        help="Setup the pseudopotential",
+        help="Set up default pseudopotentials",
     )
 
 
 def run(args=None):
     """
-    Resolve calculation options and prepare DFT input files.
+    Dispatch the ``caddie setup`` workflow.
 
-    This function implements the `caddie calc` workflow. It resolves
-    missing options interactively when needed, validates user selections,
-    copies template input files, and applies code- and cluster-specific
-    configuration edits.
+    This function resolves the current calculation kind and code from the
+    working directory and applies system- and structure-dependent setup
+    steps such as lattice and atomic positions, automatic k-point grids,
+    high-symmetry k-paths, and pseudopotential configuration.
 
     Parameters
     ----------
     args : argparse.Namespace
-        Parsed command-line arguments for the `calc` subcommand.
+        Parsed command-line arguments for the ``setup`` subcommand.
     """
     kind, code = ut.resolve_calc_current_dir()
     apply_setup(
         kind=kind,
         code=code,
-        structure_file=args.file,
+        structure_file=args.structure,
         autokgrid=args.autokgrid,
         kppra=args.kppra,
         init=args.init,
         path=args.path,
-        pseudo=args.pseudo,
+    )
+    apply_pseudos(
+        kind_calc=kind,
+        code=code,
+        symbols=structure.symbols,
+        relativistic=relativistic,
+        configure=True,
     )
 
 

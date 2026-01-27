@@ -69,9 +69,6 @@ def main(argv: list[str] | None = None) -> int:
         Command-line arguments (excluding the program name). If ``None``,
         arguments are taken from ``sys.argv[1:]``.
     """
-    # print("dftCaddie 🏌️\n============")
-    _caddie_heading()
-
     if argv is None:
         argv = sys.argv[1:]
 
@@ -85,6 +82,12 @@ def main(argv: list[str] | None = None) -> int:
         action="count",
         default=0,
         help="Increase verbosity (-v, -vv).",
+    )
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="Only show errors.",
     )
     subparsers = parser.add_subparsers(title="Commands", dest="command")
 
@@ -109,11 +112,11 @@ def main(argv: list[str] | None = None) -> int:
         description="Get the desired pseudopotentials.",
     )
     pseudo_client.add_arguments(pseudo_parser)
-
     # ---
     args = parser.parse_args(argv)
-    _configure_logging(args.verbose, quiet=False)
+    _configure_logging(args.verbose, quiet=args.quiet)
 
+    _caddie_heading()
     # Dispatch
     if args.command == "calc":
         calc_client.run(args)
