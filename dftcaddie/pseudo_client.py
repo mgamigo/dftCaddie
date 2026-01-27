@@ -1,19 +1,23 @@
 """
-dftCaddie | dftcaddie.cofig_client
+dftCaddie | dftcaddie.pseudo_client
 ==================================
 
-CLI handler for the `caddie cofig` command.
+CLI handler for the ``caddie pseudo`` command.
 
-This module registers calculation-preparation options and implements the
-interactive flow that resolves missing parameters, then writes DFT input
-files to a folder via ``dftcaddie.file_management``.
+This module implements the workflow used to select and apply
+pseudopotentials for a calculation. It resolves the current calculation
+kind and code, selects appropriate pseudopotentials for the given
+structure, updates ``SYSTEM.INFO`` accordingly, and optionally configures
+energy cutoffs based on pseudopotential recommendations.
 
 Functions
 ---------
-add_arguments
-    Register command-line arguments for the `cofig` subcommand.
-run
-    Resolve calculation options and prepare DFT input files.
+add_arguments()
+    Register command-line arguments for the ``pseudo`` subcommand.
+run()
+    Dispatch the ``pseudo`` workflow using parsed CLI arguments.
+apply_pseudos()
+    Resolve and apply pseudopotentials and related settings to input files.
 """
 
 import logging
@@ -29,31 +33,32 @@ log = logging.getLogger(__name__)
 _all__ = [
     "add_arguments",
     "run",
+    "apply_pseudos",
 ]
 
 
 def add_arguments(parser):
     """
-    Add command-line arguments for the `config` subcommand.
+    Add command-line arguments for the ``pseudo`` subcommand.
 
     Parameters
     ----------
     parser : argparse.ArgumentParser
-        Subparser instance to which the `config` arguments are added.
+        Subparser instance to which the ``pseudo`` arguments are added.
     """
     parser.add_argument(
-        "-f",
-        "--file",
+        "-s",
+        "--structure",
         metavar="FILE",
         required=True,
-        help="File from which to get the crystal structure.",
+        help="Structure file used to initialize the calculation (e.g. CIF, POSCAR).",
     )
     parser.add_argument(
         "-e",
         "--exchange",
-        metavar="EX",
+        metavar="XC",
         default="pbe",
-        help="Kind of exchange (pbe, pbesol, pz, ...).",
+        help="Exchange-correlation functional (e.g., pbe, pbesol, pz).",
     )
     parser.add_argument(
         "-k",
@@ -78,20 +83,21 @@ def add_arguments(parser):
 
 def run(args=None):
     """
-    Resolve calculation options and prepare DFT input files.
+    Dispatch the ``caddie pseudo`` workflow.
 
-    This function implements the `caddie calc` workflow. It resolves
-    missing options interactively when needed, validates user selections,
-    copies template input files, and applies code- and cluster-specific
-    configuration edits.
+    This function resolves the current calculation kind and code from the
+    working directory, reads the provided structure file, and applies
+    pseudopotential configuration to the existing input templates. Depending
+    on the selected options, it may also configure energy cutoffs based on
+    pseudopotential recommendations.
 
     Parameters
     ----------
     args : argparse.Namespace
-        Parsed command-line arguments for the `calc` subcommand.
+        Parsed command-line arguments for the ``pseudo`` subcommand.
     """
     kind, code = ut.resolve_calc_current_dir()
-    structure = ut.get_structure(args.file)
+    structure = ut.get_structure(args.structure)
     apply_pseudos(
         kind_calc=kind,
         code=code,
@@ -139,7 +145,7 @@ def apply_pseudos(
         If True, use the relativistic exchange folder variant (prefix ``"rel-"``).
     configure : bool
         If True, read suggested cutoff values from pseudo headers and update
-        CUTOFF/ECUTRHO in ``SYSTEM.INFO``.
+        cutoffs.
     system_info_path : str, optional
         Path to the ``SYSTEM.INFO`` file to edit, by default "SYSTEM.INFO".
     ratio : float, optional

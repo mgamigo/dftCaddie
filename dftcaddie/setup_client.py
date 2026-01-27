@@ -40,12 +40,12 @@ _all__ = [
 
 def add_arguments(parser):
     """
-    Add command-line arguments for the `config` subcommand.
+    Add command-line arguments for the ``setup`` subcommand.
 
     Parameters
     ----------
     parser : argparse.ArgumentParser
-        Subparser instance to which the `config` arguments are added.
+        Subparser instance to which the ``setup`` arguments are added.
     """
     parser.add_argument(
         "-s",
