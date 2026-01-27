@@ -227,6 +227,8 @@ def copy_input_files(calculation: SimpleNamespace) -> list[str]:
     # Resolve needed files.
     log.info("\nWriting input files:")
     files_to_copy = calculations[calculation.kind]["files"][calculation.code]
+    if not os.path.exists("SYSTEM.INFO") and calculation.code == "quantum_espresso":
+        files_to_copy.append("SYSTEM.INFO")
     files_to_copy.append("master.sh")
 
     # Copy the files
@@ -653,7 +655,9 @@ def write_pseudos_to_system_info(
 
     _remove_lines(system_info_path, "ATOMIC_SPECIES=", "EOL")
     _insert_lines(system_info_path, lines, "ATOMIC_SPECIES=")
-    _replace_setting(system_info_path, "EXCHANGE=", f"EXCHANGE='{exchange_folder.split('/')[-3]}'")
+    _replace_setting(
+        system_info_path, "EXCHANGE=", f"EXCHANGE='{exchange_folder.split('/')[-3]}'"
+    )
 
 
 def configure_qe_cutoffs_from_pseudos(

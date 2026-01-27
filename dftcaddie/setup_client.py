@@ -23,6 +23,7 @@ apply_setup
 import logging
 import os
 import shutil
+from types import SimpleNamespace
 
 from dftcaddie import utils as ut
 from dftcaddie import file_management as files
@@ -50,14 +51,8 @@ def add_arguments(parser):
         "-s",
         "--structure",
         metavar="FILE",
-        required=False,
+        required=True,
         help="Structure file used to initialize the calculation (e.g. CIF, POSCAR).",
-    )
-    parser.add_argument(
-        "-i",
-        "--init",
-        action="store_true",
-        help="Initialize setup from templates before applying options.",
     )
     parser.add_argument(
         "-ak",
@@ -101,55 +96,54 @@ def run(args=None):
         Parsed command-line arguments for the ``setup`` subcommand.
     """
     kind, code = ut.resolve_calc_current_dir()
+    structure = ut.get_structure(args.structure)
+
     apply_setup(
         kind=kind,
         code=code,
-        structure_file=args.structure,
+        structure=structure,
         autokgrid=args.autokgrid,
         kppra=args.kppra,
-        init=args.init,
         path=args.path,
     )
-    apply_pseudos(
-        kind_calc=kind,
-        code=code,
-        symbols=structure.symbols,
-        relativistic=relativistic,
-        configure=True,
-    )
+    if args.pseudo:
+        # Get default relativistic value for this calculation kind
+        setting = ut.get_config(kind=kind, config_name="soc")
+        relativistic = setting.get("default", False)
+        apply_pseudos(
+            kind_calc=kind,
+            code=code,
+            symbols=structure.symbols,
+            relativistic=relativistic,
+            configure=True,
+        )
 
 
 def apply_setup(
     kind: str,
     code: str,
-    structure_file: str = None,
+    structure: SimpleNamespace,
     autokgrid: bool = False,
     kppra: int = 9000,
     path: bool = False,
-    pseudo: bool = False,
-    relativistic: bool = None,
-    init: bool = False,
-    system_info_path: str = "SYSTEM.INFO",
 ) -> int:
     """
-    Apply structure- and system-dependent setup steps to a calculation.
+    Apply structure-dependent setup steps to a calculation.
 
-    This function implements the ``caddie setup`` workflow. Depending on the
-    selected options, it initializes template input files, reads a structure
-    file, and applies structure-specific configuration such as lattice and
-    atomic positions, automatic k-point grids, high-symmetry k-paths, and
-    pseudopotential setup.
+    This function updates input templates using structural information
+    (lattice vectors and atomic positions) and optionally configures an
+    automatic k-point grid and a high-symmetry k-path.
 
     Parameters
     ----------
     kind : str
-        Calculation kind (e.g., ``"relax"``, ``"bands"``), used to select
-        kind-dependent configuration options.
+        Calculation kind (e.g., ``"relax"``, ``"bands"``). Included for
+        interface consistency, but not used directly in this function.
     code : str
         DFT code identifier (e.g., ``"quantum_espresso"``).
-    structure_file : str or None, optional
-        Path to a structure file readable by ``get_structure``. If ``None``,
-        no structure-dependent setup is applied.
+    structure : SimpleNamespace
+        Structure container providing lattice vectors, fractional atomic
+        positions, chemical symbols, and space-group information.
     autokgrid : bool, optional
         If True, compute and write an automatic k-point grid based on the
         structure, by default False.
@@ -159,46 +153,15 @@ def apply_setup(
     path : bool, optional
         If True, insert a high-symmetry k-path based on the structure space
         group, by default False.
-    pseudo : bool, optional
-        If True, apply pseudopotential configuration during setup. When used
-        together with ``init``, pseudopotentials are initialized from
-        defaults, by default False.
-    relativistic : bool
-        If True, use the relativistic exchange folder variant (prefix ``"rel-"``).
-    init : bool, optional
-        If True, initialize ``SYSTEM.INFO`` from the template library before
-        applying all possible modifications, by default False.
-    system_info_path : str, optional
-        Path to the ``SYSTEM.INFO`` file to create or modify, by default
-        "SYSTEM.INFO".
 
     Returns
     -------
     int
         Exit code (0 on successful completion).
     """
-    if code == "quantum_espresso":
-        if init or not os.path.exists(system_info_path):
-            source_dir = os.path.join(os.path.dirname(__file__), "data", code)
-            source_path = os.path.join(source_dir, system_info_path)
-            destination_path = os.path.join(os.getcwd(), system_info_path)
-            shutil.copy(source_path, destination_path)
-    if structure_file is not None:
-        structure = ut.get_structure(structure_file)
-        files.set_crystal_structure(structure, code)
-        if autokgrid or init:
-            files.set_auto_kgrid(structure, code, kppra)
-        if path or init:
-            files.set_high_symmetry_path(structure, code)
-        if pseudo or init:
-            setting = ut.get_config(kind=kind, config_name="soc")
-            if relativistic is None:
-                relativistic = setting.get("default", False)
-            apply_pseudos(
-                kind_calc=kind,
-                code=code,
-                symbols=structure.symbols,
-                relativistic=relativistic,
-                configure=True,
-            )
+    files.set_crystal_structure(structure, code)
+    if autokgrid:
+        files.set_auto_kgrid(structure, code, kppra)
+    if path:
+        files.set_high_symmetry_path(structure, code)
     return 0

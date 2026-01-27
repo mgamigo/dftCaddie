@@ -23,6 +23,7 @@ from dftcaddie import utils as ut
 from dftcaddie.config import calculations, clusters
 from dftcaddie import file_management as files
 from dftcaddie.setup_client import apply_setup
+from dftcaddie.pseudo_client import apply_pseudos
 
 log = logging.getLogger(__name__)
 
@@ -68,17 +69,23 @@ def add_arguments(parser):
         help="Ask for details instead of going for defaults",
     )
     parser.add_argument(
-        "-i",
-        "--init",
-        action="store_true",
-        help="Initialize calculation from scratch by copying template input files.",
-    )
-    parser.add_argument(
         "-s",
         "--structure",
         metavar="FILE",
         required=False,
         help="Structure file used to initialize the calculation (e.g. CIF, POSCAR).",
+    )
+    parser.add_argument(
+        "-p",
+        "--pseudo",
+        action="store_true",
+        help="Set up default pseudopotentials",
+    )
+    parser.add_argument(
+        "-i",
+        "--init",
+        action="store_true",
+        help="Initialize setup from scratch (structure must be provided).",
     )
     parser.add_argument(
         "--cluster",
@@ -159,10 +166,20 @@ def run(args=None):
     files.change_mpi_command(scripts, calculation.cluster)
     files.configure_qe_cutoffs_from_pseudos
     files.configure_input_files(calculation)
-    apply_setup(
-        kind=calculation.kind,
-        code=calculation.code,
-        structure_file=calculation.structure,
-        init=calculation.init,
-        relativistic=calculation.soc,
-    )
+    if calculation.structure is not None:
+        structure = ut.get_structure(args.structure)
+        apply_setup(
+            kind=calculation.kind,
+            code=calculation.code,
+            structure=structure,
+            autokgrid=calculation.init,
+            path=calculation.init,
+        )
+        if calculation.pseudo or calculation.init:
+            apply_pseudos(
+                kind_calc=calculation.kind,
+                code=calculation.code,
+                symbols=structure.symbols,
+                relativistic=calculation.soc,
+                configure=True,
+            )

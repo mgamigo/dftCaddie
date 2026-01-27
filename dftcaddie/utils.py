@@ -265,7 +265,6 @@ def get_structure(file: str) -> SimpleNamespace:
         - ``space_group`` : str
             Space-group number extracted from spglib.
     """
-    ...
     C = Cell.from_file(file)
     formula = C.atoms.get_chemical_formula()
     lattice = np.asarray(C.atoms.get_cell())
