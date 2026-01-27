@@ -164,4 +164,5 @@ def run(args=None):
         code=calculation.code,
         structure_file=calculation.file,
         init=calculation.init,
+        relativistic=calculation.soc,
     )

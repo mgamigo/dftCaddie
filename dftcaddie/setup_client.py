@@ -65,7 +65,7 @@ def add_arguments(parser):
     parser.add_argument(
         "--kppra",
         metavar="INT",
-        type = int,
+        type=int,
         default=9000,
         help="Target number of k-points per atom",
     )
@@ -118,6 +118,7 @@ def apply_setup(
     kppra: int = 9000,
     path: bool = False,
     pseudo: bool = False,
+    relativistic: bool = None,
     init: bool = False,
     system_info_path: str = "SYSTEM.INFO",
 ) -> int:
@@ -153,6 +154,8 @@ def apply_setup(
         If True, apply pseudopotential configuration during setup. When used
         together with ``init``, pseudopotentials are initialized from
         defaults, by default False.
+    relativistic : bool
+        If True, use the relativistic exchange folder variant (prefix ``"rel-"``).
     init : bool, optional
         If True, initialize ``SYSTEM.INFO`` from the template library before
         applying all possible modifications, by default False.
@@ -180,7 +183,8 @@ def apply_setup(
             files.set_high_symmetry_path(structure, code)
         if pseudo or init:
             setting = ut.get_config(kind=kind, config_name="soc")
-            relativistic = setting.get("default", False)
+            if relativistic is None:
+                relativistic = setting.get("default", False)
             apply_pseudos(
                 kind_calc=kind,
                 code=code,
