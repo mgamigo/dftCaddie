@@ -56,7 +56,7 @@ calculations:
       vasp:
         - INCAR.RELAX
         - KPOINTS.SCC
-  bands:
+  phonons:
     name: "[P]honons"
     config:
       - name: code

@@ -8,6 +8,7 @@ DFT codes, and necessary input files.
 """
 
 from pathlib import Path
+from functools import lru_cache
 import yaml
 
 DEFAULT_CONFIG_PATH = Path(__file__).parent / "data" / "config.default.yaml"
@@ -17,7 +18,8 @@ USER_PATHS = [
 ]
 
 
-def load_config() -> dict:
+@lru_cache(maxsize=1)
+def _load_config() -> dict:
     for path in USER_PATHS:
         if path.exists():
             with open(path, "r") as f:
@@ -26,8 +28,7 @@ def load_config() -> dict:
     with open(DEFAULT_CONFIG_PATH, "r") as f:
         return yaml.safe_load(f) or {}
 
-
-CONFIG = load_config()
+CONFIG = _load_config()
 
 calculations = CONFIG["calculations"]
 clusters = CONFIG["clusters"]

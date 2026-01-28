@@ -54,18 +54,10 @@ _remove_lines()
     Remove a block of lines between two matching markers.
 """
 
-import os
-import shutil
-import glob
 import logging
 from types import SimpleNamespace
 from typing import Iterable
-
-import numpy as np
-import spglib as spg
-from ase.data import atomic_numbers, atomic_masses
-from yaiv.cell import Cell
-from yaiv.utils import auto_kgrid
+import os
 
 from dftcaddie.config import (
     calculations,
@@ -280,6 +272,8 @@ def copy_input_files(calculation: SimpleNamespace) -> list[str]:
     -----
     - User confirmation is required if files exist at the destination.
     """
+    import shutil
+
     # Resolve needed files.
     log.info("\nWriting input files:")
     files_to_copy = calculations[calculation.kind]["files"][calculation.code]
@@ -645,6 +639,8 @@ def get_qe_pseudo_paths(
     RuntimeError
         If multiple candidates are found for a symbol.
     """
+    from glob import glob
+
     symbols = set(symbols)
 
     ps_library = os.environ.get("PSLIBRARY")
@@ -666,7 +662,7 @@ def get_qe_pseudo_paths(
     for sym in symbols:
         target = suggested_qe_pseudos[sym]
         target = target.replace("$fct", exchange_folder).replace("*", kind)[:-6]
-        matches = glob.glob(f"{source_path}/{target}*")
+        matches = glob(f"{source_path}/{target}*")
 
         if len(matches) == 1:
             pseudos.append(matches[0])
@@ -698,6 +694,8 @@ def write_pseudos_to_system_info(
     pseudos : list[str]
         Pseudopotential paths aligned with ``symbols`` inferred from filenames.
     """
+    from ase.data import atomic_numbers, atomic_masses
+
     symbols = [os.path.basename(p).split(".")[0] for p in pseudos]
     masses = [atomic_masses[atomic_numbers[sym]] for sym in symbols]
     exchange_folder = pseudos[0]
@@ -745,6 +743,8 @@ def configure_qe_cutoffs_from_pseudos(
     RuntimeError
         If suggested values cannot be read for all pseudos.
     """
+    import numpy as np
+
     log.info("\nConfiguring cutoffs from pseudo headers (ratio=%s)", ratio)
 
     cutoff_vals: list[float] = []
@@ -793,6 +793,8 @@ def set_auto_kgrid(structure: SimpleNamespace, code: str, kppra: int = 9000) -> 
     kppra : int, optional
         Target number of k-points per reciprocal atom, by default 9000.
     """
+    from yaiv.utils import auto_kgrid
+
     lattice = structure.lattice
     n_atoms = len(structure.positions)
 

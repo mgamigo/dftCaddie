@@ -103,11 +103,11 @@ def run(args=None):
         Parsed command-line arguments for the ``calc`` subcommand.
     """
     from types import SimpleNamespace
-    from dftcaddie import utils as ut
     from dftcaddie.config import calculations, clusters
-    from dftcaddie import file_management as files
     from dftcaddie.setup_client import apply_setup
     from dftcaddie.pseudo_client import apply_pseudos
+    from dftcaddie import utils as ut
+    from dftcaddie import file_management as files
 
     calculation = SimpleNamespace(**vars(args))
     details = calculation.details

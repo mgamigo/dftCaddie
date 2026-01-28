@@ -32,13 +32,8 @@ get_config()
 """
 
 import sys
-import socket
 import os
 from types import SimpleNamespace
-
-import numpy as np
-import spglib as spg
-from yaiv.cell import Cell
 
 from dftcaddie.config import calculations
 
@@ -72,6 +67,8 @@ def resolve_cluster(clusters: dict) -> str:
     str
         The cluster key that matches the current hostname, or None if no match is found.
     """
+    import socket
+
     hostname = socket.gethostname()
     # Solve the appropiate heading:
     keys = list(clusters.keys())
@@ -278,6 +275,10 @@ def get_structure(file: str) -> SimpleNamespace:
         - ``space_group`` : str
             Space-group number extracted from spglib.
     """
+    import numpy as np
+    import spglib as spg
+    from yaiv.cell import Cell
+
     C = Cell.from_file(file)
     formula = C.atoms.get_chemical_formula()
     lattice = np.asarray(C.atoms.get_cell())
