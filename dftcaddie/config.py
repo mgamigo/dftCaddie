@@ -10,6 +10,9 @@ DFT codes, and necessary input files.
 from pathlib import Path
 from functools import lru_cache
 import yaml
+import logging
+
+log = logging.getLogger(__name__)
 
 DEFAULT_CONFIG_PATH = Path(__file__).parent / "data" / "config.default.yaml"
 USER_PATHS = [
@@ -43,6 +46,7 @@ def resolve_pslibrary() -> Path:
     # 1. From environment
     env = os.environ.get("PSLIBRARY")
     if env:
+        log.info("Using PSLIBRARY from environment")
         return Path(env).expanduser()
 
     # 2. From YAML (optional)
@@ -50,7 +54,9 @@ def resolve_pslibrary() -> Path:
     if isinstance(pseudo_cfg, dict):
         root = pseudo_cfg.get("root")
         if root:
+            log.info("Using PSLIBRARY from config file")
             return Path(root).expanduser()
+
 
     # 3. Hard error
     raise RuntimeError(
