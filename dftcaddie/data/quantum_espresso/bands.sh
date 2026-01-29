@@ -48,5 +48,6 @@ EOF
 
 echo "running the bands calculation"
 $QE_PATH/pw.x -npool $NPOOLS <$NAME.bands.pwi >$NAME.bands.pwo
+cp ../tmp/$NAME.save/data-file-schema.xml ./bands.xml
 rm input_tmp.in
 echo "done"

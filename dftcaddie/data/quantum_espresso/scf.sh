@@ -50,5 +50,6 @@ EOF
 
 echo "running the scf calculation"
 $QE_PATH/pw.x -npool $NPOOLS <$NAME.scf.pwi >$NAME.scf.pwo
+cp ../tmp/$NAME.save/data-file-schema.xml ./scf.xml
 rm input_tmp.in
 echo "done"
