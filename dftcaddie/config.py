@@ -28,6 +28,38 @@ def _load_config() -> dict:
     with open(DEFAULT_CONFIG_PATH, "r") as f:
         return yaml.safe_load(f) or {}
 
+
+@lru_cache(maxsize=1)
+def resolve_pslibrary() -> Path:
+    """
+    Resolve the root path of the pseudopotential library.
+
+    Priority:
+    1. Environment variable PSLIBRARY
+    2. User configuration (YAML)
+    """
+    import os
+
+    # 1. From environment
+    env = os.environ.get("PSLIBRARY")
+    if env:
+        return Path(env).expanduser()
+
+    # 2. From YAML (optional)
+    pseudo_cfg = CONFIG.get("pseudopotentials")
+    if isinstance(pseudo_cfg, dict):
+        root = pseudo_cfg.get("root")
+        if root:
+            return Path(root).expanduser()
+
+    # 3. Hard error
+    raise RuntimeError(
+        "Pseudopotential library not found. "
+        "Define 'pseudopotentials.root' in config.yaml "
+        "or set the PSLIBRARY environment variable."
+    )
+
+
 CONFIG = _load_config()
 
 calculations = CONFIG["calculations"]

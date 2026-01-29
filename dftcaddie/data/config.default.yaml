@@ -3,6 +3,10 @@
 # Users can extend this file to add new calculation kinds, clusters,
 # MPI executables, or pseudopotential mappings.
 
+# Folder in which pseudopotentials are stored. Overwritten by env variable $PSLIBRARY (if present).
+pseudopotentials:
+  root: /opt/pslibrary
+
 # Supported calculations and required files (located at dftcaddie/data)
 calculations:
   bands:
@@ -108,12 +112,6 @@ mpi_executables:
   - pw.x
   - projwfc.x
   - ph.x
-
-# List of supported pseudopotentials kinds (subfolder must exist at $PSLIBRARY)
-pseudopotentials:
-  - pbe
-  - pbesol
-  - pz
 
 # Suggested pseudopotentials (same as suggested in pslibrary repository)
 suggested_qe_pseudos:

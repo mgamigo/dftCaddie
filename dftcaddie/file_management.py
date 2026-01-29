@@ -640,12 +640,11 @@ def get_qe_pseudo_paths(
         If multiple candidates are found for a symbol.
     """
     from glob import glob
+    from dftcaddie.config import resolve_pslibrary
 
     symbols = set(symbols)
 
-    ps_library = os.environ.get("PSLIBRARY")
-    if not ps_library:
-        raise EnvironmentError("PSLIBRARY environment variable is not set.")
+    ps_library = resolve_pslibrary()
 
     exchange_folder = f"rel-{exchange}" if relativistic else exchange
     source_path = os.path.join(ps_library, exchange_folder, "PSEUDOPOTENTIALS")
