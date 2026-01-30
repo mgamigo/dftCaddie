@@ -94,8 +94,8 @@ def main(argv: list[str] | None = None) -> int:
     # --- calc subcommand ---
     calc_parser = subparsers.add_parser(
         "calc",
-        help="Create or prepare a new DFT calculation",
-        description="Create or prepare a new DFT calculation",
+        help="Create a new DFT calculation",
+        description="Create a new DFT calculation",
     )
     calc_client.add_arguments(calc_parser)
     # --- setup subcommand ---
