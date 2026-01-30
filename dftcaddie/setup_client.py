@@ -162,11 +162,11 @@ def apply_setup(
     int
         Exit code (0 on successful completion).
     """
-    from dftcaddie import file_management as files
+    from dftcaddie import file_management as fm
 
-    files.set_crystal_structure(structure, code)
+    fm.set_crystal_structure(structure, code)
     if autokgrid:
-        files.set_auto_kgrid(structure, code, kppra)
+        fm.set_auto_kgrid(structure, code, kppra)
     if kpath:
-        files.set_high_symmetry_path(structure, code)
+        fm.set_high_symmetry_path(structure, code)
     return 0

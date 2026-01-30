@@ -480,7 +480,6 @@ def set_spin_orbit_coupling(kind: str, code: str, soc: bool) -> None:
         If True, enable SOC (set ``noncolin=.true.`` and ``lspinorb=.true.``).
         If False, disable SOC.
     """
-    ...
     files = calculations[kind]["files"][code]
 
     if code == "quantum_espresso":
@@ -641,6 +640,7 @@ def get_qe_pseudo_paths(
     """
     from glob import glob
     from dftcaddie.config import resolve_pslibrary
+    from pathlib import Path
 
     symbols = set(symbols)
 
@@ -660,7 +660,8 @@ def get_qe_pseudo_paths(
     pseudos = []
     for sym in symbols:
         target = suggested_qe_pseudos[sym]
-        target = target.replace("$fct", exchange_folder).replace("*", kind)[:-6]
+        target = target.replace("$fct", exchange_folder).replace("*", kind)
+        target = ".".join(target.split(".")[:2])
         matches = glob(f"{source_path}/{target}*")
 
         if len(matches) == 1:

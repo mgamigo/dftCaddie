@@ -107,7 +107,7 @@ def run(args=None):
     from dftcaddie.setup_client import apply_setup
     from dftcaddie.pseudo_client import apply_pseudos
     from dftcaddie import utils as ut
-    from dftcaddie import file_management as files
+    from dftcaddie import file_management as fm
 
     calculation = SimpleNamespace(**vars(args))
     details = calculation.details
@@ -157,15 +157,15 @@ def run(args=None):
         print(f"{key.title()}: {value}")
     print(f"-------")
 
-    copied_files = files.copy_input_files(calculation)
+    copied_files = fm.copy_input_files(calculation)
 
     log.info("\nEditing master.sh:")
-    scripts = files.populate_master_script("master.sh", copied_files)
-    files.set_master_preamble("master.sh", calculation.cluster)
+    scripts = fm.populate_master_script("master.sh", copied_files)
+    fm.set_master_preamble("master.sh", calculation.cluster)
 
-    files.change_mpi_command(scripts, calculation.cluster)
-    files.configure_qe_cutoffs_from_pseudos
-    files.configure_input_files(calculation)
+    fm.change_mpi_command(scripts, calculation.cluster)
+    fm.configure_qe_cutoffs_from_pseudos
+    fm.configure_input_files(calculation)
     if calculation.structure is not None:
         structure = ut.get_structure(args.structure)
         apply_setup(

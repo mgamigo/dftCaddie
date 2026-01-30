@@ -166,21 +166,21 @@ def apply_pseudos(
         If ``code`` is not supported.
     """
 
-    from dftcaddie import file_management as files
+    from dftcaddie import file_management as fm
 
     if code != "quantum_espresso":
         raise NotImplementedError("Only quantum_espresso supported for now.")
 
-    pseudos = files.get_qe_pseudo_paths(
+    pseudos = fm.get_qe_pseudo_paths(
         symbols=symbols,
         exchange=exchange,
         kind=kind_pseudo,
         relativistic=relativistic,
     )
-    files.write_pseudos_to_system_info(system_info_path, pseudos)
-    files.set_spin_orbit_coupling(kind_calc, code, relativistic)
+    fm.write_pseudos_to_system_info(system_info_path, pseudos)
+    fm.set_spin_orbit_coupling(kind_calc, code, relativistic)
 
     if configure:
-        files.configure_qe_cutoffs_from_pseudos(system_info_path, pseudos, ratio=ratio)
+        fm.configure_qe_cutoffs_from_pseudos(system_info_path, pseudos, ratio=ratio)
 
     return 0

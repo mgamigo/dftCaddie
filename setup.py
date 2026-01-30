@@ -24,6 +24,7 @@ setuptools.setup(
     install_requires=[
         "pyyaml",
         "yaiv",
+        "pytest",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
