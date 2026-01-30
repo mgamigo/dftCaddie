@@ -54,7 +54,7 @@ def _caddie_heading():
     O>>         .                 'o                |
      \       .                                      |
      /\    .                                        |
-    / /  .'                  DFT, but with a caddie |
+    / /  .'            DFT — don’t shoot the caddie |
 ^^^^^^^`^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"""
     )
 
