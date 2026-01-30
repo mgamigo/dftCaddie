@@ -127,5 +127,6 @@ def main(argv: list[str] | None = None) -> int:
     else:
         parser.print_help()
         return 0
-    print(f"\nFinished! ⛳")
+    print("\n⛳ Caddie's done. Good luck out there...")
+
     return 0
