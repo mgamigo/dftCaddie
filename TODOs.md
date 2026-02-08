@@ -1,5 +1,7 @@
 # CODE IDEA
 
+- Create the sbatch client for changing partitions and configurations easily.
+
 dftCaddie/
 ├── __init__.py
 ├── cli.py                 # Command-line interface for user interaction

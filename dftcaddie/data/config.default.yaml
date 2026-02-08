@@ -84,28 +84,28 @@ calculations:
 clusters:
   local:
     hostname: ""
-    heading: default
     mpi_command: "mpiexec -np 2"
+    heading: default
   ekhi:
     hostname: "ekhi"
-    heading: ekhi
     mpi_command: "mpiexec -np $NPROCS"
+    heading: ekhi
   triton:
     hostname: "triton"
-    heading: triton
     mpi_command: "srun"
+    heading: triton
   puhti:
     hostname: "puhti"
-    heading: puhti_mahti
     mpi_command: "srun"
+    heading: puhti_mahti
   mahti:
     hostname: "mahti"
-    heading: puhti_mahti
     mpi_command: "srun"
+    heading: puhti_mahti
   planck:
     hostname: "login"
-    heading: planck
     mpi_command: "srun --mpi=pmi2"
+    heading: planck
 
 # Mpi executables over which to attach the cluster specific mpi_commands
 mpi_executables:
