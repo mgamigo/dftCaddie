@@ -57,7 +57,6 @@ def resolve_pslibrary() -> Path:
             log.info("Using PSLIBRARY from config file")
             return Path(root).expanduser()
 
-
     # 3. Hard error
     raise RuntimeError(
         "Pseudopotential library not found. "
@@ -71,5 +70,4 @@ CONFIG = _load_config()
 calculations = CONFIG["calculations"]
 clusters = CONFIG["clusters"]
 mpi_executables = CONFIG["mpi_executables"]
-pseudopotentials = CONFIG["pseudopotentials"]
 suggested_qe_pseudos = CONFIG["suggested_qe_pseudos"]
