@@ -100,7 +100,11 @@ def test_set_master_preamble_prepends_heading(tmp_path: Path, monkeypatch):
     master.write_text("#!/bin/bash\necho hi\n", encoding="utf-8")
 
     monkeypatch.setattr(fm, "__file__", str(pkg_root / "file_management.py"))
-    monkeypatch.setattr(fm, "clusters", {"mycluster": {"heading": "heading.txt"}})
+    monkeypatch.setattr(
+        fm,
+        "clusters",
+        {"mycluster": {"headings": [{"name": "default", "file": "heading.txt"}]}},
+    )
 
     fm.set_master_preamble(str(master), "mycluster")
 

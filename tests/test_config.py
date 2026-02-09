@@ -43,13 +43,13 @@ def test_clusters_schema_minimal():
             continue
         assert isinstance(cfg, dict), f"clusters[{key!r}] must be a dict"
         assert "mpi_command" in cfg, f"clusters[{key!r}] missing 'mpi_command'"
-        assert "heading" in cfg, f"clusters[{key!r}] missing 'heading'"
+        assert "headings" in cfg, f"clusters[{key!r}] missing 'headings'"
         assert (
             isinstance(cfg["mpi_command"], str) and cfg["mpi_command"]
         ), f"clusters[{key!r}]['mpi_command'] must be a string"
         assert (
-            isinstance(cfg["heading"], str) and cfg["heading"]
-        ), f"clusters[{key!r}]['heading'] must be a string"
+            isinstance(cfg["headings"], list) and cfg["headings"]
+        ), f"clusters[{key!r}]['headings'] must be a list"
 
 
 def test_mpi_executables_basic():

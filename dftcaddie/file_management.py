@@ -384,7 +384,7 @@ def set_master_preamble(master_script_path: str, cluster: str) -> None:
     )
 
     source_dir = os.path.join(os.path.dirname(__file__), "data", "sbatch_headings")
-    heading = clusters[cluster]["heading"]
+    heading = clusters[cluster]["headings"][0]["file"]
     file_path = os.path.join(source_dir, heading)
 
     log.debug("Using preamble file: %s", file_path)
