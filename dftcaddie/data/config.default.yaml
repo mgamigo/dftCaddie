@@ -118,6 +118,12 @@ clusters:
     headings:
       - name: default
         file: planck
+      - name: intelnodes
+        file: planck
+      - name: intelnewnodes
+        file: planck
+      - name: amdnodes
+        file: planck
 
 # Mpi executables over which to attach the cluster specific mpi_commands
 mpi_executables:

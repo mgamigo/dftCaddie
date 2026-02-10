@@ -25,7 +25,7 @@ import sys
 import argparse
 import logging
 
-from dftcaddie import calc_client, setup_client, pseudo_client
+from dftcaddie import calc_client, setup_client, pseudo_client, sbatch_client
 
 _all__ = [
     "main",
@@ -112,6 +112,13 @@ def main(argv: list[str] | None = None) -> int:
         description="Get the desired pseudopotentials.",
     )
     pseudo_client.add_arguments(pseudo_parser)
+    # --- sbatch subcommand ---
+    sbatch_parser = subparsers.add_parser(
+        "sbatch",
+        help="Get the desired sbatch header.",
+        description="Get the desired sbatch header.",
+    )
+    sbatch_client.add_arguments(sbatch_parser)
     # ---
     args = parser.parse_args(argv)
     _configure_logging(args.verbose, quiet=args.quiet)
@@ -124,6 +131,8 @@ def main(argv: list[str] | None = None) -> int:
         setup_client.run(args)
     elif args.command == "pseudo":
         pseudo_client.run(args)
+    elif args.command == "sbatch":
+        sbatch_client.run(args)
     else:
         parser.print_help()
         return 0

@@ -79,19 +79,22 @@ def resolve_cluster(clusters: dict) -> str:
     return "local"
 
 
-def format_options(options: list[str] | list[bool], brackets: bool = False) -> str:
+def format_options(
+    options: list[str] | list[bool], brackets: bool = False, numbers: bool = False
+) -> str:
     """
     Formats a list of strings into a comma-separated string, with optional
-    bracket notation for the first character of each string.
+    bracket or numbered notation.
 
     Parameters
     ----------
     options : list[str]
         A list of strings representing options to be formatted.
-
     brackets : bool, optional
         If True, encloses the first character of each option in brackets
         (default is False).
+    numbers : bool, optional
+        If True, each options are numbered. Preferred for many options.
 
     Returns
     -------
@@ -106,6 +109,10 @@ def format_options(options: list[str] | list[bool], brackets: bool = False) -> s
         options = [bool2affirmation[key] for key in options]
     if brackets:
         options = [f"[{x[0].upper()}]{x[1:]}" for x in options]
+    elif numbers:
+        options = [
+            f"[{i}] {x[0].upper()}{x[1:]}" for i, x in enumerate(options, start=1)
+        ]
     return ", ".join(options)
 
 
@@ -118,7 +125,6 @@ def resolve_user_input(user_input: str, options: list[str] | list[bool]) -> str 
     ----------
     user_input : str
         The user's input string to match against the list of options.
-
     options : list[str]
         A list of strings representing possible options to match.
 
@@ -133,8 +139,16 @@ def resolve_user_input(user_input: str, options: list[str] | list[bool]) -> str 
     terminated.
     - If options are booleans, yes/no user input is read as True/False.
     """
-    boolean = False
+    # Handle numbered input.
+    try:
+        user_input = int(user_input)
+    except ValueError:
+        pass
+    if isinstance(user_input, int):
+        return options[user_input - 1]
+
     # Handle boolean options
+    boolean = False
     if isinstance(options[0], bool):
         boolean = True
         options = [bool2affirmation[key] for key in options]
