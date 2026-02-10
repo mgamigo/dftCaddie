@@ -1,6 +1,8 @@
 node=$(hostname)
 echo "******************"
 echo "job run at node " $node
+echo "NPROCS = " $NPROCS
+echo "NPOOLS = " $NPOOLS
 echo "******************"
 echo ""
 
