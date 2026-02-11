@@ -118,6 +118,33 @@ def test_set_master_preamble_prepends_header(tmp_path: Path, monkeypatch):
     assert text[2] == "echo hi"
 
 
+def test_remove_master_preamble_removes_header_block(tmp_path: Path):
+    master = tmp_path / "master.sh"
+
+    master.write_text(
+        "\n".join(
+            [
+                "#!/bin/bash",
+                "#SBATCH --nodes=1",
+                "#SBATCH --ntasks=40",
+                "# === DFTCADDIE SBATCH HEADER END ===",
+                "echo hi",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    fm.remove_master_preamble(str(master))
+
+    text = master.read_text(encoding="utf-8").splitlines()
+
+    # Header lines between "bin/bash" and the end marker are removed (excluded).
+    assert text[0] == "#!/bin/bash"
+    assert text[1] == "# === DFTCADDIE SBATCH HEADER END ==="
+    assert text[2] == "echo hi"
+
+
 # -------------------------
 # change_mpi_command
 # -------------------------

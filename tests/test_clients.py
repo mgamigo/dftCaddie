@@ -1,9 +1,11 @@
 from types import SimpleNamespace
 import pytest
+import builtins
 
 import dftcaddie.calc_client as calc_client
 import dftcaddie.setup_client as setup_client
 import dftcaddie.pseudo_client as pseudo_client
+import dftcaddie.sbatch_client as sbatch_client
 
 
 def _make_calc_args(**overrides):
@@ -55,6 +57,10 @@ def _make_pseudo_args(
         relativistic=relativistic,
         configure=configure,
     )
+
+
+def _make_sbatch_args(cluster=None, header=None):
+    return SimpleNamespace(cluster=cluster, header=header)
 
 
 def test_calc_client_calls_apply_setup_when_structure_provided(monkeypatch):
@@ -497,3 +503,175 @@ def test_apply_pseudos_raises_for_unsupported_code():
             relativistic=False,
             configure=False,
         )
+
+
+def test_sbatch_run_resolves_cluster_and_applies_header_when_header_provided(
+    monkeypatch,
+):
+    # Provide a minimal clusters config for the client
+    monkeypatch.setattr(
+        "dftcaddie.config.clusters",
+        {
+            "local": {
+                "headers": [
+                    {"name": "short"},
+                    {"name": "long"},
+                ]
+            }
+        },
+    )
+
+    # If args.cluster is None, it should use resolve_cluster()
+    monkeypatch.setattr("dftcaddie.utils.resolve_cluster", lambda clusters: "local")
+
+    # Avoid sys.exit in check_option_exists
+    monkeypatch.setattr("dftcaddie.utils.check_option_exists", lambda *a, **k: None)
+
+    called = {}
+
+    def fake_apply_header(cluster, header):
+        called["cluster"] = cluster
+        called["header"] = header
+        return 0
+
+    monkeypatch.setattr(sbatch_client, "apply_header", fake_apply_header)
+
+    args = _make_sbatch_args(cluster=None, header="long")
+    sbatch_client.run(args)
+
+    assert called["cluster"] == "local"
+    assert called["header"] == 1  # "long" is index 1
+
+
+def test_sbatch_run_interactive_header_selection(monkeypatch):
+    monkeypatch.setattr(
+        "dftcaddie.config.clusters",
+        {
+            "local": {
+                "headers": [
+                    {"name": "short"},
+                    {"name": "long"},
+                    {"name": "debug"},
+                ]
+            }
+        },
+    )
+
+    # cluster already provided -> no need to resolve hostname
+    monkeypatch.setattr("dftcaddie.utils.check_option_exists", lambda *a, **k: None)
+
+    # The interactive path prints numbered options + uses input + resolve_user_input
+    monkeypatch.setattr(
+        "dftcaddie.utils.format_options",
+        lambda opts, numbers=False, **k: "1) short, 2) long, 3) debug",
+    )
+    monkeypatch.setattr(builtins, "input", lambda prompt="": "2")  # user types "2"
+    monkeypatch.setattr(
+        "dftcaddie.utils.resolve_user_input", lambda user_input, options: "long"
+    )
+
+    called = {}
+
+    monkeypatch.setattr(
+        sbatch_client,
+        "apply_header",
+        lambda cluster, header: called.update({"cluster": cluster, "header": header})
+        or 0,
+    )
+
+    args = _make_sbatch_args(cluster="local", header=None)
+    sbatch_client.run(args)
+
+    assert called["cluster"] == "local"
+    assert called["header"] == 1  # "long" is index 1
+
+
+def test_apply_header_preserves_existing_job_name_and_calls_file_management(
+    monkeypatch, tmp_path
+):
+    # Work in a temp dir because apply_header opens "master.sh"
+    monkeypatch.chdir(tmp_path)
+
+    master = tmp_path / "master.sh"
+    master.write_text(
+        "\n".join(
+            [
+                "#!/bin/bash",
+                '#SBATCH --job-name="MYJOB"',
+                "#SBATCH --time=01:00:00",
+                "# === DFTCADDIE SBATCH HEADER END ===",
+                "echo hi",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    calls = []
+
+    monkeypatch.setattr(
+        "dftcaddie.file_management.remove_master_preamble",
+        lambda path: calls.append(("remove_master_preamble", path)),
+    )
+    monkeypatch.setattr(
+        "dftcaddie.file_management.set_master_preamble",
+        lambda path, cluster, header: calls.append(
+            ("set_master_preamble", path, cluster, header)
+        ),
+    )
+    monkeypatch.setattr(
+        "dftcaddie.file_management._replace_setting",
+        lambda path, match, new_line: calls.append(
+            ("replace_setting", path, match, new_line)
+        ),
+    )
+
+    rc = sbatch_client.apply_header(cluster="local", header=0)
+
+    assert rc == 0
+    assert calls[0] == ("remove_master_preamble", "master.sh")
+    assert calls[1] == ("set_master_preamble", "master.sh", "local", 0)
+    assert calls[2] == (
+        "replace_setting",
+        "master.sh",
+        "#SBATCH --job-name",
+        '#SBATCH --job-name="MYJOB"',
+    )
+
+
+def test_apply_header_defaults_job_name_when_missing(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+
+    (tmp_path / "master.sh").write_text(
+        "\n".join(
+            [
+                "#!/bin/bash",
+                "#SBATCH --time=01:00:00",
+                "# === DFTCADDIE SBATCH HEADER END ===",
+                "echo hi",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    calls = []
+    monkeypatch.setattr(
+        "dftcaddie.file_management.remove_master_preamble",
+        lambda path: None,
+    )
+    monkeypatch.setattr(
+        "dftcaddie.file_management.set_master_preamble",
+        lambda path, cluster, header: None,
+    )
+    monkeypatch.setattr(
+        "dftcaddie.file_management._replace_setting",
+        lambda path, match, new_line: calls.append((match, new_line)),
+    )
+
+    rc = sbatch_client.apply_header(cluster="local", header=0)
+
+    assert rc == 0
+    assert calls == [
+        ("#SBATCH --job-name", '#SBATCH --job-name="NONAME"'),
+    ]
