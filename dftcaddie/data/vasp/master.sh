@@ -1,10 +1,5 @@
 #!/bin/bash
-#SBATCH --nodes=1
-#SBATCH --ntasks=96
-#SBATCH --time=240:00:00
-#SBATCH --partition=intelnodes
-#SBATCH --mem=188gb
-#SBATCH --job-name="LSe-Se"
+# === DFTCADDIE SBATCH HEADER END ===
 
 node=`hostname`
 echo "******************"

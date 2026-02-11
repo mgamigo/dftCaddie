@@ -1,3 +1,6 @@
+#!/bin/bash
+# === DFTCADDIE SBATCH HEADER END ===
+
 node=$(hostname)
 echo "******************"
 echo "job run at node " $node

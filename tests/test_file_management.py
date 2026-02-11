@@ -87,14 +87,14 @@ def test_populate_master_script_adds_only_sh_and_not_self(tmp_path: Path):
 # -------------------------
 
 
-def test_set_master_preamble_prepends_heading(tmp_path: Path, monkeypatch):
+def test_set_master_preamble_prepends_header(tmp_path: Path, monkeypatch):
     # Create fake "package data" dir structure next to file_management.py
     # We monkeypatch fm.__file__ so its dirname points to our tmp tree.
     pkg_root = tmp_path / "pkg"
-    (pkg_root / "data" / "sbatch_headings").mkdir(parents=True)
+    (pkg_root / "data" / "sbatch_headers").mkdir(parents=True)
 
-    heading_file = pkg_root / "data" / "sbatch_headings" / "heading.txt"
-    heading_file.write_text("#SBATCH -A TEST\n", encoding="utf-8")
+    header_file = pkg_root / "data" / "sbatch_headers" / "header.txt"
+    header_file.write_text("#SBATCH -A TEST\n", encoding="utf-8")
 
     master = tmp_path / "master.sh"
     master.write_text("#!/bin/bash\necho hi\n", encoding="utf-8")
@@ -103,16 +103,19 @@ def test_set_master_preamble_prepends_heading(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(
         fm,
         "clusters",
-        {"mycluster": {"headings": [{"name": "default", "file": "heading.txt"}]}},
+        {"mycluster": {"headers": [{"name": "default", "file": "header.txt"}]}},
     )
+    print(master)
 
     fm.set_master_preamble(str(master), "mycluster")
 
     text = master.read_text(encoding="utf-8").splitlines()
-    assert text[0] == "#SBATCH -A TEST"
-    # blank line inserted
-    assert text[1] == ""
-    assert text[2] == "#!/bin/bash"
+    for line in text:
+        print(line)
+
+    assert text[0] == "#!/bin/bash"
+    assert text[1] == "#SBATCH -A TEST"
+    assert text[2] == "echo hi"
 
 
 # -------------------------

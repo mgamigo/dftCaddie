@@ -80,12 +80,6 @@ def add_arguments(parser):
         action="store_true",
         help="Initialize setup from scratch (structure must be provided).",
     )
-    parser.add_argument(
-        "--cluster",
-        metavar="CLUSTER",
-        required=False,
-        help="Cluster name used to generate an SBATCH header.",
-    )
 
 
 def run(args=None):
@@ -113,9 +107,8 @@ def run(args=None):
     details = calculation.details
     del calculation.details
 
-    if calculation.cluster is None:
-        calculation.cluster = ut.resolve_cluster(clusters)
-        log.debug("Resolved cluster: %s", calculation.cluster)
+    calculation.cluster = ut.resolve_cluster(clusters)
+    log.debug("Resolved cluster: %s", calculation.cluster)
 
     # Select calculation type
     if calculation.kind is None:

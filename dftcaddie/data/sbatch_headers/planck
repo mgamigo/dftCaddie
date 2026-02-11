@@ -1,4 +1,3 @@
-#!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --ntasks=96
 #SBATCH --mem=180gb

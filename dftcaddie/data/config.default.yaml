@@ -85,37 +85,37 @@ clusters:
   local:
     hostname: ""
     mpi_command: "mpiexec -np 2"
-    headings:
+    headers:
       - name: default
         file: default
   ekhi:
     hostname: "ekhi"
     mpi_command: "mpiexec -np $NPROCS"
-    headings:
+    headers:
       - name: default
         file: ekhi
   triton:
     hostname: "triton"
     mpi_command: "srun"
-    headings:
+    headers:
       - name: default
         file: triton
   puhti:
     hostname: "puhti"
     mpi_command: "srun"
-    headings:
+    headers:
       - name: default
         file: puhti_mahti
   mahti:
     hostname: "mahti"
     mpi_command: "srun"
-    headings:
+    headers:
       - name: default
         file: puhti_mahti
   planck:
     hostname: "login"
     mpi_command: "srun --mpi=pmi2"
-    headings:
+    headers:
       - name: default
         file: planck
       - name: intelnodes

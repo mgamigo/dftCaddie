@@ -1,4 +1,3 @@
-#!/bin/bash
 #SBATCH --account=torma
 #SBATCH --ntasks=10
 #SBATCH --mem=20gb

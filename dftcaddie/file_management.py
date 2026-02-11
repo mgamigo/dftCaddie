@@ -22,7 +22,7 @@ copy_input_files()
 populate_master_script()
     Insert sub-script execution lines into ``master.sh``.
 set_master_preamble()
-    Prepend a cluster-specific SBATCH heading to ``master.sh``.
+    Prepend a cluster-specific SBATCH header to ``master.sh``.
 change_mpi_command()
     Replace MPI prefixes in scripts with the cluster-specific MPI command.
 set_spin_orbit_coupling()
@@ -185,7 +185,7 @@ def _insert_lines(
     with open(file_path, "w") as file:
         file.writelines(updated_lines)
 
-    log.info(
+    log.debug(
         "Inserted %d lines into '%s'",
         len(lines_to_insert),
         file_path,
@@ -244,7 +244,7 @@ def _remove_lines(
     with open(file_path, "w") as file:
         file.writelines(lines)
 
-    log.info(
+    log.debug(
         "Removed lines between '%s' and '%s' in '%s'",
         starting_partial_match,
         finishing_partial_match,
@@ -361,11 +361,29 @@ def populate_master_script(
     return sub_scripts
 
 
-def set_master_preamble(master_script_path: str, cluster: str) -> None:
+def remove_master_preamble(master_script_path: str) -> None:
+    """
+    Removes cluster-specific preamble from a master script file.
+
+    Parameters
+    ----------
+    master_script_path : str
+        Path to the master script file to be updated.
+    """
+    log.info(
+        "Removing cluster preamble from '%s'",
+        master_script_path,
+    )
+    _remove_lines(
+        master_script_path, "bin/bash", "# === DFTCADDIE SBATCH HEADER END ==="
+    )
+
+
+def set_master_preamble(master_script_path: str, cluster: str, header: int = 0) -> None:
     """
     Prepends cluster-specific preamble to a master script file.
 
-    This function reads a cluster-specific heading from a file and inserts
+    This function reads a cluster-specific header from a file and inserts
     it at the beginning of a master script, updating the script to reflect
     the target cluster’s setup requirements.
 
@@ -376,33 +394,32 @@ def set_master_preamble(master_script_path: str, cluster: str) -> None:
     cluster : str
         The name of the cluster whose preamble should be added to the master
         script.
+    header : int
+        Index of the header to be used for the particular cluster.
     """
+    header_name = clusters[cluster]["headers"][header]["name"]
     log.info(
-        "Adding cluster preamble for '%s' to '%s'",
+        "Adding cluster preamble for '%s/%s' to '%s'",
         cluster,
+        header_name,
         master_script_path,
     )
 
-    source_dir = os.path.join(os.path.dirname(__file__), "data", "sbatch_headings")
-    heading = clusters[cluster]["headings"][0]["file"]
-    file_path = os.path.join(source_dir, heading)
+    source_dir = os.path.join(os.path.dirname(__file__), "data", "sbatch_headers")
+    header_file = clusters[cluster]["headers"][header]["file"]
+    file_path = os.path.join(source_dir, header_file)
 
     log.debug("Using preamble file: %s", file_path)
 
     with open(file_path, "r") as file:
         preamble = file.readlines()
 
-    with open(master_script_path, "r") as file:
-        master = file.readlines()
-
-    updated_lines = preamble + ["\n"] + master
-
-    with open(master_script_path, "w") as file:
-        file.writelines(updated_lines)
+    _insert_lines(master_script_path, preamble, match_string="bin/bash")
 
     log.info(
-        "Successfully added heading '%s' to '%s'",
-        heading,
+        "Successfully added header '%s/%s' to '%s'",
+        cluster,
+        header_name,
         master_script_path,
     )
 

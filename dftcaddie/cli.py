@@ -108,15 +108,15 @@ def main(argv: list[str] | None = None) -> int:
     # --- calc subcommand ---
     pseudo_parser = subparsers.add_parser(
         "pseudo",
-        help="Get the desired pseudopotentials.",
-        description="Get the desired pseudopotentials.",
+        help="Set the desired pseudopotentials.",
+        description="Set the desired pseudopotentials.",
     )
     pseudo_client.add_arguments(pseudo_parser)
     # --- sbatch subcommand ---
     sbatch_parser = subparsers.add_parser(
         "sbatch",
-        help="Get the desired sbatch header.",
-        description="Get the desired sbatch header.",
+        help="Set the desired sbatch header.",
+        description="Set the desired sbatch header.",
     )
     sbatch_client.add_arguments(sbatch_parser)
     # ---
