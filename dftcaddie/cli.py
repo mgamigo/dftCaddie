@@ -74,7 +74,7 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(
         prog="caddie",
-        description="DFT Caddie - Your assistant for DFT calculations.",
+        description="DFT Caddie - Your assistant for DFT calculations",
     )
     parser.add_argument(
         "-v",
@@ -101,22 +101,22 @@ def main(argv: list[str] | None = None) -> int:
     # --- setup subcommand ---
     setup_parser = subparsers.add_parser(
         "setup",
-        help="Configure the calculation for a given system.",
-        description="Configure the calculation for a given system.",
+        help="Configure the calculation for a given system",
+        description="Configure the calculation for a given system",
     )
     setup_client.add_arguments(setup_parser)
     # --- calc subcommand ---
     pseudo_parser = subparsers.add_parser(
         "pseudo",
-        help="Set the desired pseudopotentials.",
-        description="Set the desired pseudopotentials.",
+        help="Set the desired pseudopotentials",
+        description="Set the desired pseudopotentials",
     )
     pseudo_client.add_arguments(pseudo_parser)
     # --- sbatch subcommand ---
     sbatch_parser = subparsers.add_parser(
         "sbatch",
-        help="Set the desired sbatch header.",
-        description="Set the desired sbatch header.",
+        help="Set the desired sbatch header",
+        description="Set the desired sbatch header",
     )
     sbatch_client.add_arguments(sbatch_parser)
     # ---

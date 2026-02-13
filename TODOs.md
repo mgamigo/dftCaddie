@@ -1,7 +1,12 @@
 # CODE IDEA
 
-- Create the sbatch client for changing partitions and configurations easily.
+- Make so that **all** config files can be stored in .config/dftcaddie.
+- Rewrite the current yaml.config as a placeholder without personal info.
+- Put instructions in current yalm.config file.
+- Complete the vasp functionalities.
+- Make SYSTEM.INFO clearer and more understandable.
 
+```
 dftCaddie/
 ├── __init__.py
 ├── cli.py                 # Command-line interface for user interaction
@@ -22,3 +27,4 @@ dftCaddie/
 ├── config.py              # Loads configuration (user of default)
 └── examples/              # Example workflows and demos
     └── example_workflow.py
+```
