@@ -65,6 +65,30 @@ def resolve_pslibrary() -> Path:
     )
 
 
+@lru_cache(maxsize=1)
+def resolve_POTCAR_library() -> Path:
+    """
+    Resolve the root path of the POTCAR library.
+
+    Priority:
+    1. User configuration (YAML)
+    """
+    import os
+
+    # From YAML (optional)
+    potcar_cfg = CONFIG.get("POTCARs")
+    if isinstance(potcar_cfg, dict):
+        root = potcar_cfg.get("root")
+        if root:
+            log.info("Using POTCARs from config file")
+            return Path(root).expanduser()
+
+    # Hard error
+    raise RuntimeError(
+        "POTCARs library not found. " "Define 'POTCARs.root' in config.yaml "
+    )
+
+
 CONFIG = _load_config()
 
 calculations = CONFIG["calculations"]

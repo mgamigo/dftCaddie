@@ -7,6 +7,9 @@
 pseudopotentials:
   root: /opt/pslibrary
 
+POTCARs:
+  root: ~/Software/VASP/pseudos
+
 # Supported calculations and required files (located at dftcaddie/data)
 calculations:
   bands:

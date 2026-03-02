@@ -94,13 +94,15 @@ def run(args=None):
     from dftcaddie import utils as ut
 
     kind, code = ut.resolve_calc_current_dir()
-    structure = ut.get_structure(args.structure)
+    log.info("Resolved calcualtion kind/code as %s/%s", kind, code)
 
     print(f"\nSummary\n-------")
     keys = list(args.__dict__.keys())
     for key, value in args.__dict__.items():
         print(f"{key.title()}: {value}")
     print(f"-------")
+
+    structure = ut.get_structure(args.structure)
 
     apply_pseudos(
         kind_calc=kind,
@@ -168,19 +170,21 @@ def apply_pseudos(
 
     from dftcaddie import file_management as fm
 
-    if code != "quantum_espresso":
-        raise NotImplementedError("Only quantum_espresso supported for now.")
+    if code == "quantum_espresso":
+        pseudos = fm.get_qe_pseudo_paths(
+            symbols=symbols,
+            exchange=exchange,
+            kind=kind_pseudo,
+            relativistic=relativistic,
+        )
+        fm.write_pseudos_to_system_info(system_info_path, pseudos)
+        fm.set_spin_orbit_coupling(kind_calc, code, relativistic)
 
-    pseudos = fm.get_qe_pseudo_paths(
-        symbols=symbols,
-        exchange=exchange,
-        kind=kind_pseudo,
-        relativistic=relativistic,
-    )
-    fm.write_pseudos_to_system_info(system_info_path, pseudos)
-    fm.set_spin_orbit_coupling(kind_calc, code, relativistic)
-
-    if configure:
-        fm.configure_qe_cutoffs_from_pseudos(system_info_path, pseudos, ratio=ratio)
-
+        if configure:
+            fm.configure_qe_cutoffs_from_pseudos(system_info_path, pseudos, ratio=ratio)
+    elif code == "vasp":
+        log.warning("Pseudo client still in developtiment for %s)", code)
+        fm.get_POTCAR(symbols=symbols)
+    else:
+        log.warning("Pseudo client skipped (not implemented for code=%s)", code)
     return 0

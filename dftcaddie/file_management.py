@@ -662,6 +662,18 @@ def set_crystal_structure(structure: SimpleNamespace, code: str) -> None:
         log.warning("set_crystal_structure skipped (code=%s)", code)
 
 
+def get_POTCAR(
+    symbols: Iterable[str],
+    exchange: str = "pbe",
+    kind: str = "kjpaw",
+):
+    from dftcaddie.config import resolve_POTCAR_library
+
+    potcar_library = resolve_POTCAR_library()
+    print(potcar_library)
+    pass
+
+
 def get_qe_pseudo_paths(
     symbols: Iterable[str],
     exchange: str = "pbe",
