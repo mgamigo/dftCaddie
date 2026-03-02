@@ -1,6 +1,6 @@
 SYSTEM = NONAME
 PREC = Accurate          # precision
-ENCUT = 500 
+ENCUT = 500              # Energy cutoff
 EDIFF = 1.0e-07          # global break condition por the scf
 ISMEAR = 0; SIGMA = 0.02 # gaussian smearing with its spread
 LSORBIT = TRUE           # whether spin orbit is taken into account
