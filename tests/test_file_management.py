@@ -91,9 +91,9 @@ def test_set_master_preamble_prepends_header(tmp_path: Path, monkeypatch):
     # Create fake "package data" dir structure next to file_management.py
     # We monkeypatch fm.__file__ so its dirname points to our tmp tree.
     pkg_root = tmp_path / "pkg"
-    (pkg_root / "data" / "sbatch_headers").mkdir(parents=True)
+    (pkg_root / "resources" / "sbatch_headers").mkdir(parents=True)
 
-    header_file = pkg_root / "data" / "sbatch_headers" / "header.txt"
+    header_file = pkg_root / "resources" / "sbatch_headers" / "header.txt"
     header_file.write_text("#SBATCH -A TEST\n", encoding="utf-8")
 
     master = tmp_path / "master.sh"

@@ -14,7 +14,7 @@ import logging
 
 log = logging.getLogger(__name__)
 
-DEFAULT_CONFIG_PATH = Path(__file__).parent / "data" / "config.default.yaml"
+DEFAULT_CONFIG_PATH = Path(__file__).parent / "resources" / "config.yaml"
 USER_PATHS = [
     Path.cwd() / "dftcaddie.yaml",
     Path.home() / ".config" / "dftcaddie" / "config.yaml",

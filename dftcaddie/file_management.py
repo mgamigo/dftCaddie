@@ -282,7 +282,7 @@ def copy_input_files(calculation: SimpleNamespace) -> list[str]:
     files_to_copy.append("master.sh")
 
     # Copy the files
-    source_dir = os.path.join(os.path.dirname(__file__), "data", calculation.code)
+    source_dir = os.path.join(os.path.dirname(__file__), "resources", calculation.code)
     copied = []
     for file_name in files_to_copy:
         source_path = os.path.join(source_dir, file_name)
@@ -405,7 +405,7 @@ def set_master_preamble(master_script_path: str, cluster: str, header: int = 0) 
         master_script_path,
     )
 
-    source_dir = os.path.join(os.path.dirname(__file__), "data", "sbatch_headers")
+    source_dir = os.path.join(os.path.dirname(__file__), "resources", "sbatch_headers")
     header_file = clusters[cluster]["headers"][header]["file"]
     file_path = os.path.join(source_dir, header_file)
 
@@ -856,7 +856,7 @@ def set_high_symmetry_path(structure: SimpleNamespace, code: str) -> None:
         log.debug("set_high_symmetry_path skipped (code=%s)", code)
         return
 
-    source_dir = os.path.join(os.path.dirname(__file__), "data", "kpaths", code)
+    source_dir = os.path.join(os.path.dirname(__file__), "resources", "kpaths", code)
     path_file = os.path.join(source_dir, f"SG{structure.space_group}")
 
     log.debug("Reading k-path template: %s", path_file)

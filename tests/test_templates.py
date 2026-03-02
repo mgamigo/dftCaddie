@@ -5,7 +5,7 @@ from dftcaddie.config import calculations
 
 
 def test_templates_declared_in_config_exist():
-    data_root = rfiles("dftcaddie") / "data"
+    data_root = rfiles("dftcaddie") / "resources"
     missing: list[str] = []
     for kind, kind_cfg in calculations.items():
         files_by_code = kind_cfg.get("files")
@@ -41,7 +41,7 @@ def test_no_duplicate_template_names_per_kind_code():
 
 
 def test_qe_system_info_has_required_markers():
-    sysinfo = rfiles("dftcaddie") / "data" / "quantum_espresso" / "SYSTEM.INFO"
+    sysinfo = rfiles("dftcaddie") / "resources" / "quantum_espresso" / "SYSTEM.INFO"
     text = sysinfo.read_text(encoding="utf-8")
 
     required = ["ATOMIC_SPECIES=", "ATOMIC_CRYST_POSITIONS=", "LATTICE=", "EOL"]
