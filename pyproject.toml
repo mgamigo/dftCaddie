@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dftcaddie"
+dynamic = ["version"]
+authors = [
+{ name = "Martin Gutierrez-Amigo", email = "martin.gutierrez.amigo@gmail.com" }
+]
+description="A caddie for your DFT calculations"
+readme = "README.md"
+dependencies = [
+    "pyyalm",
+    "yaiv",
+    "pytest",
+]
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)"
+]
+
+[project.urls]
+Homepage = "https://github.com/mgamigo/dftCaddie"
+"Bug Tracker" = "https://github.com/mgamigo/dftCaddie/issues"
+
+[tool.setuptools.dynamic]
+version = { attr = "dftcaddie.__version__" }
+
+[tool.setuptools.packages.find]
+exclude = ["tests*", "docs*"]
+
+[project.scripts]
+caddie = "dftcaddie.cli:main"
+
+[tool.setuptools.package-data]
+dftcaddie = ["data/**/*"]
