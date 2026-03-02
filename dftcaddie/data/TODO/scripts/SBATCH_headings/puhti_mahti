@@ -1,8 +1,0 @@
-#!/bin/bash
-#SBATCH --account=torma
-#SBATCH --ntasks=10
-#SBATCH --mem=20gb
-#SBATCH --time=5:00:00
-#SBATCH --partition=small
-#SBATCH --job-name="NONAME"
-

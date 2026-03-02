@@ -1,8 +1,0 @@
-#!/bin/bash
-#SBATCH --nodes=1
-#SBATCH --ntasks=96
-#SBATCH --mem=180gb
-#SBATCH --time=240:00:00
-#SBATCH --partition=intelnodes
-#SBATCH --job-name="NONAME"
-
