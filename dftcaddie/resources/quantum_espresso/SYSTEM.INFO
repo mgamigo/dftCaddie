@@ -2,8 +2,8 @@
 
 #SYSTEM******************************+
 NAME='NoName'
-ATM_NUM=#num
-ATM_TYPES=#num
+ATM_NUM=Num
+ATM_TYPES=Num
 CUTOFF=60
 ECUTRHO=`python3 -c "print(int(10*float('$CUTOFF')))"`
 SMEAR=0.012

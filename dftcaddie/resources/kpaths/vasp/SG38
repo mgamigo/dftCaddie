@@ -1,5 +1,5 @@
 Orthorhombic
-20   !  20 grids
+100   ! 100 grid
 Line-mode
 reciprocal
 0.000000  0.500000  0.500000   ! Y_1

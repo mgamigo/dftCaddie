@@ -610,6 +610,8 @@ def set_crystal_structure(structure: SimpleNamespace, code: str) -> None:
     system name, number of atoms, number of atomic types, fractional atomic
     positions, and lattice vectors.
 
+    For VASP just writes the POSCAR.
+
     Parameters
     ----------
     structure : SimpleNamespace
@@ -618,43 +620,46 @@ def set_crystal_structure(structure: SimpleNamespace, code: str) -> None:
     code : str
         DFT code identifier.
     """
-    if code != "quantum_espresso":
-        log.debug("set_crystal_structure skipped (code=%s)", code)
-        return
+    if code == "quantum_espresso":
+        formula = structure.formula
+        lattice = structure.lattice
+        positions = structure.positions
+        symbols = structure.symbols
 
-    formula = structure.formula
-    lattice = structure.lattice
-    positions = structure.positions
-    symbols = structure.symbols
+        nat = len(positions)
+        ntyp = len(set(symbols))
 
-    nat = len(positions)
-    ntyp = len(set(symbols))
+        log.info(
+            "Updating crystal structure in SYSTEM.INFO (NAME=%s, NAT=%d, NTYP=%d)...",
+            formula,
+            nat,
+            ntyp,
+        )
 
-    log.info(
-        "Updating crystal structure in SYSTEM.INFO (NAME=%s, NAT=%d, NTYP=%d)...",
-        formula,
-        nat,
-        ntyp,
-    )
+        _replace_setting("SYSTEM.INFO", "NAME='NoName'", f"NAME='{formula}'")
+        _replace_setting("SYSTEM.INFO", "ATM_NUM=", f"ATM_NUM={nat}")
+        _replace_setting("SYSTEM.INFO", "ATM_TYPES=", f"ATM_TYPES={ntyp}")
 
-    _replace_setting("SYSTEM.INFO", "NAME='NoName'", f"NAME='{formula}'")
-    _replace_setting("SYSTEM.INFO", "ATM_NUM=", f"ATM_NUM={nat}")
-    _replace_setting("SYSTEM.INFO", "ATM_TYPES=", f"ATM_TYPES={ntyp}")
+        # Atomic positions (fractional)
+        log.debug("Writing %d atomic positions", nat)
+        _remove_lines("SYSTEM.INFO", "ATOMIC_CRYST_POSITIONS=", "EOL")
+        pos_lines = [
+            f"{s:<2} {x:14.9f} {y:14.9f} {z:14.9f}\n"
+            for s, (x, y, z) in zip(symbols, positions)
+        ]
+        _insert_lines("SYSTEM.INFO", pos_lines, "ATOMIC_CRYST_POSITIONS=")
 
-    # Atomic positions (fractional)
-    log.debug("Writing %d atomic positions", nat)
-    _remove_lines("SYSTEM.INFO", "ATOMIC_CRYST_POSITIONS=", "EOL")
-    pos_lines = [
-        f"{s:<2} {x:14.9f} {y:14.9f} {z:14.9f}\n"
-        for s, (x, y, z) in zip(symbols, positions)
-    ]
-    _insert_lines("SYSTEM.INFO", pos_lines, "ATOMIC_CRYST_POSITIONS=")
+        # Lattice vectors
+        log.debug("Writing lattice vectors")
+        _remove_lines("SYSTEM.INFO", "LATTICE=", "EOL")
+        lat_lines = [f"{x:14.9f} {y:14.9f} {z:14.9f}\n" for x, y, z in lattice]
+        _insert_lines("SYSTEM.INFO", lat_lines, "LATTICE=")
+    elif code == "vasp":
+        from ase.io import write
 
-    # Lattice vectors
-    log.debug("Writing lattice vectors")
-    _remove_lines("SYSTEM.INFO", "LATTICE=", "EOL")
-    lat_lines = [f"{x:14.9f} {y:14.9f} {z:14.9f}\n" for x, y, z in lattice]
-    _insert_lines("SYSTEM.INFO", lat_lines, "LATTICE=")
+        write("POSCAR", structure.atoms, format="vasp", direct=True)
+    else:
+        log.warning("set_crystal_structure skipped (code=%s)", code)
 
 
 def get_qe_pseudo_paths(
@@ -855,16 +860,19 @@ def set_auto_kgrid(structure: SimpleNamespace, code: str, kppra: int = 9000) -> 
     n_atoms = len(structure.positions)
 
     log.info("Computing automatic k-grid (kppra=%d, n_atoms=%d)", kppra, n_atoms)
-
-    if code != "quantum_espresso":
-        log.debug("set_auto_kgrid skipped (code=%s)", code)
-        return
-
     kgrid = auto_kgrid(lattice, n_atoms=n_atoms, kppra=kppra)
     kgrid_str = " ".join(map(str, kgrid))
 
-    log.info("Setting KGRID='%s' in SYSTEM.INFO", kgrid_str)
-    _replace_setting("SYSTEM.INFO", "KGRID=", f"KGRID='{kgrid_str}'")
+    if code == "quantum_espresso":
+        log.info("Setting KGRID='%s' in SYSTEM.INFO", kgrid_str)
+        _replace_setting("SYSTEM.INFO", "KGRID=", f"KGRID='{kgrid_str}'")
+    elif code == "vasp":
+        pass
+        log.info("Setting KGRID='%s' in KPOINTS.SCC", kgrid_str)
+        _remove_lines("KPOINTS.SCC", "Gamma", "0 0 0")
+        _insert_lines("KPOINTS.SCC", [kgrid_str + "\n"], "Gamma")
+    else:
+        log.warning("set_auto_kgrid skipped (code=%s)", code)
 
 
 def set_high_symmetry_path(structure: SimpleNamespace, code: str) -> None:
@@ -891,15 +899,18 @@ def set_high_symmetry_path(structure: SimpleNamespace, code: str) -> None:
         structure.space_group,
     )
 
-    if code != "quantum_espresso":
-        log.debug("set_high_symmetry_path skipped (code=%s)", code)
-        return
-
     source_dir = os.path.join(os.path.dirname(__file__), "resources", "kpaths", code)
     path_file = os.path.join(source_dir, f"SG{structure.space_group}")
 
-    log.debug("Reading k-path template: %s", path_file)
-    with open(path_file, "r") as file:
-        lines = file.readlines()
-    _remove_lines("SYSTEM.INFO", "QE_CRYST_PATH=", "EOL")
-    _insert_lines("SYSTEM.INFO", lines, "QE_CRYST_PATH=")
+    if code == "quantum_espresso":
+        log.debug("Reading k-path template: %s", path_file)
+        with open(path_file, "r") as file:
+            lines = file.readlines()
+        _remove_lines("SYSTEM.INFO", "QE_CRYST_PATH=", "EOL")
+        _insert_lines("SYSTEM.INFO", lines, "QE_CRYST_PATH=")
+    elif code == "vasp":
+        import shutil
+
+        shutil.copy(path_file, "KPOINTS.BS")
+    else:
+        log.warning("set_high_symmetry_path skipped (code=%s)", code)

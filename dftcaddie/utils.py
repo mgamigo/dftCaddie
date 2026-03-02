@@ -288,6 +288,8 @@ def get_structure(file: str) -> SimpleNamespace:
             Fractional atomic positions.
         - ``space_group`` : str
             Space-group number extracted from spglib.
+        - ``atoms`` : ase.Atoms
+            ase.Atoms object
     """
     import numpy as np
     import spglib as spg
@@ -305,6 +307,7 @@ def get_structure(file: str) -> SimpleNamespace:
         symbols=symbols,
         positions=positions,
         space_group=space_group,
+        atoms=C.atoms,
     )
     return data
 

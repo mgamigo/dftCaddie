@@ -93,13 +93,15 @@ def run(args=None):
     from dftcaddie.pseudo_client import apply_pseudos
 
     kind, code = ut.resolve_calc_current_dir()
-    structure = ut.get_structure(args.structure)
+    log.info("Resolved calcualtion kind/code as %s/%s",kind, code)
 
     print(f"\nSummary\n-------")
     keys = list(args.__dict__.keys())
     for key, value in args.__dict__.items():
         print(f"{key.title()}: {value}")
     print(f"-------")
+
+    structure = ut.get_structure(args.structure)
 
     apply_setup(
         kind=kind,
