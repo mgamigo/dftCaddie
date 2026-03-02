@@ -152,12 +152,11 @@ def run(args=None):
 
     copied_files = fm.copy_input_files(calculation)
 
-    log.info("\nEditing master.sh:")
+    log.info("Editing master.sh ...")
     scripts = fm.populate_master_script("master.sh", copied_files)
     fm.set_master_preamble("master.sh", calculation.cluster)
 
     fm.change_mpi_command(scripts, calculation.cluster)
-    fm.configure_qe_cutoffs_from_pseudos
     fm.configure_input_files(calculation)
     if calculation.structure is not None:
         structure = ut.get_structure(args.structure)

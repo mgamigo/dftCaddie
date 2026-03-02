@@ -133,6 +133,7 @@ mpi_executables:
   - pw.x
   - projwfc.x
   - ph.x
+  - vasp_ncl
 
 # Suggested pseudopotentials (same as suggested in pslibrary repository)
 suggested_qe_pseudos:

@@ -275,7 +275,7 @@ def copy_input_files(calculation: SimpleNamespace) -> list[str]:
     import shutil
 
     # Resolve needed files.
-    log.info("\nWriting input files:")
+    log.info("Writing input files ...")
     files_to_copy = calculations[calculation.kind]["files"][calculation.code]
     if not os.path.exists("SYSTEM.INFO") and calculation.code == "quantum_espresso":
         files_to_copy.append("SYSTEM.INFO")
@@ -306,7 +306,7 @@ def copy_input_files(calculation: SimpleNamespace) -> list[str]:
 
         shutil.copy(source_path, destination_path)
         copied.append(file_name)
-        log.info("Copied '%s'", file_name)
+        log.debug("Copied '%s'", file_name)
 
     return files_to_copy
 
@@ -348,13 +348,13 @@ def populate_master_script(
 
     # Prepare lines to append
     if len(sub_scripts) > 0:
-        script_lines = [f"bash {script}\n" for script in sub_scripts]
-        _insert_lines(master_script_path, script_lines, "#Actual JOBS")
         log.info(
-            "Added %d sub-scripts to '%s'",
+            "Adding %d sub-scripts to '%s' ...",
             len(sub_scripts),
             master_script_path,
         )
+        script_lines = [f"bash {script}\n" for script in sub_scripts]
+        _insert_lines(master_script_path, script_lines, "#Actual JOBS")
     else:
         log.info("No sub-scripts to add to '%s'", master_script_path)
 
@@ -399,7 +399,7 @@ def set_master_preamble(master_script_path: str, cluster: str, header: int = 0) 
     """
     header_name = clusters[cluster]["headers"][header]["name"]
     log.info(
-        "Adding cluster preamble for '%s/%s' to '%s'",
+        "Adding cluster preamble for '%s/%s' to '%s' ...",
         cluster,
         header_name,
         master_script_path,
@@ -416,7 +416,7 @@ def set_master_preamble(master_script_path: str, cluster: str, header: int = 0) 
 
     _insert_lines(master_script_path, preamble, match_string="bin/bash")
 
-    log.info(
+    log.debug(
         "Successfully added header '%s/%s' to '%s'",
         cluster,
         header_name,
@@ -439,7 +439,7 @@ def change_mpi_command(file_path: str | list, cluster: str) -> None:
     cluster : str
         The name of the cluster whose MPI command should be used in the script.
     """
-    log.info("\nChanging mpi commands:")
+    log.info("Changing mpi commands ...")
     mpi_command = clusters[cluster]["mpi_command"]
     commands = {clusters[key]["mpi_command"] for key in clusters}
     commands = sorted(commands, key=len, reverse=True)
@@ -465,13 +465,13 @@ def change_mpi_command(file_path: str | list, cluster: str) -> None:
                     lines[i] = f"{mpi_command} {line}"
 
         if not changes:
-            log.info("No MPI commands found in '%s'", file)
+            log.debug("No MPI commands found in '%s'", file)
             return
 
         with open(file, "w") as f:
             f.writelines(lines)
 
-        log.info(
+        log.debug(
             "Applied MPI command '%s' to '%s'",
             mpi_command,
             file,
@@ -502,7 +502,7 @@ def set_spin_orbit_coupling(kind: str, code: str, soc: bool) -> None:
     if code == "quantum_espresso":
 
         scripts = [file for file in files if file.endswith(".sh")]
-        log.info("\nConfiguring for SOC : %s", soc)
+        log.info("Configuring for SOC : %s", soc)
 
         for script in scripts:
             if soc:
@@ -511,6 +511,8 @@ def set_spin_orbit_coupling(kind: str, code: str, soc: bool) -> None:
             else:
                 _replace_setting(script, "noncolin=", "noncolin=.false.")
                 _replace_setting(script, "lspinorb=", "lspinorb=.false.")
+    else:
+        log.warning("No SOC configuration implemented for %s code", code)
 
 
 def set_cell_relaxation(code: str, cell_relaxation: bool) -> None:
@@ -528,12 +530,15 @@ def set_cell_relaxation(code: str, cell_relaxation: bool) -> None:
         If True, set variable-cell relaxation (``vc-relax``). If False, set
         ionic relaxation only (``relax``).
     """
-    log.info("\nConfiguring for cell_relaxation : %s", cell_relaxation)
+    log.info("Configuring for cell_relaxation : %s", cell_relaxation)
     if code == "quantum_espresso":
         if cell_relaxation:
             _replace_setting("relax.sh", "calculation=", "calculation='vc-relax'")
         else:
             _replace_setting("relax.sh", "calculation=", "calculation='relax'")
+
+    else:
+        log.warning("No cell_relaxation configuration implemented for %s code", code)
 
 
 def configure_input_files(calculation: SimpleNamespace) -> None:
@@ -546,7 +551,7 @@ def configure_input_files(calculation: SimpleNamespace) -> None:
         Calculation options container.
     """
     options = set(calculation.__dict__.keys())
-    log.info("\nConfiguring scripts according to options:")
+    log.info("Configuring scripts according to options ...")
 
     # Spin-orbit coupling
     if "soc" in options:
@@ -560,7 +565,7 @@ def configure_input_files(calculation: SimpleNamespace) -> None:
             code=calculation.code, cell_relaxation=calculation.cell_relaxation
         )
 
-    log.info("\nFile configuration completed")
+    log.debug("File configuration completed.")
 
 
 def set_crystal_structure(structure: SimpleNamespace, code: str) -> None:
@@ -592,7 +597,7 @@ def set_crystal_structure(structure: SimpleNamespace, code: str) -> None:
     ntyp = len(set(symbols))
 
     log.info(
-        "\nUpdating crystal structure in SYSTEM.INFO (NAME=%s, NAT=%d, NTYP=%d)",
+        "Updating crystal structure in SYSTEM.INFO (NAME=%s, NAT=%d, NTYP=%d)...",
         formula,
         nat,
         ntyp,
@@ -667,7 +672,7 @@ def get_qe_pseudo_paths(
     source_path = os.path.join(ps_library, exchange_folder, "PSEUDOPOTENTIALS")
 
     log.info(
-        "\nResolving QE pseudos (exchange=%s, kind=%s, relativistic=%s) from %s",
+        "Resolving QE pseudos (exchange=%s, kind=%s, relativistic=%s) from %s ...",
         exchange,
         kind,
         relativistic,
@@ -722,7 +727,7 @@ def write_pseudos_to_system_info(
         for s, m, p in zip(symbols, masses, pseudos)
     ]
 
-    log.info("\nUpdating %s: ATOMIC_SPECIES and EXCHANGE", system_info_path)
+    log.info("Updating %s: ATOMIC_SPECIES and EXCHANGE ...", system_info_path)
 
     _remove_lines(system_info_path, "ATOMIC_SPECIES=", "EOL")
     _insert_lines(system_info_path, lines, "ATOMIC_SPECIES=")
@@ -762,7 +767,7 @@ def configure_qe_cutoffs_from_pseudos(
     """
     import numpy as np
 
-    log.info("\nConfiguring cutoffs from pseudo headers (ratio=%s)", ratio)
+    log.info("Configuring cutoffs from pseudo headers (ratio=%s)", ratio)
 
     cutoff_vals: list[float] = []
     ecutrho_vals: list[float] = []
@@ -815,7 +820,7 @@ def set_auto_kgrid(structure: SimpleNamespace, code: str, kppra: int = 9000) -> 
     lattice = structure.lattice
     n_atoms = len(structure.positions)
 
-    log.info("\nComputing automatic k-grid (kppra=%d, n_atoms=%d)", kppra, n_atoms)
+    log.info("Computing automatic k-grid (kppra=%d, n_atoms=%d)", kppra, n_atoms)
 
     if code != "quantum_espresso":
         log.debug("set_auto_kgrid skipped (code=%s)", code)
@@ -848,7 +853,7 @@ def set_high_symmetry_path(structure: SimpleNamespace, code: str) -> None:
         If the k-path template for the given space group is not found.
     """
     log.info(
-        "\nSetting high-symmetry path for space group %s in SYSTEM.INFO",
+        "Setting high-symmetry path for space group %s in SYSTEM.INFO",
         structure.space_group,
     )
 

@@ -43,7 +43,11 @@ def _configure_logging(verbose: int, quiet: bool) -> None:
     else:
         level = logging.WARNING
 
-    logging.basicConfig(level=level, format="%(message)s")
+    #    logging.basicConfig(level=level, format="%(message)s")
+    logging.basicConfig(
+        level=level,
+        format="%(levelname)s: %(message)s",
+    )
 
 
 def _caddie_heading():
