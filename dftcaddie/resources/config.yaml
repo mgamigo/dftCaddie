@@ -49,7 +49,7 @@ calculations:
         options:
           - true
           - false
-        default: true
+        default: false
       - name: cell_relaxation
         type: bool
         prompt: "Cell relaxation?"

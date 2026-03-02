@@ -93,7 +93,7 @@ def _replace_setting(file_path: str, partial_match: str, new_line: str) -> None:
     """
     Replace the first line starting with a specific substring, ignoring
     leading spaces, with a new line preserving the original line's
-    indentation.
+    indentation and comments (staring with `#` or `!`).
 
     Parameters
     ----------
@@ -115,8 +115,33 @@ def _replace_setting(file_path: str, partial_match: str, new_line: str) -> None:
     replaced = False
     for i, line in enumerate(lines):
         if line.lstrip().startswith(partial_match):
+
             leading_spaces = len(line) - len(line.lstrip(" "))
-            lines[i] = (" " * leading_spaces) + new_line + "\n"
+            stripped = line.lstrip(" ")
+            body = stripped.rstrip("\n")
+
+            # Detect inline comment
+            for sep in ("#", "!"):
+                if sep in body:
+                    code_part, comment = body.split(sep, 1)
+                    separator = sep
+                    break
+            else:
+                code_part = body
+                comment = None
+                separator = None
+
+            if comment is not None:
+                code_part = code_part.rstrip()
+                spacing = max(len(body) - len(new_line) - len(comment) - 1, 1)
+                lines[i] = (
+                    f"{' ' * leading_spaces}"
+                    f"{new_line}"
+                    f"{' ' * spacing}"
+                    f"{separator}{comment}\n"
+                )
+            else:
+                lines[i] = f"{' ' * leading_spaces}{new_line}\n"
             replaced = True
             log.debug(
                 "Replaced line starting with '%s' in '%s'",
@@ -498,12 +523,10 @@ def set_spin_orbit_coupling(kind: str, code: str, soc: bool) -> None:
         If False, disable SOC.
     """
     files = calculations[kind]["files"][code]
+    log.info("Configuring for SOC : %s", soc)
 
     if code == "quantum_espresso":
-
         scripts = [file for file in files if file.endswith(".sh")]
-        log.info("Configuring for SOC : %s", soc)
-
         for script in scripts:
             if soc:
                 _replace_setting(script, "noncolin=", "noncolin=.true.")
@@ -511,6 +534,13 @@ def set_spin_orbit_coupling(kind: str, code: str, soc: bool) -> None:
             else:
                 _replace_setting(script, "noncolin=", "noncolin=.false.")
                 _replace_setting(script, "lspinorb=", "lspinorb=.false.")
+    elif code == "vasp":
+        INCARS = [file for file in files if file.startswith("INCAR")]
+        for INCAR in INCARS:
+            if soc:
+                _replace_setting(INCAR, "LSORBIT =", "LSORBIT = TRUE")
+            else:
+                _replace_setting(INCAR, "LSORBIT =", "LSORBIT = FALSE")
     else:
         log.warning("No SOC configuration implemented for %s code", code)
 
@@ -536,7 +566,11 @@ def set_cell_relaxation(code: str, cell_relaxation: bool) -> None:
             _replace_setting("relax.sh", "calculation=", "calculation='vc-relax'")
         else:
             _replace_setting("relax.sh", "calculation=", "calculation='relax'")
-
+    elif code == "vasp":
+        if cell_relaxation:
+            _replace_setting("INCAR.RELAX", "ISIF =", "ISIF = 3")
+        else:
+            _replace_setting("INCAR.RELAX", "ISIF =", "ISIF = 2")
     else:
         log.warning("No cell_relaxation configuration implemented for %s code", code)
 
