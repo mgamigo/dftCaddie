@@ -17,13 +17,13 @@ log = logging.getLogger(__name__)
 
 @lru_cache(maxsize=1)
 def _load_config() -> dict:
-    default = False
-    CONFIG_FILE = (Path.home() / ".config" / "dftcaddie" / "config.yaml",)
+    CONFIG_FILE = Path.home() / ".config" / "dftcaddie" / "config.yaml"
+    SOURCE_DIR = Path.home() / ".config" / "dftcaddie"
     if not CONFIG_FILE.exists():
         CONFIG_FILE = Path(__file__).parent / "resources" / "config.yaml"
-        default = True
+        SOURCE_DIR = Path(__file__).parent / "resources"
     with open(CONFIG_FILE, "r") as f:
-        return yaml.safe_load(f) or {}, default
+        return yaml.safe_load(f) or {}, SOURCE_DIR
 
 
 @lru_cache(maxsize=1)
@@ -101,7 +101,7 @@ def resolve_potcar_library() -> Path:
     return path
 
 
-CONFIG, DEFAULT = _load_config()
+CONFIG, SOURCE_DIR = _load_config()
 
 calculations = CONFIG["calculations"]
 clusters = CONFIG["clusters"]
