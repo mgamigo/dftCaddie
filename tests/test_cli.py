@@ -24,7 +24,7 @@ def test_caddie_help_works():
 
 def test_caddie_subcommand_help_works():
     # Only the subcommands your CLI actually supports
-    for sub in ("calc", "setup", "pseudo", "sbatch", "config"):
+    for sub in ("calc", "setup", "pseudo", "sbatch", "init"):
         p = _run(["caddie", sub, "--help"])
         assert p.returncode == 0, (sub, p.stderr)
         assert (p.stdout + p.stderr).strip() != ""
