@@ -66,7 +66,7 @@ def resolve_pslibrary() -> Path:
 
 
 @lru_cache(maxsize=1)
-def resolve_POTCAR_library() -> Path:
+def resolve_potcar_library() -> Path:
     """
     Resolve the root path of the POTCAR library.
 

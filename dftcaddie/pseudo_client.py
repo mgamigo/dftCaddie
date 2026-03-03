@@ -58,8 +58,8 @@ def add_arguments(parser):
         "-k",
         "--kind",
         metavar="KIND",
-        default="kjpaw",
-        help="Kind of pseudopotential (kjpaw, us, ...).",
+        default="paw",
+        help="Kind of pseudopotential (paw, us, ...).",
     )
     parser.add_argument(
         "-r",
@@ -121,7 +121,7 @@ def apply_pseudos(
     symbols: list[str],
     relativistic: bool,
     exchange: str = "pbe",
-    kind_pseudo: str = "kjpaw",
+    kind_pseudo: str = "paw",
     configure: bool = False,
     system_info_path: str = "SYSTEM.INFO",
     ratio: float = 1.5,
@@ -146,7 +146,7 @@ def apply_pseudos(
     exchange : str
         Exchange/correlation label used to locate pseudopotentials (e.g., ``"pbe"``).
     kind_pseudo : str
-        Pseudopotential kind/wildcard used to resolve files (e.g., ``"kjpaw"``, ``"us"``).
+        Pseudopotential kind/wildcard used to resolve files (e.g., ``"paw"``, ``"us"``).
     relativistic : bool
         If True, use the relativistic exchange folder variant (prefix ``"rel-"``).
     configure : bool
@@ -169,6 +169,7 @@ def apply_pseudos(
     """
 
     from dftcaddie import file_management as fm
+    import warnings
 
     if code == "quantum_espresso":
         pseudos = fm.get_qe_pseudo_paths(
@@ -183,8 +184,12 @@ def apply_pseudos(
         if configure:
             fm.configure_qe_cutoffs_from_pseudos(system_info_path, pseudos, ratio=ratio)
     elif code == "vasp":
-        log.warning("Pseudo client still in developtiment for %s)", code)
-        fm.get_POTCAR(symbols=symbols)
+        pseudos = fm.get_potcar_paths(symbols=symbols)
+        fm.write_potcar(pseudos)
+        fm.set_spin_orbit_coupling(kind_calc, code, relativistic)
+
+        if configure:
+            fm.configure_vasp_cutoffs_from_potcar("POTCAR", ratio=ratio)
     else:
-        log.warning("Pseudo client skipped (not implemented for code=%s)", code)
+        warnings.warn(f"Pseudo client skipped (not implemented for code={code})", UserWarning)
     return 0

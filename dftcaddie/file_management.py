@@ -38,11 +38,17 @@ set_auto_kgrid()
 set_high_symmetry_path()
     Insert a high-symmetry k-path.
 get_qe_pseudo_paths()
-    Resolve pseudopotential path.
+    Resolve QE pseudopotential paths.
 write_pseudos_to_system_info()
     Write ATOMIC_SPECIES and EXCHANGE into ``SYSTEM.INFO`` (QE).
 configure_qe_cutoffs_from_pseudos()
     Read suggested cutoffs from pseudo headers and update ``SYSTEM.INFO`` (QE).
+get_potcar_paths()
+    Resolve VAPS POTCAR paths.
+write_potcar()
+    Concatenate a list of POTCAR files into a single POTCAR.
+configure_vasp_cutoffs_from_potcar()
+    Read suggested cutoffs from vasp ``POTCAR`` and update ``ENCUT`` in ``INCAR`` files.
 
 Private Utilities
 -----------------
@@ -55,6 +61,7 @@ _remove_lines()
 """
 
 import logging
+import warnings
 from types import SimpleNamespace
 from typing import Iterable
 import os
@@ -86,6 +93,10 @@ __all__ = [
     "get_qe_pseudo_paths",
     "write_pseudos_to_system_info",
     "configure_qe_cutoffs_from_pseudos",
+    # Pseudopotentials (VASP)
+    "get_potcar_paths",
+    "write_potcar",
+    "configure_vasp_cutoffs_from_potcar",
 ]
 
 
@@ -542,7 +553,7 @@ def set_spin_orbit_coupling(kind: str, code: str, soc: bool) -> None:
             else:
                 _replace_setting(INCAR, "LSORBIT =", "LSORBIT = FALSE")
     else:
-        log.warning("No SOC configuration implemented for %s code", code)
+        warnings.warn("No SOC configuration implemented for {code} code", UserWarning)
 
 
 def set_cell_relaxation(code: str, cell_relaxation: bool) -> None:
@@ -572,7 +583,7 @@ def set_cell_relaxation(code: str, cell_relaxation: bool) -> None:
         else:
             _replace_setting("INCAR.RELAX", "ISIF =", "ISIF = 2")
     else:
-        log.warning("No cell_relaxation configuration implemented for %s code", code)
+        warnings.warn("No cell_relaxation configuration implemented for {code} code", UserWarning)
 
 
 def configure_input_files(calculation: SimpleNamespace) -> None:
@@ -659,25 +670,54 @@ def set_crystal_structure(structure: SimpleNamespace, code: str) -> None:
 
         write("POSCAR", structure.atoms, format="vasp", direct=True)
     else:
-        log.warning("set_crystal_structure skipped (code=%s)", code)
+        warnings.warn("set_crystal_structure skipped (code={code})", UserWarning)
 
 
-def get_POTCAR(
-    symbols: Iterable[str],
-    exchange: str = "pbe",
-    kind: str = "kjpaw",
-):
-    from dftcaddie.config import resolve_POTCAR_library
+def set_high_symmetry_path(structure: SimpleNamespace, code: str) -> None:
+    """
+    Set the high-symmetry k-path in ``SYSTEM.INFO`` based on space group.
 
-    potcar_library = resolve_POTCAR_library()
-    print(potcar_library)
-    pass
+    For Quantum ESPRESSO, this reads a template k-path file from the library
+    (keyed by the structure space group) and inserts it under ``QE_CRYST_PATH=``.
+
+    Parameters
+    ----------
+    structure : SimpleNamespace
+        Structure container. Must define ``space_group`` (int).
+    code : str
+        DFT code identifier. Currently only ``"quantum_espresso"`` is supported.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the k-path template for the given space group is not found.
+    """
+    log.info(
+        "Setting high-symmetry path for space group %s in SYSTEM.INFO",
+        structure.space_group,
+    )
+
+    source_dir = os.path.join(os.path.dirname(__file__), "resources", "kpaths", code)
+    path_file = os.path.join(source_dir, f"SG{structure.space_group}")
+
+    if code == "quantum_espresso":
+        log.debug("Reading k-path template: %s", path_file)
+        with open(path_file, "r") as file:
+            lines = file.readlines()
+        _remove_lines("SYSTEM.INFO", "QE_CRYST_PATH=", "EOL")
+        _insert_lines("SYSTEM.INFO", lines, "QE_CRYST_PATH=")
+    elif code == "vasp":
+        import shutil
+
+        shutil.copy(path_file, "KPOINTS.BS")
+    else:
+        warnings.warn("set_high_symmetry_path skipped (code={code})", UserWarning)
 
 
 def get_qe_pseudo_paths(
     symbols: Iterable[str],
     exchange: str = "pbe",
-    kind: str = "kjpaw",
+    kind: str = "paw",
     relativistic: bool = False,
 ) -> list[str]:
     """
@@ -691,8 +731,8 @@ def get_qe_pseudo_paths(
         Exchange/correlation label used to locate pseudos (e.g., ``"pbe"``),
         by default "pbe".
     kind : str, optional
-        Pseudopotential kind/wildcard (e.g., ``"kjpaw"``, ``"us"``),
-        by default "kjpaw".
+        Pseudopotential kind/wildcard (e.g., ``"paw"``, ``"us"``),
+        by default "paw".
     relativistic : bool, optional
         If True, use the relativistic exchange folder (prefix ``"rel-"``),
         by default False.
@@ -704,8 +744,6 @@ def get_qe_pseudo_paths(
 
     Raises
     ------
-    EnvironmentError
-        If ``PSLIBRARY`` is not set.
     FileNotFoundError
         If no pseudopotential is found for a symbol.
     RuntimeError
@@ -714,8 +752,6 @@ def get_qe_pseudo_paths(
     from glob import glob
     from dftcaddie.config import resolve_pslibrary
     from pathlib import Path
-
-    symbols = set(symbols)
 
     ps_library = resolve_pslibrary()
 
@@ -730,6 +766,10 @@ def get_qe_pseudo_paths(
         source_path,
     )
 
+    if kind == "paw":
+        kind = "kjpaw"
+
+    symbols = set(symbols)
     pseudos = []
     for sym in symbols:
         target = suggested_qe_pseudos[sym]
@@ -884,45 +924,155 @@ def set_auto_kgrid(structure: SimpleNamespace, code: str, kppra: int = 9000) -> 
         _remove_lines("KPOINTS.SCC", "Gamma", "0 0 0")
         _insert_lines("KPOINTS.SCC", [kgrid_str + "\n"], "Gamma")
     else:
-        log.warning("set_auto_kgrid skipped (code=%s)", code)
+        warnings.warn("set_auto_kgrid skipped (code={code})", UserWarning)
 
 
-def set_high_symmetry_path(structure: SimpleNamespace, code: str) -> None:
+def get_potcar_paths(
+    symbols: Iterable[str],
+    exchange: str = "pbe",
+    kind: str = "paw",
+) -> list[str]:
     """
-    Set the high-symmetry k-path in ``SYSTEM.INFO`` based on space group.
+    Resolve VASP POTCAR file paths for a given set of atomic symbols.
 
-    For Quantum ESPRESSO, this reads a template k-path file from the library
-    (keyed by the structure space group) and inserts it under ``QE_CRYST_PATH=``.
+    This function locates the appropriate pseudopotential library directory
+    (matching the requested exchange–correlation functional and PAW type),
+    and selects one POTCAR file per atomic species following a priority
+    order: bare potential → `_pv` → `_sv`.
 
     Parameters
     ----------
-    structure : SimpleNamespace
-        Structure container. Must define ``space_group`` (int).
-    code : str
-        DFT code identifier. Currently only ``"quantum_espresso"`` is supported.
+    symbols : Iterable[str]
+        Chemical symbols present in the structure (e.g., ``["Si", "O"]``).
+    exchange : str, optional
+        Exchange/correlation label used to locate pseudos (e.g., ``"pbe"``),
+        by default "pbe".
+    kind : str, optional
+        Pseudopotential kind/wildcard (e.g., ``"paw"``, ``"us"``),
+        by default "paw".
+
+    Returns
+    -------
+    list[str]
+        List of absolute paths to the selected POTCAR files, one per
+        unique atomic symbol.
 
     Raises
     ------
     FileNotFoundError
-        If the k-path template for the given space group is not found.
+        If no subfolder in the POTCAR library matches the requested
+        exchange and kind.
+    FileNotFoundError
+        If no suitable POTCAR file is found for a given atomic symbol
+        (neither bare, `_pv`, nor `_sv` variants).
     """
+    from dftcaddie.config import resolve_potcar_library
+    from pathlib import Path
+
+    potcar_library = resolve_potcar_library()
+
     log.info(
-        "Setting high-symmetry path for space group %s in SYSTEM.INFO",
-        structure.space_group,
+        "Resolving POTCAR files (exchange=%s, kind=%s) from %s ...",
+        exchange,
+        kind,
+        potcar_library,
     )
 
-    source_dir = os.path.join(os.path.dirname(__file__), "resources", "kpaths", code)
-    path_file = os.path.join(source_dir, f"SG{structure.space_group}")
-
-    if code == "quantum_espresso":
-        log.debug("Reading k-path template: %s", path_file)
-        with open(path_file, "r") as file:
-            lines = file.readlines()
-        _remove_lines("SYSTEM.INFO", "QE_CRYST_PATH=", "EOL")
-        _insert_lines("SYSTEM.INFO", lines, "QE_CRYST_PATH=")
-    elif code == "vasp":
-        import shutil
-
-        shutil.copy(path_file, "KPOINTS.BS")
+    subfolders = [p.name for p in potcar_library.iterdir() if p.is_dir()]
+    for subfolder in subfolders:
+        if exchange in subfolder.lower() and kind in subfolder.lower():
+            source_path = os.path.join(potcar_library, subfolder)
+            log.debug("Resolved source_path as %s", source_path)
+            break
     else:
-        log.warning("set_high_symmetry_path skipped (code=%s)", code)
+        raise FileNotFoundError(
+            f"Not subfolder fund in {potcar_library} that contains {kind} and {exchange}"
+        )
+
+    symbols = set(symbols)
+    pseudos = []
+    for sym in symbols:
+        candidates = [sym, f"{sym}_pv", f"{sym}_sv"]
+
+        for name in candidates:
+            pseudo = os.path.join(source_path, name, "POTCAR")
+            if os.path.exists(pseudo):
+                log.debug(
+                    "Selected POTCAR for %s: %s",
+                    sym,
+                    os.path.basename(os.path.dirname(pseudo)),
+                )
+                pseudos.append(pseudo)
+                break
+        else:
+            raise FileNotFoundError(
+                f"No POTCAR found for {sym!r} under {source_path!r} "
+                "for either bare, _pv or _sv."
+            )
+    return pseudos
+
+
+def write_potcar(pseudos: list[str], output: str = "POTCAR") -> None:
+    """
+    Concatenate a list of POTCAR files into a single POTCAR.
+
+    Parameters
+    ----------
+    pseudos : list of str
+        Paths to individual POTCAR files in the desired order.
+    output : str, optional
+        Output POTCAR filename (default: "POTCAR").
+    """
+    import shutil
+
+    log.info("Writing POTCAR...")
+    with open(output, "wb") as fout:
+        for pseudo in pseudos:
+            with open(pseudo, "rb") as fin:
+                shutil.copyfileobj(fin, fout)
+
+
+def configure_vasp_cutoffs_from_potcar(
+    potcar: str,
+    ratio: float = 1.5,
+) -> int:
+    """
+    Read suggested cutoffs from vasp ``POTCAR`` headers and update ``ENCUT`` in ``INCAR`` files.
+
+    Parameters
+    ----------
+    potcar : str
+        POTCAR file path to read.
+    ratio : float, optional
+        Safety factor applied to the maximum suggested values, by default 1.5.
+
+    Returns
+    -------
+    encut : int
+        Wavefunction cutoff used (after applying ``ratio``).
+
+    Raises
+    ------
+    FileNotFoundError
+        If ``INCAR`` files are not found.
+    """
+    import numpy as np
+    import glob
+
+    log.info("Configuring ENCUT from POTCAR headers (ratio=%s)", ratio)
+
+    enmax_vals: list[float] = []
+
+    with open(potcar, "r") as f:
+        for line in f:
+            if "ENMAX" in line:
+                enmax_vals.append(float(line.split()[2].strip(";")))
+    encut = int(np.max(enmax_vals) * ratio)
+    incar_files = glob.glob("INCAR*")
+    if len(incar_files) == 0:
+        raise FileNotFoundError("No `INCAR` files found.")
+    log.info("Setting ENCUT=%d in %s", encut, incar_files)
+    for file in incar_files:
+        _replace_setting(file, "ENCUT =", f"ENCUT = {encut}")
+
+    return encut

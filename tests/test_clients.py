@@ -493,17 +493,16 @@ def test_apply_pseudos_does_not_configure_cutoffs_when_configure_false(monkeypat
 
 
 def test_apply_pseudos_raises_for_unsupported_code():
-    with pytest.raises(NotImplementedError):
+    with pytest.warns(UserWarning, match="Pseudo client skipped"):
         pseudo_client.apply_pseudos(
             kind_calc="relax",
-            code="vasp",
+            code="UNKNOWN_CODE",
             symbols=["Si"],
             exchange="pbe",
             kind_pseudo="kjpaw",
             relativistic=False,
             configure=False,
         )
-
 
 def test_sbatch_run_resolves_cluster_and_applies_header_when_header_provided(
     monkeypatch,
