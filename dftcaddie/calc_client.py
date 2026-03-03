@@ -66,7 +66,7 @@ def add_arguments(parser):
         "--structure",
         metavar="FILE",
         required=False,
-        help="Structure file used to initialize the calculation (e.g. CIF, POSCAR).",
+        help="Structure file (e.g. CIF, POSCAR, .pwi).",
     )
     parser.add_argument(
         "-p",

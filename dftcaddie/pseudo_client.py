@@ -41,11 +41,9 @@ def add_arguments(parser):
         Subparser instance to which the ``pseudo`` arguments are added.
     """
     parser.add_argument(
-        "-s",
-        "--structure",
+        "structure",
         metavar="FILE",
-        required=True,
-        help="Structure file used to initialize the calculation (e.g. CIF, POSCAR).",
+        help="Structure file (e.g. CIF, POSCAR, .pwi).",
     )
     parser.add_argument(
         "-e",
@@ -169,6 +167,7 @@ def apply_pseudos(
     """
 
     from dftcaddie import file_management as fm
+    from dftcaddie.config import default_cutoff_ratio
     import warnings
 
     if code == "quantum_espresso":
@@ -182,14 +181,18 @@ def apply_pseudos(
         fm.set_spin_orbit_coupling(kind_calc, code, relativistic)
 
         if configure:
-            fm.configure_qe_cutoffs_from_pseudos(system_info_path, pseudos, ratio=ratio)
+            fm.configure_qe_cutoffs_from_pseudos(
+                system_info_path, pseudos, ratio=default_cutoff_ratio
+            )
     elif code == "vasp":
         pseudos = fm.get_potcar_paths(symbols=symbols)
         fm.write_potcar(pseudos)
         fm.set_spin_orbit_coupling(kind_calc, code, relativistic)
 
         if configure:
-            fm.configure_vasp_cutoffs_from_potcar("POTCAR", ratio=ratio)
+            fm.configure_vasp_cutoffs_from_potcar("POTCAR", ratio=default_cutoff_ratio)
     else:
-        warnings.warn(f"Pseudo client skipped (not implemented for code={code})", UserWarning)
+        warnings.warn(
+            f"Pseudo client skipped (not implemented for code={code})", UserWarning
+        )
     return 0

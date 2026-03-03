@@ -22,6 +22,7 @@ apply_setup
 
 import logging
 from types import SimpleNamespace
+from dftcaddie.config import default_kppra
 
 log = logging.getLogger(__name__)
 
@@ -42,11 +43,9 @@ def add_arguments(parser):
         Subparser instance to which the ``setup`` arguments are added.
     """
     parser.add_argument(
-        "-s",
-        "--structure",
+        "structure",
         metavar="FILE",
-        required=True,
-        help="Structure file used to initialize the calculation (e.g. CIF, POSCAR).",
+        help="Structure file (e.g. CIF, POSCAR, .pwi).",
     )
     parser.add_argument(
         "-ak",
@@ -58,7 +57,7 @@ def add_arguments(parser):
         "--kppra",
         metavar="INT",
         type=int,
-        default=9000,
+        default=default_kppra,
         help="Target number of k-points per atom (used with --autokgrid).",
     )
     parser.add_argument(

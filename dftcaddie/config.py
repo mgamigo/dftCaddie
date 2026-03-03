@@ -103,6 +103,8 @@ def resolve_potcar_library() -> Path:
 
 CONFIG, SOURCE_DIR = _load_config()
 
+default_kppra = CONFIG["default_kppra"]
+default_cutoff_ratio = CONFIG["default_cutoff_ratio"]
 calculations = CONFIG["calculations"]
 clusters = CONFIG["clusters"]
 mpi_executables = CONFIG["mpi_executables"]

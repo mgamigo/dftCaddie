@@ -65,7 +65,7 @@ def run(args=None):
     if args.init:
         return apply_config(force=args.force)
 
-    print("Nothing to do. Use --init to initialize configuration.")
+    print("\nNothing to do. Use --init to initialize configuration.")
     return 0
 
 
@@ -95,7 +95,6 @@ def apply_config(force: bool = False) -> int:
 
     pkg_root = Path(__file__).parent
     resources = pkg_root / "resources"
-    print(resources)
 
     user_root = Path.home() / ".config" / "dftcaddie"
     templates_src = resources / "templates"

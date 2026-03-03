@@ -79,6 +79,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="caddie",
         description="DFT Caddie - Your assistant for DFT calculations",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
         "-v",
@@ -100,6 +101,7 @@ def main(argv: list[str] | None = None) -> int:
         "calc",
         help="Start a new DFT calculation",
         description="Start a new DFT calculation",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     calc_client.add_arguments(calc_parser)
     # --- setup subcommand ---
@@ -107,6 +109,7 @@ def main(argv: list[str] | None = None) -> int:
         "setup",
         help="Configure the calculation for a given system",
         description="Configure the calculation for a given system",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     setup_client.add_arguments(setup_parser)
     # --- calc subcommand ---
@@ -114,6 +117,7 @@ def main(argv: list[str] | None = None) -> int:
         "pseudo",
         help="Set the desired pseudopotentials",
         description="Set the desired pseudopotentials",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     pseudo_client.add_arguments(pseudo_parser)
     # --- sbatch subcommand ---
