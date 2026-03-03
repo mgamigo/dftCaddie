@@ -35,4 +35,4 @@ exclude = ["tests*", "docs*"]
 caddie = "dftcaddie.cli:main"
 
 [tool.setuptools.package-data]
-dftcaddie = ["data/**/*"]
+dftcaddie = ["resources/**/*"]
