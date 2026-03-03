@@ -126,8 +126,8 @@ def main(argv: list[str] | None = None) -> int:
     # --- config subcommand ---
     config_parser = subparsers.add_parser(
         "config",
-        help="Text for config",
-        description="Text for config",
+        help="Initialize dftCaddie user configuration directory",
+        description="Initialize dftCaddie user configuration directory",
     )
     config_client.add_arguments(config_parser)
     # ---

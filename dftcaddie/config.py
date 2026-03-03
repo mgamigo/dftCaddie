@@ -14,82 +14,94 @@ import logging
 
 log = logging.getLogger(__name__)
 
-DEFAULT_CONFIG_PATH = Path(__file__).parent / "resources" / "config.yaml"
-USER_PATHS = [
-    Path.cwd() / "dftcaddie.yaml",
-    Path.home() / ".config" / "dftcaddie" / "config.yaml",
-]
-
 
 @lru_cache(maxsize=1)
 def _load_config() -> dict:
-    for path in USER_PATHS:
-        if path.exists():
-            with open(path, "r") as f:
-                return yaml.safe_load(f) or {}
-
-    with open(DEFAULT_CONFIG_PATH, "r") as f:
-        return yaml.safe_load(f) or {}
+    default = False
+    CONFIG_FILE = (Path.home() / ".config" / "dftcaddie" / "config.yaml",)
+    if not CONFIG_FILE.exists():
+        CONFIG_FILE = Path(__file__).parent / "resources" / "config.yaml"
+        default = True
+    with open(CONFIG_FILE, "r") as f:
+        return yaml.safe_load(f) or {}, default
 
 
 @lru_cache(maxsize=1)
 def resolve_pslibrary() -> Path:
     """
-    Resolve the root path of the pseudopotential library.
+    Resolve the root path of the QE pslibrary.
 
-    Priority:
-    1. Environment variable PSLIBRARY
-    2. User configuration (YAML)
+    The path is read from the user configuration key
+    ``qe_pseudopotentials``. The directory must exist.
+
+    Returns
+    -------
+    Path
+        Absolute path to the pslibrary.
+
+    Raises
+    ------
+    RuntimeError
+        If the path is not defined or does not exist.
     """
-    import os
+    root = CONFIG.get("qe_pslibrary")
 
-    # 1. From environment
-    env = os.environ.get("PSLIBRARY")
-    if env:
-        log.info("Using PSLIBRARY from environment")
-        return Path(env).expanduser()
+    if not root:
+        raise RuntimeError(
+            "QE PSLIBRARY not defined. " "Set 'qe_pslibrary' in config.yaml."
+        )
 
-    # 2. From YAML (optional)
-    pseudo_cfg = CONFIG.get("pseudopotentials")
-    if isinstance(pseudo_cfg, dict):
-        root = pseudo_cfg.get("root")
-        if root:
-            log.info("Using PSLIBRARY from config file")
-            return Path(root).expanduser()
+    path = Path(root).expanduser()
 
-    # 3. Hard error
-    raise RuntimeError(
-        "Pseudopotential library not found. "
-        "Define 'pseudopotentials.root' in config.yaml "
-        "or set the PSLIBRARY environment variable."
-    )
+    if not path.exists():
+        raise RuntimeError(
+            f"QE PSLIBRARY not found at '{path}'. "
+            "Check 'qe_pslibrary' in config.yaml."
+        )
+
+    log.info("Using QE pseudopotentials from %s", path)
+    return path
 
 
 @lru_cache(maxsize=1)
 def resolve_potcar_library() -> Path:
     """
-    Resolve the root path of the POTCAR library.
+    Resolve the root path of the VASP POTCAR library.
 
-    Priority:
-    1. User configuration (YAML)
+    The path is read from the user configuration key
+    ``vasp_pseudopotentials``. The directory must exist.
+
+    Returns
+    -------
+    Path
+        Absolute path to the POTCAR library.
+
+    Raises
+    ------
+    RuntimeError
+        If the path is not defined or does not exist.
     """
-    import os
+    root = CONFIG.get("vasp_pseudopotentials")
 
-    # From YAML (optional)
-    potcar_cfg = CONFIG.get("POTCARs")
-    if isinstance(potcar_cfg, dict):
-        root = potcar_cfg.get("root")
-        if root:
-            log.info("Using POTCARs from config file")
-            return Path(root).expanduser()
+    if not root:
+        raise RuntimeError(
+            "VASP POTCAR library not defined. "
+            "Set 'vasp_pseudopotentials' in config.yaml."
+        )
 
-    # Hard error
-    raise RuntimeError(
-        "POTCARs library not found. " "Define 'POTCARs.root' in config.yaml "
-    )
+    path = Path(root).expanduser()
+
+    if not path.exists():
+        raise RuntimeError(
+            f"VASP POTCAR library not found at '{path}'. "
+            "Check 'vasp_pseudopotentials' in config.yaml."
+        )
+
+    log.info("Using VASP POTCARs from %s", path)
+    return path
 
 
-CONFIG = _load_config()
+CONFIG, DEFAULT = _load_config()
 
 calculations = CONFIG["calculations"]
 clusters = CONFIG["clusters"]
