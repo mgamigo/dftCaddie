@@ -100,7 +100,9 @@ __all__ = [
 ]
 
 
-def _replace_setting(file_path: str, partial_match: str, new_line: str) -> None:
+def _replace_setting(
+    file_path: str, partial_match: str, new_line: str, keep_comment: bool = True
+) -> None:
     """
     Replace the first line starting with a specific substring, ignoring
     leading spaces, with a new line preserving the original line's
@@ -116,6 +118,8 @@ def _replace_setting(file_path: str, partial_match: str, new_line: str) -> None:
     new_line : str
         The new line content to use as a replacement, including preserved
         indentation.
+    keep_comment : bool, optional
+        If True, the comment delimited by # or ! is conserved.
     """
 
     # Read the file's contents
@@ -133,7 +137,7 @@ def _replace_setting(file_path: str, partial_match: str, new_line: str) -> None:
 
             # Detect inline comment
             for sep in ("#", "!"):
-                if sep in body:
+                if sep in body and keep_comment:
                     code_part, comment = body.split(sep, 1)
                     separator = sep
                     break
@@ -318,7 +322,7 @@ def copy_input_files(calculation: SimpleNamespace) -> list[str]:
     files_to_copy.append("master.sh")
 
     # Copy the files
-    source_dir = os.path.join(os.path.dirname(__file__), "resources", calculation.code)
+    source_dir = os.path.join(os.path.dirname(__file__), "resources/templates", calculation.code)
     copied = []
     for file_name in files_to_copy:
         source_path = os.path.join(source_dir, file_name)
@@ -583,7 +587,9 @@ def set_cell_relaxation(code: str, cell_relaxation: bool) -> None:
         else:
             _replace_setting("INCAR.RELAX", "ISIF =", "ISIF = 2")
     else:
-        warnings.warn("No cell_relaxation configuration implemented for {code} code", UserWarning)
+        warnings.warn(
+            "No cell_relaxation configuration implemented for {code} code", UserWarning
+        )
 
 
 def configure_input_files(calculation: SimpleNamespace) -> None:

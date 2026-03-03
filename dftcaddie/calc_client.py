@@ -40,7 +40,7 @@ def add_arguments(parser):
         "--kind",
         metavar="KIND",
         required=False,
-        help="Calculation kind (e.g., bands, relax)",
+        help="Calculation kind (e.g., bands, relax, phonons)",
     )
     parser.add_argument(
         "-c",

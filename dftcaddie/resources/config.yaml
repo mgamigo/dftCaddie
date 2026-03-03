@@ -3,12 +3,10 @@
 # Users can extend this file to add new calculation kinds, clusters,
 # MPI executables, or pseudopotential mappings.
 
-# Folder in which pseudopotentials are stored. Overwritten by env variable $PSLIBRARY (if present).
-pseudopotentials:
-  root: /opt/pslibrary
-
-POTCARs:
-  root: ~/Software/VASP/pseudos
+# Folder in which QE pseudopotentials are stored.
+qe_pseudopotentials: /opt/pslibrary
+# Folder in which VASP POTCARs are stored.
+vasp_pseudopotentials: ~/Software/VASP/pseudos
 
 # Supported calculations and required files (located at dftcaddie/data)
 calculations:

@@ -20,7 +20,6 @@ apply_header(cluster, header)
 """
 
 import logging
-from types import SimpleNamespace
 
 log = logging.getLogger(__name__)
 
@@ -81,7 +80,7 @@ def run(args=None):
     headers = clusters[args.cluster]["headers"]
     options = [item["name"] for item in headers]
     if args.header is None:
-        print(f"\nAvailable sbatch headers:")
+        print(f"\nAvailable sbatch headers for Cluster={args.cluster}:")
         print(ut.format_options(options, numbers=True))
         user_input = input("Choose a sbatch header: ").strip().lower()
         args.header = ut.resolve_user_input(user_input, options)
@@ -142,6 +141,9 @@ def apply_header(cluster: str, header: int) -> int:
     fm.set_master_preamble(master_script_path, cluster=cluster, header=header)
     # Reapply name
     fm._replace_setting(
-        master_script_path, "#SBATCH --job-name", f'#SBATCH --job-name="{name}"'
+        master_script_path,
+        "#SBATCH --job-name",
+        f'#SBATCH --job-name="{name}"',
+        keep_comment=False,
     )
     return 0
