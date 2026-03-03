@@ -25,7 +25,7 @@ import sys
 import argparse
 import logging
 
-from dftcaddie import calc_client, setup_client, pseudo_client, sbatch_client, config_client
+from dftcaddie import calc_client, setup_client, pseudo_client, sbatch_client, init_client
 
 _all__ = [
     "main",
@@ -127,13 +127,13 @@ def main(argv: list[str] | None = None) -> int:
         description="Set the desired sbatch header",
     )
     sbatch_client.add_arguments(sbatch_parser)
-    # --- config subcommand ---
-    config_parser = subparsers.add_parser(
-        "config",
+    # --- init subcommand ---
+    init_parser = subparsers.add_parser(
+        "init",
         help="Initialize dftCaddie user configuration directory",
         description="Initialize dftCaddie user configuration directory",
     )
-    config_client.add_arguments(config_parser)
+    init_client.add_arguments(init_parser)
     # ---
     args = parser.parse_args(argv)
     _configure_logging(args.verbose, quiet=args.quiet)
@@ -148,8 +148,8 @@ def main(argv: list[str] | None = None) -> int:
         pseudo_client.run(args)
     elif args.command == "sbatch":
         sbatch_client.run(args)
-    elif args.command == "config":
-        config_client.run(args)
+    elif args.command == "init":
+        init_client.run(args)
     else:
         parser.print_help()
         return 0

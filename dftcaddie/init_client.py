@@ -1,8 +1,8 @@
 """
-dftCaddie | dftcaddie.config_client
+dftCaddie | dftcaddie.init_client
 ===================================
 
-CLI handler for the ``caddie config`` command.
+CLI handler for the ``caddie init`` command.
 
 This module initializes a user configuration directory under
 ``~/.config/dftcaddie`` by copying editable resources.
@@ -12,8 +12,8 @@ Functions
 add_arguments(parser)
     Register command-line arguments for the ``config`` subcommand.
 run(args=None)
-    Dispatch the ``config`` workflow.
-apply_config(force=False)
+    Dispatch the ``init`` workflow.
+apply_init(force=False)
     Create and populate the user configuration directory.
 """
 
@@ -24,24 +24,19 @@ log = logging.getLogger(__name__)
 __all__ = [
     "add_arguments",
     "run",
-    "apply_config",
+    "apply_init",
 ]
 
 
 def add_arguments(parser):
     """
-    Add command-line arguments for the ``config`` subcommand.
+    Add command-line arguments for the ``init`` subcommand.
 
     Parameters
     ----------
     parser : argparse.ArgumentParser
-        Subparser instance to which the ``config`` arguments are added.
+        Subparser instance to which the ``init`` arguments are added.
     """
-    parser.add_argument(
-        "--init",
-        action="store_true",
-        help="Initialize user configuration directory.",
-    )
     parser.add_argument(
         "-f",
         "--force",
@@ -52,7 +47,7 @@ def add_arguments(parser):
 
 def run(args=None):
     """
-    Dispatch the ``caddie config`` workflow.
+    Dispatch the ``caddie init`` workflow.
 
     This function initializes a user configuration directory under
     ``~/.config/dftcaddie`` by copying editable resources.
@@ -60,30 +55,7 @@ def run(args=None):
     Parameters
     ----------
     args : argparse.Namespace
-        Parsed command-line arguments for the ``config`` subcommand.
-    """
-    if args.init:
-        return apply_config(force=args.force)
-
-    print("\nNothing to do. Use --init to initialize configuration.")
-    return 0
-
-
-def apply_config(force: bool = False) -> int:
-    """
-    Initialize ~/.config/dftcaddie with editable resources.
-
-    This function copies editable resources bundled with the package
-    (configuration file, calculation templates, and SBATCH headers)
-    into the user's configuration directory. Existing files and
-    directories are preserved unless ``force`` is True.
-
-    Parameters
-    ----------
-    force : bool
-        If True, overwrite existing files and directories in the user
-        configuration directory. If False, existing entries are kept
-        and skipped with a warning.
+        Parsed command-line arguments for the ``init`` subcommand.
 
     Returns
     -------
@@ -109,14 +81,14 @@ def apply_config(force: bool = False) -> int:
 
     def copytree(src: Path, dst: Path):
         if dst.exists():
-            if not force:
+            if not args.force:
                 log.warning("Directory %s already exists. Skipping.", dst)
                 return
             shutil.rmtree(dst)
         shutil.copytree(src, dst)
 
     def copyfile(src: Path, dst: Path):
-        if dst.exists() and not force:
+        if dst.exists() and not args.force:
             log.warning("File %s already exists. Skipping.", dst)
             return
         shutil.copy2(src, dst)
