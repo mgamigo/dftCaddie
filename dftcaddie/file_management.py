@@ -53,7 +53,7 @@ configure_vasp_cutoffs_from_potcar()
 Private Utilities
 -----------------
 _replace_setting()
-    Replace a single setting line in a file while preserving indentation.
+    Replace a single setting line in a file while preserving indentation or comments.
 _insert_lines()
     Insert a block of lines after a matching line in a file.
 _remove_lines()
