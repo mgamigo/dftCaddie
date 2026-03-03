@@ -4,7 +4,7 @@
 # MPI executables, or pseudopotential mappings.
 
 # Folder in which QE pseudopotentials are stored.
-qe_pseudopotentials: /opt/pslibrary
+qe_pseudopotentials: ~/Software/pslibrary
 # Folder in which VASP POTCARs are stored.
 vasp_pseudopotentials: ~/Software/VASP/pseudos
 
