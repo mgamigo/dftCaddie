@@ -1,8 +1,8 @@
-#SBATCH --account=torma
-#SBATCH --ntasks=10
-#SBATCH --mem=20gb
-#SBATCH --time=5:00:00
-#SBATCH --partition=small
+#SBATCH --nodes=2
+#SBATCH --ntasks=100
+#SBATCH --mem=200gb
+#SBATCH --time=240:00:00
+#SBATCH --partition=long
 #SBATCH --job-name="NONAME"
 
 export NPROCS=$SLURM_NTASKS

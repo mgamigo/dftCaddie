@@ -1,8 +1,8 @@
 #SBATCH --nodes=1
-#SBATCH --ntasks=40
-#SBATCH --mem=88gb
+#SBATCH --ntasks=10
+#SBATCH --mem=10gb
 #SBATCH --time=48:00:00
-#SBATCH --partition=intelnodes
+#SBATCH --partition=small
 #SBATCH --job-name="NONAME"
 
 export NPROCS=$SLURM_NTASKS

@@ -1,15 +1,99 @@
-# dftCaddie user configuration
-# ============================
-# Users can extend this file to add new calculation kinds, clusters,
-# MPI executables, or pseudopotential mappings.
+# ============================================================
+# dftCaddie — User Configuration File
+# ============================================================
+#
+# This file allows you to customize:
+#   • Pseudopotential locations
+#   • Available clusters and SBATCH headers
+#   • MPI launch commands
+#   • Calculation kinds and templates
+#
+# You can safely edit this file.
+# New calculation kinds, clusters, or headers can be added
+# following the same structure shown below.
+#
+# User configuration directory:
+#   ~/.config/dftcaddie/
+# ============================================================
 
-# Folder in which QE pseudopotentials are stored.
+
+# ------------------------------------------------------------
+# Pseudopotential locations
+# ------------------------------------------------------------
+# Absolute paths to your pseudopotential libraries.
+# These folders must contain the raw QE / VASP pseudo files.
+
 qe_pseudopotentials: ~/Software/pslibrary
-# Folder in which VASP POTCARs are stored.
 vasp_pseudopotentials: ~/Software/VASP/pseudos
 
-# Supported calculations and required files (located at dftcaddie/data)
+
+# ------------------------------------------------------------
+# Cluster definitions
+# ------------------------------------------------------------
+# Each cluster entry defines:
+#   hostname      → substring used to auto-detect the cluster
+#   mpi_command   → MPI launcher prepended to executables
+#   headers       → Available SBATCH header presets
+#
+# Header files must exist in:
+#   ~/.config/dftcaddie/sbatch_headers/
+#
+# "local" is used as fallback when no hostname matches.
+
+clusters:
+  local:
+    hostname: ""
+    mpi_command: "mpiexec -np 2"
+    headers:
+      - name: default
+        file: local.default
+  cluster1:
+    hostname: "cluster1_hostname"
+    mpi_command: "mpiexec -np $NPROCS"
+    headers:
+      - name: default
+        file: cluster1.default
+  cluster2:
+    hostname: "cluster2_hostname"
+    mpi_command: "srun --mpi=pmi2"
+    headers:
+      - name: default
+        file: cluster2.default
+      - name: long
+        file: cluster2.long
+      - name: small
+        file: cluster2.small
+
+
+# ------------------------------------------------------------
+# MPI-aware executables
+# ------------------------------------------------------------
+# These executables will automatically receive the cluster's
+# mpi_command prefix when generating scripts.
+
+mpi_executables:
+  - pw.x
+  - projwfc.x
+  - ph.x
+  - vasp_ncl
+
+
+# ------------------------------------------------------------
+# Calculation definitions
+# ------------------------------------------------------------
+# Each calculation kind defines:
+#   name    → Display label in CLI
+#   config  → Interactive configuration options
+#   files   → Required template files
+#
+# Template files must be located in:
+#   ~/.config/dftcaddie/templates/<code>/
+#
+# Advanced users may extend this section.
+# Incorrect edits may break CLI behavior.
+
 calculations:
+
   bands:
     name: "[B]ands"
     config:
@@ -36,6 +120,7 @@ calculations:
         - KPOINTS.SCC
         - scf.sh
         - bands.sh
+
   relax:
     name: "[R]elax"
     config:
@@ -64,6 +149,7 @@ calculations:
         - INCAR.RELAX
         - KPOINTS.SCC
         - relax.sh
+
   phonons:
     name: "[P]honons"
     config:
@@ -84,59 +170,18 @@ calculations:
         - ph.sh
         - matdyn.sh
 
-# Supported clusters with custom preambles located at dftcaddie/data
-clusters:
-  local:
-    hostname: ""
-    mpi_command: "mpiexec -np 2"
-    headers:
-      - name: default
-        file: default
-  ekhi:
-    hostname: "ekhi"
-    mpi_command: "mpiexec -np $NPROCS"
-    headers:
-      - name: default
-        file: ekhi
-  triton:
-    hostname: "triton"
-    mpi_command: "srun"
-    headers:
-      - name: default
-        file: triton
-  puhti:
-    hostname: "puhti"
-    mpi_command: "srun"
-    headers:
-      - name: default
-        file: puhti_mahti
-  mahti:
-    hostname: "mahti"
-    mpi_command: "srun"
-    headers:
-      - name: default
-        file: puhti_mahti
-  planck:
-    hostname: "login"
-    mpi_command: "srun --mpi=pmi2"
-    headers:
-      - name: default
-        file: planck
-      - name: intelnodes
-        file: planck
-      - name: intelnewnodes
-        file: planck
-      - name: amdnodes
-        file: planck
+# ------------------------------------------------------------
+# Suggested Quantum ESPRESSO pseudopotentials
+# ------------------------------------------------------------
+# Wildcard patterns used to select default pseudos from PSLibrary.
+#
+# Special placeholders:
+#   $fct → exchange functional (pbe, pbesol, pz, ...)
+#   *    → pseudo kind (kjpaw, us, ...)
+#
+# These patterns are used to automatically resolve
+# preferred pseudopotentials for each element.
 
-# Mpi executables over which to attach the cluster specific mpi_commands
-mpi_executables:
-  - pw.x
-  - projwfc.x
-  - ph.x
-  - vasp_ncl
-
-# Suggested pseudopotentials (same as suggested in pslibrary repository)
 suggested_qe_pseudos:
   H: "H.$fct-*_psl.1.0.0"
   He: "He.$fct-*_psl.1.0.0"
