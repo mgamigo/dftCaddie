@@ -1,68 +1,31 @@
-from dftcaddie.config import calculations, clusters, mpi_executables, suggested_qe_pseudos, default_kppra, default_cutoff_ratio
+import pathlib
+import os
+
+from dftcaddie import config
 
 
-def test_calculations_schema_minimal():
+def test_pseudo_libraries():
+    assert isinstance(config.resolve_pslibrary(), pathlib.PosixPath)
+    assert isinstance(config.resolve_potcar_library(), pathlib.PosixPath)
+
+
+def test_resources_folder_exists():
+    assert config.SOURCE_DIR.exists()
+
+
+def test_numerical_defaults():
+    assert config.default_kppra > 0, "default_kppra should be bigger than 0"
     assert (
-        isinstance(calculations, dict) and calculations
-    ), "calculations must be a non-empty dict"
-
-    for kind, cfg in calculations.items():
-        assert isinstance(kind, str) and kind, "kind keys must be non-empty strings"
-        assert isinstance(cfg, dict), f"calculations[{kind!r}] must be a dict"
-
-        # required top-level keys
-        assert "name" in cfg, f"calculations[{kind!r}] missing 'name'"
-        assert (
-            isinstance(cfg["name"], str) and cfg["name"]
-        ), f"calculations[{kind!r}]['name'] must be a string"
-        flavors = cfg.get("flavors", None)
-        if flavors is None:
-            assert "files" in cfg, f"calculations[{kind!r}] missing 'files'"
-        else:
-            for flavor, cfg in flavors.items():
-                assert (
-                    "files" in cfg
-                ), f"calculations[{kind!r}][{flavor!r}] missing 'files'"
-                assert (
-                    "name" in cfg
-                ), f"calculations[{kind!r}][{flavor!r}] missing 'name'"
-
-        # assert isinstance(
-        #    cfg["files"], dict
-        # ), f"calculations[{kind!r}]['files'] must be a dict"
-
-        # for code, files_list in cfg["files"].items():
-        #    assert (
-        #        isinstance(code, str) and code
-        #    ), f"code keys must be non-empty strings (kind={kind!r})"
-        #    assert isinstance(
-        #        files_list, list
-        #    ), f"calculations[{kind!r}]['files'][{code!r}] must be a list"
-        #    assert files_list, f"files list empty for kind={kind!r}, code={code!r}"
-        #    assert all(
-        #        isinstance(f, str) and f for f in files_list
-        #    ), f"All template filenames must be non-empty strings (kind={kind!r}, code={code!r})"
+        config.default_cutoff_ratio > 0
+    ), "default_cutoff_ratio should be bigger than 0"
 
 
-def test_clusters_schema_minimal():
-    assert isinstance(clusters, dict), "clusters must be a dict"
-
-    # allow None key if you use it, but enforce structure for real clusters
-    for key, cfg in clusters.items():
-        if key is None:
-            continue
-        assert isinstance(cfg, dict), f"clusters[{key!r}] must be a dict"
-        assert "mpi_command" in cfg, f"clusters[{key!r}] missing 'mpi_command'"
-        assert "headers" in cfg, f"clusters[{key!r}] missing 'headers'"
-        assert (
-            isinstance(cfg["mpi_command"], str) and cfg["mpi_command"]
-        ), f"clusters[{key!r}]['mpi_command'] must be a string"
-        assert (
-            isinstance(cfg["headers"], list) and cfg["headers"]
-        ), f"clusters[{key!r}]['headers'] must be a list"
+def test_suggested_pseudos():
+    assert len(config.suggested_qe_pseudos) == 94, f"Not 94 suggested pseudos."
 
 
 def test_mpi_executables_basic():
+    mpi_executables = config.mpi_executables
     assert isinstance(
         mpi_executables, (list, tuple, set)
     ), "mpi_executables should be a sequence"
@@ -70,9 +33,61 @@ def test_mpi_executables_basic():
         isinstance(x, str) and x for x in mpi_executables
     ), "mpi_executables must be non-empty strings"
 
-def test_suggested_pseudos():
-    assert (len(suggested_qe_pseudos) == 94), f"Not 94 suggested pseudos."
 
-def test_numerical_defaults_exist():
-    assert isinstance(default_kppra, int), f"Default kppra must be an integer."
-    assert isinstance(default_cutoff_ratio, (int, float)), f"Default kppra must be eiher integer or float."
+def _check_key(dictionary, key, key_type=None):
+    assert key in dictionary.keys(), f"Missing key {key!r} in {dictionary!r}"
+    if key_type is not None:
+        assert isinstance(
+            dictionary[key], key_type
+        ), f"{key!r} is not {key_type!r} type"
+
+
+def test_clusters_schema():
+    clusters = config.clusters
+    assert isinstance(clusters, dict), "clusters must be a dict"
+
+    check_list = [
+        ["hostname", str],
+        ["mpi_command", str],
+        ["headers", list],
+    ]
+    for cluster, cluster_dict in clusters.items():
+        for key in check_list:
+            _check_key(cluster_dict, key[0], key[1])
+        headers = cluster_dict["headers"]
+        for header in headers:
+            _check_key(header, "name", str)
+            _check_key(header, "file", str)
+            path = os.path.join(config.SOURCE_DIR, "sbatch_headers", header["file"])
+            assert os.path.exists(path), "Missing header file: {path!r}"
+
+
+def _check_calculation_flavor(flavor_dict):
+    _check_key(flavor_dict, "config", list)
+    _check_key(flavor_dict, "files", dict)
+    cfg = flavor_dict["config"]
+    for item in cfg:
+        _check_key(item, "name", str)
+        _check_key(item, "prompt", str)
+        _check_key(item, "options", list)
+        if item["name"] == "code":
+            codes = item["options"]
+    files = flavor_dict["files"]
+    for code, code_files in files.items():
+        assert code in codes
+        for f in code_files:
+            path = os.path.join(config.SOURCE_DIR, "templates", f)
+            assert os.path.exists(path)
+
+
+def test_calculations_schema():
+    calculations = config.calculations
+    for kind, kind_dict in calculations.items():
+        _check_key(kind_dict, "name", str)
+        if "flavors" not in kind_dict.keys():
+            _check_calculation_flavor(kind_dict)
+        else:
+            flavors = kind_dict["flavors"]
+            for flavor, flavor_dict in flavors.items():
+                _check_key(flavor_dict, "name", str)
+                _check_calculation_flavor(flavor_dict)

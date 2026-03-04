@@ -105,7 +105,8 @@ CONFIG, SOURCE_DIR = _load_config()
 
 default_kppra = CONFIG["default_kppra"]
 default_cutoff_ratio = CONFIG["default_cutoff_ratio"]
-calculations = CONFIG["calculations"]
-clusters = CONFIG["clusters"]
-mpi_executables = CONFIG["mpi_executables"]
+
 suggested_qe_pseudos = CONFIG["suggested_qe_pseudos"]
+mpi_executables = CONFIG["mpi_executables"]
+clusters = CONFIG["clusters"]
+calculations = CONFIG["calculations"]
