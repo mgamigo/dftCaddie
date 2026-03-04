@@ -41,6 +41,8 @@ from dftcaddie.config import calculations
 log = logging.getLogger(__name__)
 
 __all__ = [
+    "affirmation2bool",
+    "bool2affirmation",
     "resolve_cluster",
     "format_options",
     "resolve_user_input",
@@ -48,8 +50,6 @@ __all__ = [
     "resolve_calc_current_dir",
     "get_structure",
     "get_config",
-    "affirmation2bool",
-    "bool2affirmation",
 ]
 
 affirmation2bool = {"yes": True, "no": False}
@@ -119,15 +119,18 @@ def format_options(
     return ", ".join(options)
 
 
-def resolve_user_input(user_input: str, options: list[str] | list[bool]) -> str | bool:
+def resolve_user_input(
+    user_input: str | int, options: list[str] | list[bool]
+) -> str | bool:
     """
     Resolve user input to find its matched value in a list of options first by
     full match, then by partial match.
 
     Parameters
     ----------
-    user_input : str
+    user_input : str | int
         The user's input string to match against the list of options.
+        Or integer (starting by 1) indicating option.
     options : list[str]
         A list of strings representing possible options to match.
 
@@ -181,7 +184,7 @@ def resolve_user_input(user_input: str, options: list[str] | list[bool]) -> str 
 
 def check_option_exists(
     value: str | bool, options: list[str] | list[bool], name: str = None
-) -> None:
+) -> int:
     """
     Checks if a value exists within a list of options, printing an error
     and exiting if not.
@@ -195,6 +198,11 @@ def check_option_exists(
     name : str, optional
         The name of the parameter being validated, included in the error
         message if provided.
+
+    Returns
+    -------
+    int
+        Exit code (0 on successful completion).
     """
     if value not in options:
         if name is None:
@@ -206,6 +214,7 @@ def check_option_exists(
         print(f"{list(options)}")
         print(f"Exiting the process.")
         sys.exit(1)  # Exit with a status code indicating an error
+    return 0
 
 
 def resolve_calc_current_dir() -> tuple[str, str, str]:
@@ -380,14 +389,16 @@ def get_config(kind: str, config_name: str, flavor: str = None) -> dict:
                 f"No config for calculation kind/flavor: '{kind}/{flavor}'"
             ) from exc
     else:
-        possible_flavors = calculations[kind].get("flavors", None)
+        try:
+            possible_flavors = calculations[kind].get("flavors", None)
+        except KeyError as exc:
+            raise KeyError(f"No calculation kind: {kind!r}") from exc
         # No possible flavors
         if possible_flavors is None:
             try:
                 configs = calculations[kind]["config"]
             except KeyError as exc:
                 raise KeyError(f"No config for calculation kind: {kind!r}") from exc
-
         # More than one possible flavor (retrieve setting for first flavor)
         else:
             for flavor, flavor_data in possible_flavors.items():
