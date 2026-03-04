@@ -25,7 +25,13 @@ import sys
 import argparse
 import logging
 
-from dftcaddie import calc_client, setup_client, pseudo_client, sbatch_client, init_client
+from dftcaddie import (
+    calc_client,
+    setup_client,
+    pseudo_client,
+    sbatch_client,
+    init_client,
+)
 
 _all__ = [
     "main",
@@ -63,19 +69,7 @@ def _caddie_heading():
     )
 
 
-def main(argv: list[str] | None = None) -> int:
-    """
-    Run the dftCaddie command-line interface.
-
-    Parameters
-    ----------
-    argv : list[str] | None
-        Command-line arguments (excluding the program name). If ``None``,
-        arguments are taken from ``sys.argv[1:]``.
-    """
-    if argv is None:
-        argv = sys.argv[1:]
-
+def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="caddie",
         description="DFT Caddie - Your assistant for DFT calculations",
@@ -135,6 +129,23 @@ def main(argv: list[str] | None = None) -> int:
     )
     init_client.add_arguments(init_parser)
     # ---
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    """
+    Run the dftCaddie command-line interface.
+
+    Parameters
+    ----------
+    argv : list[str] | None
+        Command-line arguments (excluding the program name). If ``None``,
+        arguments are taken from ``sys.argv[1:]``.
+    """
+    if argv is None:
+        argv = sys.argv[1:]
+
+    parser = _build_parser()
     args = parser.parse_args(argv)
     _configure_logging(args.verbose, quiet=args.quiet)
 

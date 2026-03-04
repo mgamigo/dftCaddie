@@ -2,6 +2,9 @@ import os
 import sys
 import subprocess
 from pathlib import Path
+import pytest
+
+from dftcaddie.cli import _build_parser
 
 
 def _run(cmd: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess:
@@ -15,6 +18,15 @@ def _run(cmd: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess
     )
 
 
+def _get_subcommands():
+    import argparse
+
+    parser = _build_parser()
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            return list(action.choices.keys())
+
+
 def test_caddie_help_works():
     p = _run(["caddie", "--help"])
     assert p.returncode == 0, p.stderr
@@ -22,12 +34,12 @@ def test_caddie_help_works():
     assert (p.stdout + p.stderr).strip() != ""
 
 
-def test_caddie_subcommand_help_works():
+@pytest.mark.parametrize("subcommand", _get_subcommands())
+def test_caddie_subcommand_help_works(subcommand):
     # Only the subcommands your CLI actually supports
-    for sub in ("calc", "setup", "pseudo", "sbatch", "init"):
-        p = _run(["caddie", sub, "--help"])
-        assert p.returncode == 0, (sub, p.stderr)
-        assert (p.stdout + p.stderr).strip() != ""
+    p = _run(["caddie", subcommand, "--help"])
+    assert p.returncode == 0, (subcommand, p.stderr)
+    assert (p.stdout + p.stderr).strip() != ""
 
 
 def test_python_module_cli_invocation_returns_zero():
