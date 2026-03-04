@@ -16,9 +16,10 @@ Private Utilities
 -----------------
 _configure_logging():
     Configure root logging level for the CLI.
-
 _caddie_heading()
     Heading for the client.
+_build_parser()
+    Build the caddie parser.
 """
 
 import sys
@@ -70,6 +71,13 @@ def _caddie_heading():
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """
+    Build caddie parser
+
+    Returns
+    -------
+    argparse.ArgumentParser
+    """
     parser = argparse.ArgumentParser(
         prog="caddie",
         description="DFT Caddie - Your assistant for DFT calculations",
