@@ -17,6 +17,8 @@ calculation input files in the working directory. It includes utilities to:
 
 Functions
 ---------
+resolve_files()
+    Resolves the specific input files for a given calculation.
 copy_input_files()
     Copy template input files for a given calculation into the working directory.
 populate_master_script()
@@ -78,6 +80,7 @@ log = logging.getLogger(__name__)
 
 __all__ = [
     # File copying / orchestration
+    "resolve_files",
     "copy_input_files",
     "populate_master_script",
     "set_master_preamble",
@@ -293,11 +296,9 @@ def _remove_lines(
     )
 
 
-def copy_input_files(calculation: SimpleNamespace) -> list[str]:
+def resolve_files(calculation: SimpleNamespace) -> list[str]:
     """
-    Copies specified input files for a given DFT code into the current
-    working directory. Prompts users to confirm overwriting if files
-    already exist at the destination.
+    Resolves the specific input files for a given calculation.
 
     Parameters
     ----------
@@ -307,7 +308,37 @@ def copy_input_files(calculation: SimpleNamespace) -> list[str]:
     Returns
     -------
     files : list[str]
-        List of files that relevant for the calculation.
+        List of files that are relevant for the calculation.
+    """
+    # Resolve needed files.
+    log.debug("Resolving needed files ...")
+    if "flavor" in calculation.__dict__.keys():
+        files_to_copy = list(
+            calculations[calculation.kind]["flavors"][calculation.flavor]["files"][
+                calculation.code
+            ]
+        )
+    else:
+        files_to_copy = calculations[calculation.kind]["files"][calculation.code]
+    if not os.path.exists("SYSTEM.INFO") and calculation.code == "quantum_espresso":
+        files_to_copy.append(f"{calculation.code}/SYSTEM.INFO")
+    files_to_copy.append(f"{calculation.code}/master.sh")
+
+    return files_to_copy
+
+
+def copy_input_files(files: list[str], overwrite: bool = False):
+    """
+    Copies specified input files into the current working directory.
+    Prompts users to confirm overwriting if files already exist at
+    the destination.
+
+    Parameters
+    ----------
+    files : list[str]
+        List of files to be copied.
+    overwrite: bool, optional
+        Whether overwritting is done without prompting (Default False).
 
     Notes
     -----
@@ -315,41 +346,32 @@ def copy_input_files(calculation: SimpleNamespace) -> list[str]:
     """
     import shutil
 
-    # Resolve needed files.
-    log.info("Writing input files ...")
-    files_to_copy = calculations[calculation.kind]["files"][calculation.code]
-    if not os.path.exists("SYSTEM.INFO") and calculation.code == "quantum_espresso":
-        files_to_copy.append("SYSTEM.INFO")
-    files_to_copy.append("master.sh")
-
     # Copy the files
-    source_dir = os.path.join(SOURCE_DIR, "templates", calculation.code)
+    source_dir = os.path.join(SOURCE_DIR, "templates")
     copied = []
-    for file_name in files_to_copy:
-        source_path = os.path.join(source_dir, file_name)
+    for file in files:
+        file_name = os.path.basename(file)
+        source_path = os.path.join(source_dir, file)
         destination_path = os.path.join(os.getcwd(), file_name)
-
         if not os.path.exists(source_path):
             log.error(
                 "Input file '%s' does not exist in the library: %s",
-                file_name,
+                file,
                 source_path,
             )
             continue
-
-        if os.path.exists(destination_path) and not calculation.overwrite:
+        if os.path.exists(destination_path) and not overwrite:
             confirmation = input(
                 f"The file '{file_name}' already exists. Do you want to overwrite it? (yes/no): "
             )
             if confirmation.strip().lower() not in ("yes", "y"):
                 log.info("Skipped overwriting '%s'", file_name)
                 continue
-
         shutil.copy(source_path, destination_path)
-        copied.append(file_name)
-        log.debug("Copied '%s'", file_name)
+        copied.append(file)
+        log.debug("Copied '%s'", file)
 
-    return files_to_copy
+    return files
 
 
 def populate_master_script(
@@ -361,10 +383,10 @@ def populate_master_script(
 
     Parameters
     ----------
-    sub_scripts : list[str]
-        A list of filenames representing sub-scripts to integrate.
     master_script_path : str
         Path to the master.sh script to be modified or populated.
+    sub_scripts : list[str]
+        A list of filenames representing sub-scripts to integrate.
 
     Returns
     -------
@@ -377,13 +399,15 @@ def populate_master_script(
     """
     log.debug("Populating master script: %s", master_script_path)
 
+    # Remove non-valid scripts
+    sub_scripts = [
+        os.path.basename(script) for script in sub_scripts if script.endswith(".sh")
+    ]
+
     # Remove master script itself and non-.sh files
     master_name = os.path.basename(master_script_path)
     if master_name in sub_scripts:
         sub_scripts.remove(master_name)
-
-    # Remove non-valid scripts
-    sub_scripts = [script for script in sub_scripts if script.endswith(".sh")]
 
     log.debug("Sub-scripts to add: %s", sub_scripts)
 
@@ -519,27 +543,24 @@ def change_mpi_command(file_path: str | list, cluster: str) -> None:
         )
 
 
-def set_spin_orbit_coupling(kind: str, code: str, soc: bool) -> None:
+def set_spin_orbit_coupling(soc: bool, code: str) -> None:
     """
     Enable or disable spin-orbit coupling settings in input scripts.
 
     For Quantum ESPRESSO calculations, this updates the ``noncolin`` and
-    ``lspinorb`` flags in the relevant ``.sh`` scripts associated with the
-    selected calculation kind.
+    ``lspinorb`` flags in the ``.sh`` scripts.
+
+    For VASP it sets LSORBIT accordingly in ``INCAR`` files.
 
     Parameters
     ----------
-    kind : str
-        Calculation kind key (e.g., ``"bands"``, ``"relax"``) used to select
-        which template scripts are modified.
-    code : str
-        DFT code identifier. Currently only ``"quantum_espresso"`` is supported.
     soc : bool
-        If True, enable SOC (set ``noncolin=.true.`` and ``lspinorb=.true.``).
-        If False, disable SOC.
+        Whether spin-orbit coupling is taken into account or not.
+    code: str
+        Code that is being used in the calculations.
     """
-    files = calculations[kind]["files"][code]
     log.info("Configuring for SOC : %s", soc)
+    files = [f for f in os.listdir(".") if os.path.isfile(f)]
 
     if code == "quantum_espresso":
         scripts = [file for file in files if file.endswith(".sh")]
@@ -561,22 +582,24 @@ def set_spin_orbit_coupling(kind: str, code: str, soc: bool) -> None:
         warnings.warn("No SOC configuration implemented for {code} code", UserWarning)
 
 
-def set_cell_relaxation(code: str, cell_relaxation: bool) -> None:
+def set_cell_relaxation(cell_relaxation: bool, code: str) -> None:
     """
     Configure ionic vs variable-cell relaxation for Quantum ESPRESSO.
 
-    This edits ``relax.sh`` to use either ``calculation='vc-relax'`` (variable
-    cell) or ``calculation='relax'`` (ions only).
+    For Quantum ESPRESSO edits ``relax.sh`` to use either ``calculation='vc-relax'``
+    (variable cell) or ``calculation='relax'`` (ions only).
+
+    For VASP it edits ISIF to either 3 (variable cell) or 2 (ions only).
 
     Parameters
     ----------
-    code : str
-        DFT code identifier. Currently only ``"quantum_espresso"`` is supported.
     cell_relaxation : bool
-        If True, set variable-cell relaxation (``vc-relax``). If False, set
-        ionic relaxation only (``relax``).
+        Whether is a variable cell relaxation.
+    code: str
+        Code that is being used in the calculations.
     """
     log.info("Configuring for cell_relaxation : %s", cell_relaxation)
+
     if code == "quantum_espresso":
         if cell_relaxation:
             _replace_setting("relax.sh", "calculation=", "calculation='vc-relax'")
@@ -607,15 +630,11 @@ def configure_input_files(calculation: SimpleNamespace) -> None:
 
     # Spin-orbit coupling
     if "soc" in options:
-        set_spin_orbit_coupling(
-            kind=calculation.kind, code=calculation.code, soc=calculation.soc
-        )
+        set_spin_orbit_coupling(calculation.soc, calculation.code)
 
     # Cell relaxation
     if calculation.kind == "relax":
-        set_cell_relaxation(
-            code=calculation.code, cell_relaxation=calculation.cell_relaxation
-        )
+        set_cell_relaxation(calculation.cell_relaxation, calculation.code)
 
     log.debug("File configuration completed.")
 

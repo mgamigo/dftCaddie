@@ -178,7 +178,7 @@ def apply_pseudos(
             relativistic=relativistic,
         )
         fm.write_pseudos_to_system_info(system_info_path, pseudos)
-        fm.set_spin_orbit_coupling(kind_calc, code, relativistic)
+        fm.set_spin_orbit_coupling(relativistic, code)
 
         if configure:
             fm.configure_qe_cutoffs_from_pseudos(
@@ -187,7 +187,7 @@ def apply_pseudos(
     elif code == "vasp":
         pseudos = fm.get_potcar_paths(symbols=symbols)
         fm.write_potcar(pseudos)
-        fm.set_spin_orbit_coupling(kind_calc, code, relativistic)
+        fm.set_spin_orbit_coupling(relativistic, code)
 
         if configure:
             fm.configure_vasp_cutoffs_from_potcar("POTCAR", ratio=default_cutoff_ratio)

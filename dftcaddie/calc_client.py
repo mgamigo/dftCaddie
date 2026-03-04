@@ -43,6 +43,13 @@ def add_arguments(parser):
         help="Calculation kind (e.g., bands, relax, phonons)",
     )
     parser.add_argument(
+        "-f",
+        "--flavor",
+        metavar="KIND",
+        required=False,
+        help="Calculation flavor (e.g., default, single_point)",
+    )
+    parser.add_argument(
         "-c",
         "--code",
         metavar="CODE",
@@ -111,37 +118,58 @@ def run(args=None):
     log.debug("Resolved cluster: %s", calculation.cluster)
 
     # Select calculation type
+    options = list(calculations.keys())
     if calculation.kind is None:
-        options = list(calculations.keys())
         option_strings = [calculations[key]["name"] for key in options]
         print(f"\nAvailable Calculation Types:\n{ut.format_options(option_strings)}")
         user_input = input("Choose a calculation type: ").strip().lower()
         calculation.kind = ut.resolve_user_input(user_input, options)
-    ut.check_option_exists(calculation.kind, calculations.keys())
+    ut.check_option_exists(calculation.kind, options)
     log.info("Calculation kind: %s", calculation.kind)
 
+    # Solve flavor if present
+    if "flavors" in calculations[calculation.kind].keys():
+        options = list(calculations[calculation.kind]["flavors"].keys())
+        if calculation.flavor is None:
+            if len(options) == 1:
+                calculation.flavor = options[0]
+                log.debug("Using only available flavor: %s", options[0])
+            else:
+                option_strings = [calculations[calculation.kind]["flavors"][key]["name"] for key in options]
+                print(
+                    f"\nAvailable flavors:\n{ut.format_options(option_strings,brackets=True)}"
+                )
+                user_input = input("Choose flavor: ").strip().lower()
+                calculation.flavor = ut.resolve_user_input(user_input, options)
+        ut.check_option_exists(calculation.flavor, options)
+        log.info("Calculation flavor: %s", calculation.flavor)
+
     # Additional configuration
-    if "config" in calculations[calculation.kind].keys():
+    if calculation.flavor is None:
         config = calculations[calculation.kind]["config"]
-        for setting in config:
-            options = setting["options"]
-            value = getattr(calculation, setting["name"], None)
-            log.debug("Resolving setting: %s", setting["name"])
-            if value is None:
-                if "default" in setting and not details:
-                    value = setting["default"]
-                    log.debug("Using default value: %s", value)
-                elif len(options) == 1:
-                    value = options[0]
-                    log.debug("Single option available: %s", value)
-                else:
-                    print(f"\n{setting['prompt']}")
-                    print(ut.format_options(options, brackets=True))
-                    user_input = input("Select: ").strip().lower()
-                    value = ut.resolve_user_input(user_input, options)
-                setattr(calculation, setting["name"], value)
-            ut.check_option_exists(value, options, setting["name"])
-            log.debug("Setting %s : %s", setting["name"], value)
+        del calculation.flavor
+    else:
+        index = options.index(calculation.flavor)
+        config = calculations[calculation.kind]["flavors"][calculation.flavor]["config"]
+    for setting in config:
+        options = setting["options"]
+        value = getattr(calculation, setting["name"], None)
+        log.debug("Resolving setting: %s", setting["name"])
+        if value is None:
+            if "default" in setting and not details:
+                value = setting["default"]
+                log.debug("Using default value: %s", value)
+            elif len(options) == 1:
+                value = options[0]
+                log.debug("Single option available: %s", value)
+            else:
+                print(f"\n{setting['prompt']}")
+                print(ut.format_options(options, brackets=True))
+                user_input = input("Select: ").strip().lower()
+                value = ut.resolve_user_input(user_input, options)
+            setattr(calculation, setting["name"], value)
+        ut.check_option_exists(value, options, setting["name"])
+        log.debug("Setting %s : %s", setting["name"], value)
 
     # Proceed with the operation using the user's selected options
     print(f"\nSummary\n-------")
@@ -149,11 +177,11 @@ def run(args=None):
     for key, value in calculation.__dict__.items():
         print(f"{key.title()}: {value}")
     print(f"-------")
-
-    copied_files = fm.copy_input_files(calculation)
+    files = fm.resolve_files(calculation)
+    fm.copy_input_files(files, calculation.overwrite)
 
     log.info("Editing master.sh ...")
-    scripts = fm.populate_master_script("master.sh", copied_files)
+    scripts = fm.populate_master_script("master.sh", files)
     fm.set_master_preamble("master.sh", calculation.cluster)
 
     fm.change_mpi_command(scripts, calculation.cluster)
