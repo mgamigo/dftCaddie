@@ -125,7 +125,7 @@ def run(args=None):
         user_input = input("Choose a calculation type: ").strip().lower()
         calculation.kind = ut.resolve_user_input(user_input, options)
     ut.check_option_exists(calculation.kind, options)
-    log.info("Calculation kind: %s", calculation.kind)
+    log.debug("Calculation kind: %s", calculation.kind)
 
     # Solve flavor if present
     if "flavors" in calculations[calculation.kind].keys():

@@ -626,7 +626,6 @@ def configure_input_files(calculation: SimpleNamespace) -> None:
         Calculation options container.
     """
     options = set(calculation.__dict__.keys())
-    log.info("Configuring scripts according to options ...")
 
     # Spin-orbit coupling
     if "soc" in options:

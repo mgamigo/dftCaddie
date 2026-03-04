@@ -127,7 +127,7 @@ def apply_setup(
     code: str,
     structure: SimpleNamespace,
     autokgrid: bool = False,
-    kppra: int = 9000,
+    kppra: int = default_kppra,
     kpath: bool = False,
 ) -> int:
     """
@@ -152,7 +152,7 @@ def apply_setup(
         structure, by default False.
     kppra : int, optional
         Target number of k-points per reciprocal atom used for automatic
-        k-grid generation, by default 9000.
+        k-grid generation. Default in ``~/config/dftcaddie/config.yaml``.
     kpath : bool, optional
         If True, insert a high-symmetry k-path based on the structure space
         group, by default False.

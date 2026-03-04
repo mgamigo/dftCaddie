@@ -208,7 +208,7 @@ def check_option_exists(
         sys.exit(1)  # Exit with a status code indicating an error
 
 
-def resolve_calc_current_dir() -> tuple(str, str, str):
+def resolve_calc_current_dir() -> tuple[str, str, str]:
     """
     Infer calculation kind, flavor and code from files in the current directory.
 
