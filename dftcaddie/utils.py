@@ -31,11 +31,14 @@ get_config()
     Retrieve a config entry by name for a given calculation kind.
 """
 
+import logging
 import sys
 import os
 from types import SimpleNamespace
 
 from dftcaddie.config import calculations
+
+log = logging.getLogger(__name__)
 
 __all__ = [
     "resolve_cluster",
@@ -205,14 +208,14 @@ def check_option_exists(
         sys.exit(1)  # Exit with a status code indicating an error
 
 
-def resolve_calc_current_dir():
+def resolve_calc_current_dir() -> tuple(str, str, str):
     """
-    Infer calculation kind and code from files in the current directory.
+    Infer calculation kind, flavor and code from files in the current directory.
 
     Returns
     -------
-    tuple[str, str]
-        (kind, code)
+    tuple[str, str, str]
+        (kind, flavor, code)
 
     Raises
     ------
@@ -223,21 +226,30 @@ def resolve_calc_current_dir():
 
     matches = []
 
-    for kind, kind_data in calculations.items():
-        for code, expected_files in kind_data["files"].items():
-            expected = set(expected_files)
+    def append_matches(matches, files):
+        for code, expected_files in files.items():
+            expected = set([os.path.basename(f) for f in expected_files])
             overlap = expected & present_files
 
             if overlap:
                 matches.append(
                     {
                         "kind": kind,
+                        "flavor": flavor,
                         "code": code,
                         "score": len(overlap),
                         "expected": len(expected),
                     }
                 )
 
+    for kind, kind_data in calculations.items():
+        flavors = kind_data.get("flavors", None)
+        if flavors is not None:
+            for flavor, flavor_data in flavors.items():
+                append_matches(matches, flavor_data["files"])
+        else:
+            flavor = None
+            append_matches(matches, kind_data["files"])
     if not matches:
         raise RuntimeError(
             "Could not infer calculation kind/code from directory contents."
@@ -254,9 +266,29 @@ def resolve_calc_current_dir():
         if m["score"] == best["score"] and m["expected"] == best["expected"]
     ]
     if len(equally_good) > 1:
-        raise RuntimeError(f"Ambiguous calculation setup detected: {equally_good}")
+        kinds = list(set([m["kind"] for m in equally_good]))
+        codes = list(set([m["code"] for m in equally_good]))
+        if len(kinds) == 1 and len(codes) == 1:
+            log.debug(
+                "Not possible to resolve between different flavors for kind/code =  %s/%s.",
+                kinds[0],
+                codes[0],
+            )
+            best["flavor"] = None
+        else:
+            raise RuntimeError(f"Ambiguous calculation setup detected: {equally_good}")
 
-    return best["kind"], best["code"]
+    if best["flavor"] is None:
+        log.info("Resolved calcualtion kind/code as %s/%s", best["kind"], best["code"])
+    else:
+        log.info(
+            "Resolved calcualtion kind/flavor/code as %s/%s/%s",
+            best["kind"],
+            best["flavor"],
+            best["code"],
+        )
+
+    return best["kind"], best["flavor"], best["code"]
 
 
 def get_structure(file: str) -> SimpleNamespace:
@@ -312,7 +344,7 @@ def get_structure(file: str) -> SimpleNamespace:
     return data
 
 
-def get_config(kind: str, config_name: str) -> dict:
+def get_config(kind: str, config_name: str, flavor: str = None) -> dict:
     """
     Retrieve a configuration entry by name for a given calculation kind.
 
@@ -322,21 +354,50 @@ def get_config(kind: str, config_name: str) -> dict:
         Calculation kind (e.g., "relax", "bands").
     config_name : str
         Name of the configuration entry to retrieve.
+    flavor : str, optional
+        Calculation flavor (e.g., "fixed_cell", "variable_cell").
 
     Returns
     -------
     dict
         Configuration dictionary matching ``config_name``.
 
+    Notes
+    -----
+    - If more than one flavor are present, but flavor is not provided. It
+      retrieves the setting from the first flavor.
+
     Raises
     ------
     KeyError
         If the calculation kind or configuration name is not found.
     """
-    try:
-        configs = calculations[kind]["config"]
-    except KeyError as exc:
-        raise KeyError(f"Unknown calculation kind: {kind!r}") from exc
+    if flavor is not None:
+        try:
+            configs = calculations[kind]["flavors"][flavor]["config"]
+        except KeyError as exc:
+            raise KeyError(
+                f"No config for calculation kind/flavor: '{kind}/{flavor}'"
+            ) from exc
+    else:
+        possible_flavors = calculations[kind].get("flavors", None)
+        # No possible flavors
+        if possible_flavors is None:
+            try:
+                configs = calculations[kind]["config"]
+            except KeyError as exc:
+                raise KeyError(f"No config for calculation kind: {kind!r}") from exc
+
+        # More than one possible flavor (retrieve setting for first flavor)
+        else:
+            for flavor, flavor_data in possible_flavors.items():
+                try:
+                    configs = flavor_data["config"]
+                    break
+                except KeyError as exc:
+                    raise KeyError(
+                        f"No config for calculation kind/flavor: '{kind}/{flavor}'"
+                    ) from exc
 
     for cfg in configs:
         if cfg.get("name") == config_name:

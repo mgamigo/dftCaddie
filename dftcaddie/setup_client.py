@@ -91,8 +91,7 @@ def run(args=None):
     from dftcaddie import utils as ut
     from dftcaddie.pseudo_client import apply_pseudos
 
-    kind, code = ut.resolve_calc_current_dir()
-    log.info("Resolved calcualtion kind/code as %s/%s",kind, code)
+    kind, flavor, code = ut.resolve_calc_current_dir()
 
     print(f"\nSummary\n-------")
     keys = list(args.__dict__.keys())
@@ -112,7 +111,7 @@ def run(args=None):
     )
     if args.pseudo:
         # Get default relativistic value for this calculation kind
-        setting = ut.get_config(kind=kind, config_name="soc")
+        setting = ut.get_config(kind=kind, flavor=flavor, config_name="soc")
         relativistic = setting.get("default", False)
         apply_pseudos(
             kind_calc=kind,

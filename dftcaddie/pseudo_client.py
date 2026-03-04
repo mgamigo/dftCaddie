@@ -91,8 +91,7 @@ def run(args=None):
 
     from dftcaddie import utils as ut
 
-    kind, code = ut.resolve_calc_current_dir()
-    log.info("Resolved calcualtion kind/code as %s/%s", kind, code)
+    kind, flavor, code = ut.resolve_calc_current_dir()
 
     print(f"\nSummary\n-------")
     keys = list(args.__dict__.keys())
