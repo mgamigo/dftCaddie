@@ -24,7 +24,7 @@
 # These folders must contain the raw QE / VASP pseudo files.
 
 qe_pslibrary: ~/Software/pslibrary
-vasp_pseudopotentials: ~/Software/VASP/pseudos
+vasp_pseudopotentials: ~/Software/vasp/pseudos
 
 
 # ------------------------------------------------------------
@@ -93,7 +93,6 @@ mpi_executables:
 # Incorrect edits may break CLI behavior.
 
 calculations:
-
   bands:
     name: "[B]ands"
     config:
@@ -103,7 +102,6 @@ calculations:
           - quantum_espresso
           - vasp
       - name: soc
-        type: bool
         prompt: "Spin–orbit coupling:"
         options:
           - true
@@ -111,45 +109,68 @@ calculations:
         default: true
     files:
       quantum_espresso:
-        - scf.sh
-        - bands.sh
-        - project_bands.sh
+        - quantum_espresso/scf.sh
+        - quantum_espresso/bands.sh
+        - quantum_espresso/project_bands.sh
       vasp:
-        - INCAR.SCC
-        - INCAR.BS
-        - KPOINTS.SCC
-        - scf.sh
-        - bands.sh
-
+        - vasp/INCAR.SCC
+        - vasp/INCAR.BS
+        - vasp/KPOINTS.SCC
+        - vasp/scf.sh
+        - vasp/bands.sh
   relax:
     name: "[R]elax"
-    config:
-      - name: code
-        prompt: "Available codes:"
-        options:
-          - quantum_espresso
-          - vasp
-      - name: soc
-        type: bool
-        prompt: "Spin–orbit coupling:"
-        options:
-          - true
-          - false
-        default: false
-      - name: cell_relaxation
-        type: bool
-        prompt: "Cell relaxation?"
-        options:
-          - true
-          - false
-    files:
-      quantum_espresso:
-        - relax.sh
-      vasp:
-        - INCAR.RELAX
-        - KPOINTS.SCC
-        - relax.sh
-
+    flavors:
+      fixed_cell:
+        name: "Fixed_cell"
+        config:
+          - name: code
+            prompt: "Available codes:"
+            options:
+              - quantum_espresso
+              - vasp
+          - name: soc
+            prompt: "Spin–orbit coupling:"
+            options:
+              - true
+              - false
+            default: false
+          - name: cell_relaxation
+            prompt: "Cell relaxation?"
+            options:
+              - false
+        files:
+          quantum_espresso:
+            - quantum_espresso/relax.sh
+          vasp:
+            - vasp/INCAR.RELAX
+            - vasp/KPOINTS.SCC
+            - vasp/relax.sh
+      variable_cell:
+        name: "Variable_cell"
+        config:
+          - name: code
+            prompt: "Available codes:"
+            options:
+              - quantum_espresso
+              - vasp
+          - name: soc
+            prompt: "Spin–orbit coupling:"
+            options:
+              - true
+              - false
+            default: false
+          - name: cell_relaxation
+            prompt: "Cell relaxation?"
+            options:
+              - true
+        files:
+          quantum_espresso:
+            - quantum_espresso/relax.sh
+          vasp:
+            - vasp/INCAR.RELAX
+            - vasp/KPOINTS.SCC
+            - vasp/relax.sh
   phonons:
     name: "[P]honons"
     config:
@@ -158,7 +179,6 @@ calculations:
         options:
           - quantum_espresso
       - name: soc
-        type: bool
         prompt: "Spin–orbit coupling:"
         options:
           - true
@@ -166,9 +186,28 @@ calculations:
         default: false
     files:
       quantum_espresso:
-        - scf.sh
-        - ph.sh
-        - matdyn.sh
+        - quantum_espresso/scf.sh
+        - quantum_espresso/ph.sh
+        - quantum_espresso/matdyn.sh
+
+
+# ------------------------------------------------------------
+# Global numerical defaults
+# ------------------------------------------------------------
+# Default parameters used when generating input files.
+# These values are applied unless explicitly overwritten
+# via CLI options.
+
+# Target k-point density in kppra units.
+# kppra = (number of k-points) × (number of atoms).
+# Used when automatically generating Monkhorst–Pack grids.
+default_kppra: 12000
+
+# Safety factor applied to suggested plane-wave cutoffs
+# read from pseudopotential headers.
+# Final cutoff = suggested_cutoff × default_cutoff_ratio.
+default_cutoff_ratio: 1.5
+
 
 
 # ------------------------------------------------------------

@@ -1,10 +1,15 @@
 import pathlib
 import os
+import pytest
 
 from dftcaddie import config
 
 
-def test_pseudo_libraries():
+def test_pseudo_libraries(monkeypatch: pytest.MonkeyPatch):
+    DEFAULT_SOURCE_DIR = pathlib.Path(__file__).parent.parent / "dftcaddie/resources"
+    if config.SOURCE_DIR == DEFAULT_SOURCE_DIR:
+        # If DEFAULT_SOURCE_DIR exists, lift the existance condition.
+        monkeypatch.setattr(pathlib.Path, "exists", lambda self: True)
     assert isinstance(config.resolve_pslibrary(), pathlib.PosixPath)
     assert isinstance(config.resolve_potcar_library(), pathlib.PosixPath)
 
