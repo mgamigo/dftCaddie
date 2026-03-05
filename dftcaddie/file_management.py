@@ -444,7 +444,7 @@ def remove_master_preamble(master_script_path: str) -> None:
     )
 
 
-def set_master_preamble(master_script_path: str, cluster: str, header: int = 0) -> None:
+def set_master_preamble(master_script_path: str, cluster: str, header: int = 0) -> int:
     """
     Prepends cluster-specific preamble to a master script file.
 
@@ -461,7 +461,13 @@ def set_master_preamble(master_script_path: str, cluster: str, header: int = 0) 
         script.
     header : int
         Index of the header to be used for the particular cluster.
+
+    Returns
+    -------
+    int
+        Exit code (0 on successful completion).
     """
+
     header_name = clusters[cluster]["headers"][header]["name"]
     log.info(
         "Adding cluster preamble for '%s/%s' to '%s' ...",
@@ -487,6 +493,7 @@ def set_master_preamble(master_script_path: str, cluster: str, header: int = 0) 
         header_name,
         master_script_path,
     )
+    return 0
 
 
 def change_mpi_command(file_path: str | list, cluster: str) -> None:

@@ -99,19 +99,16 @@ def test_set_master_preamble_prepends_header(tmp_path: Path, monkeypatch):
     master = tmp_path / "master.sh"
     master.write_text("#!/bin/bash\necho hi\n", encoding="utf-8")
 
-    monkeypatch.setattr(fm, "__file__", str(pkg_root / "file_management.py"))
+    monkeypatch.setattr(fm, "SOURCE_DIR", str(pkg_root / "resources"))
     monkeypatch.setattr(
         fm,
         "clusters",
         {"mycluster": {"headers": [{"name": "default", "file": "header.txt"}]}},
     )
-    print(master)
 
-    fm.set_master_preamble(str(master), "mycluster")
+    assert fm.set_master_preamble(str(master), "mycluster") == 0
 
     text = master.read_text(encoding="utf-8").splitlines()
-    for line in text:
-        print(line)
 
     assert text[0] == "#!/bin/bash"
     assert text[1] == "#SBATCH -A TEST"
@@ -231,7 +228,7 @@ def test_set_spin_orbit_coupling_edits_all_sh_scripts(tmp_path: Path, monkeypatc
         {"bands": {"files": {"quantum_espresso": ["a.sh", "b.sh", "SYSTEM.INFO"]}}},
     )
 
-    fm.set_spin_orbit_coupling(kind="bands", code="quantum_espresso", soc=True)
+    fm.set_spin_orbit_coupling(soc=True, code="quantum_espresso")
 
     assert "noncolin=.true." in (tmp_path / "a.sh").read_text(encoding="utf-8")
     assert "lspinorb=.true." in (tmp_path / "a.sh").read_text(encoding="utf-8")
