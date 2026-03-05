@@ -85,7 +85,7 @@ def add_arguments(parser):
         "-i",
         "--init",
         action="store_true",
-        help="Initialize setup from scratch (structure must be provided).",
+        help="Initialize full setup from scratch (structure must be provided).",
     )
 
 
@@ -113,6 +113,8 @@ def run(args=None):
     calculation = SimpleNamespace(**vars(args))
     details = calculation.details
     del calculation.details
+    if calculation.init:
+        calculation.pseudo = True
 
     calculation.cluster = ut.resolve_cluster(clusters)
     log.debug("Resolved cluster: %s", calculation.cluster)
@@ -195,7 +197,7 @@ def run(args=None):
             autokgrid=calculation.init,
             kpath=calculation.init,
         )
-        if calculation.pseudo or calculation.init:
+        if calculation.pseudo:
             apply_pseudos(
                 kind_calc=calculation.kind,
                 code=calculation.code,
