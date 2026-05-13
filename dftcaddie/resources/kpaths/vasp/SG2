@@ -1,5 +1,5 @@
 Triclinic
-100   ! 100 grid
+50   ! 50 grid
 Line-mode
 reciprocal
    0.000  -0.500   0.000   ! Y

@@ -1,5 +1,5 @@
 Orthorhombic
-100   ! 100 grid
+50   ! 50 grid
 Line-mode
 reciprocal
  0.500000  0.500000  0.000000   ! Y
