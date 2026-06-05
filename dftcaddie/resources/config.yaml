@@ -32,7 +32,7 @@ vasp_pseudopotentials: ~/Software/vasp/pseudos
 # ------------------------------------------------------------
 # Each cluster entry defines:
 #   hostname      → substring used to auto-detect the cluster
-#   mpi_command   → MPI launcher prepended to executables
+#   mpi_command   → MPI launcher prepended to mpi executables
 #   headers       → Available SBATCH header presets
 #
 # Header files must exist in:
