@@ -73,6 +73,7 @@ from dftcaddie.config import (
     clusters,
     mpi_executables,
     suggested_qe_pseudos,
+    nscf_kppra_ratio,
     SOURCE_DIR,
 )
 
@@ -950,7 +951,9 @@ def set_auto_kgrid(structure: SimpleNamespace, code: str, kppra: int = 9000) -> 
     Set an automatic k-point grid in ``SYSTEM.INFO``.
 
     This computes a Monkhorst-Pack-like k-grid from the structure and writes it
-    to the ``KGRID=`` entry in ``SYSTEM.INFO``.
+    to the ``KGRID=`` and ``NKGRID=`` entries in ``SYSTEM.INFO``.
+
+    In VASP, it rewrites KPOINTS.SCC.
 
     Parameters
     ----------
@@ -969,11 +972,15 @@ def set_auto_kgrid(structure: SimpleNamespace, code: str, kppra: int = 9000) -> 
 
     log.info("Computing automatic k-grid (kppra=%d, n_atoms=%d)", kppra, n_atoms)
     kgrid = auto_kgrid(lattice, n_atoms=n_atoms, kppra=kppra)
+    kgrid_nscf = auto_kgrid(lattice, n_atoms=n_atoms, kppra=nscf_kppra_ratio * kppra)
     kgrid_str = " ".join(map(str, kgrid))
+    kgrid_nscf_str = " ".join(map(str, kgrid_nscf))
 
     if "quantum_espresso" in code:
         log.info("Setting KGRID='%s' in SYSTEM.INFO", kgrid_str)
         _replace_setting("SYSTEM.INFO", "KGRID=", f"KGRID='{kgrid_str}'")
+        log.info("Setting NKGRID='%s' in SYSTEM.INFO", kgrid_str)
+        _replace_setting("SYSTEM.INFO", "NKGRID=", f"NKGRID='{kgrid_nscf_str}'")
     elif "vasp" in code:
         log.info("Setting KGRID='%s' in KPOINTS.SCC", kgrid_str)
         _remove_lines("KPOINTS.SCC", "Gamma", "0 0 0")

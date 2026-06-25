@@ -131,6 +131,7 @@ def resolve_potcar_library() -> Path:
 CONFIG, SOURCE_DIR = _load_config()
 
 default_kppra = CONFIG["default_kppra"]
+nscf_kppra_ratio = CONFIG["nscf_kppra_ratio"]
 default_cutoff_ratio = CONFIG["default_cutoff_ratio"]
 
 suggested_qe_pseudos = CONFIG["suggested_qe_pseudos"]
