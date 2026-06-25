@@ -169,7 +169,7 @@ def apply_pseudos(
     from dftcaddie.config import default_cutoff_ratio
     import warnings
 
-    if code == "quantum_espresso":
+    if "quantum_espresso" in code:
         pseudos = fm.get_qe_pseudo_paths(
             symbols=symbols,
             exchange=exchange,
@@ -183,7 +183,7 @@ def apply_pseudos(
             fm.configure_qe_cutoffs_from_pseudos(
                 system_info_path, pseudos, ratio=default_cutoff_ratio
             )
-    elif code == "vasp":
+    elif "vasp" in code:
         pseudos = fm.get_potcar_paths(symbols=symbols)
         fm.write_potcar(pseudos)
         fm.set_spin_orbit_coupling(relativistic, code)

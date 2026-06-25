@@ -320,10 +320,6 @@ def resolve_files(calculation: SimpleNamespace) -> list[str]:
         )
     else:
         files_to_copy = calculations[calculation.kind]["files"][calculation.code]
-    if not os.path.exists("SYSTEM.INFO") and calculation.code == "quantum_espresso":
-        files_to_copy.append(f"{calculation.code}/SYSTEM.INFO")
-    files_to_copy.append(f"{calculation.code}/master.sh")
-
     return files_to_copy
 
 
@@ -571,7 +567,7 @@ def set_spin_orbit_coupling(soc: bool, code: str) -> None:
     log.info("Configuring for SOC : %s", soc)
     files = [f for f in os.listdir(".") if os.path.isfile(f)]
 
-    if code == "quantum_espresso":
+    if "quantum_espresso" in code:
         scripts = [file for file in files if file.endswith(".sh")]
         for script in scripts:
             if soc:
@@ -582,7 +578,7 @@ def set_spin_orbit_coupling(soc: bool, code: str) -> None:
                 _replace_setting(script, "noncolin=", "noncolin=.false.")
                 _replace_setting(script, "lspinorb=", "lspinorb=.false.")
                 _replace_setting(script, "spinors=", "spinors=false")
-    elif code == "vasp":
+    elif "vasp" in code:
         INCARS = [file for file in files if file.startswith("INCAR")]
         for INCAR in INCARS:
             if soc:
@@ -667,7 +663,7 @@ def set_crystal_structure(structure: SimpleNamespace, code: str) -> None:
     code : str
         DFT code identifier.
     """
-    if code == "quantum_espresso":
+    if "quantum_espresso" in code:
         formula = structure.formula
         lattice = structure.lattice
         positions = structure.positions
@@ -701,7 +697,7 @@ def set_crystal_structure(structure: SimpleNamespace, code: str) -> None:
         _remove_lines("SYSTEM.INFO", "LATTICE=", "EOL")
         lat_lines = [f"{x:14.9f} {y:14.9f} {z:14.9f}\n" for x, y, z in lattice]
         _insert_lines("SYSTEM.INFO", lat_lines, "LATTICE=")
-    elif code == "vasp":
+    elif "vasp" in code:
         from ase.io import write
 
         write("POSCAR", structure.atoms, format="vasp", direct=True)
@@ -734,21 +730,43 @@ def set_high_symmetry_path(structure: SimpleNamespace, code: str) -> None:
         "Setting high-symmetry path for space group %s in SYSTEM.INFO",
         structure.space_group,
     )
+    FOUND = False
 
-    source_dir = os.path.join(os.path.dirname(__file__), "resources", "kpaths", code)
-    path_file = os.path.join(source_dir, f"SG{structure.space_group}")
+    if "quantum_espresso" in code:
+        source_dir = os.path.join(
+            os.path.dirname(__file__), "resources", "kpaths", "quantum_espresso"
+        )
+        path_file = os.path.join(source_dir, f"SG{structure.space_group}")
 
-    if code == "quantum_espresso":
         log.debug("Reading k-path template: %s", path_file)
         with open(path_file, "r") as file:
             lines = file.readlines()
         _remove_lines("SYSTEM.INFO", "QE_CRYST_PATH=", "EOL")
         _insert_lines("SYSTEM.INFO", lines, "QE_CRYST_PATH=")
-    elif code == "vasp":
+        FOUND = True
+    if "vasp" in code:
         import shutil
 
+        source_dir = os.path.join(
+            os.path.dirname(__file__), "resources", "kpaths", "vasp"
+        )
+        path_file = os.path.join(source_dir, f"SG{structure.space_group}")
         shutil.copy(path_file, "KPOINTS.BS")
-    else:
+        FOUND = True
+
+    if "wannier" in code:
+        source_dir = os.path.join(
+            os.path.dirname(__file__), "resources", "kpaths", "wannier90"
+        )
+        path_file = os.path.join(source_dir, f"SG{structure.space_group}")
+
+        log.debug("Reading k-path template: %s", path_file)
+        with open(path_file, "r") as file:
+            lines = file.readlines()
+        _remove_lines("wannier1.sh", "BEGIN KPOINT_PATH", "END KPOINT_PATH")
+        _insert_lines("wannier1.sh", lines, "BEGIN KPOINT_PATH")
+        FOUND = True
+    if not FOUND:
         warnings.warn("set_high_symmetry_path skipped (code={code})", UserWarning)
 
 
@@ -953,11 +971,10 @@ def set_auto_kgrid(structure: SimpleNamespace, code: str, kppra: int = 9000) -> 
     kgrid = auto_kgrid(lattice, n_atoms=n_atoms, kppra=kppra)
     kgrid_str = " ".join(map(str, kgrid))
 
-    if code == "quantum_espresso":
+    if "quantum_espresso" in code:
         log.info("Setting KGRID='%s' in SYSTEM.INFO", kgrid_str)
         _replace_setting("SYSTEM.INFO", "KGRID=", f"KGRID='{kgrid_str}'")
-    elif code == "vasp":
-        pass
+    elif "vasp" in code:
         log.info("Setting KGRID='%s' in KPOINTS.SCC", kgrid_str)
         _remove_lines("KPOINTS.SCC", "Gamma", "0 0 0")
         _insert_lines("KPOINTS.SCC", [kgrid_str + "\n"], "Gamma")
