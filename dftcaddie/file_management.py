@@ -763,8 +763,8 @@ def set_high_symmetry_path(structure: SimpleNamespace, code: str) -> None:
         log.debug("Reading k-path template: %s", path_file)
         with open(path_file, "r") as file:
             lines = file.readlines()
-        _remove_lines("wannier1.sh", "BEGIN KPOINT_PATH", "END KPOINT_PATH")
-        _insert_lines("wannier1.sh", lines, "BEGIN KPOINT_PATH")
+        _remove_lines("wannier90_in.sh", "BEGIN KPOINT_PATH", "END KPOINT_PATH")
+        _insert_lines("wannier90_in.sh", lines, "BEGIN KPOINT_PATH")
         FOUND = True
     if not FOUND:
         warnings.warn("set_high_symmetry_path skipped (code={code})", UserWarning)
