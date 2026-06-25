@@ -559,6 +559,8 @@ def set_spin_orbit_coupling(soc: bool, code: str) -> None:
 
     For VASP it sets LSORBIT accordingly in ``INCAR`` files.
 
+    For WANNIER90 it sets spinors = true/false.
+
     Parameters
     ----------
     soc : bool
@@ -575,9 +577,11 @@ def set_spin_orbit_coupling(soc: bool, code: str) -> None:
             if soc:
                 _replace_setting(script, "noncolin=", "noncolin=.true.")
                 _replace_setting(script, "lspinorb=", "lspinorb=.true.")
+                _replace_setting(script, "spinors=", "spinors=true")
             else:
                 _replace_setting(script, "noncolin=", "noncolin=.false.")
                 _replace_setting(script, "lspinorb=", "lspinorb=.false.")
+                _replace_setting(script, "spinors=", "spinors=false")
     elif code == "vasp":
         INCARS = [file for file in files if file.startswith("INCAR")]
         for INCAR in INCARS:
