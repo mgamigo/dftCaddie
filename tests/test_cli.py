@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 import pytest
 
+from dftcaddie import cli
 from dftcaddie.cli import _build_parser
 
 
@@ -49,3 +50,18 @@ def test_python_module_cli_invocation_returns_zero():
     """
     p = _run([sys.executable, "-m", "dftcaddie.cli", "--help"])
     assert p.returncode == 0, p.stderr
+
+
+def test_keyboard_interrupt_exits_cleanly(monkeypatch, capsys):
+    def interrupt(_args):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli.calc_client, "run", interrupt)
+
+    assert cli.main(["calc"]) == 130
+    captured = capsys.readouterr()
+
+    assert "See you on the back nine ⛳" in captured.err
+    assert "Traceback" not in captured.err
+    assert "KeyboardInterrupt" not in captured.err
+    assert "Caddie's done" not in captured.out

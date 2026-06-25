@@ -157,21 +157,25 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     _configure_logging(args.verbose, quiet=args.quiet)
 
-    _caddie_heading()
-    # Dispatch
-    if args.command == "calc":
-        calc_client.run(args)
-    elif args.command == "setup":
-        setup_client.run(args)
-    elif args.command == "pseudo":
-        pseudo_client.run(args)
-    elif args.command == "sbatch":
-        sbatch_client.run(args)
-    elif args.command == "init":
-        init_client.run(args)
-    else:
-        parser.print_help()
-        return 0
+    try:
+        _caddie_heading()
+        # Dispatch
+        if args.command == "calc":
+            calc_client.run(args)
+        elif args.command == "setup":
+            setup_client.run(args)
+        elif args.command == "pseudo":
+            pseudo_client.run(args)
+        elif args.command == "sbatch":
+            sbatch_client.run(args)
+        elif args.command == "init":
+            init_client.run(args)
+        else:
+            parser.print_help()
+            return 0
+    except KeyboardInterrupt:
+        print("\nSee you on the back nine ⛳", file=sys.stderr)
+        return 130
     print("\n⛳ Caddie's done. Good luck out there...")
 
     return 0
