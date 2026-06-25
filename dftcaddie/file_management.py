@@ -716,6 +716,8 @@ def set_high_symmetry_path(structure: SimpleNamespace, code: str) -> None:
     For Quantum ESPRESSO, this reads a template k-path file from the library
     (keyed by the structure space group) and inserts it under ``QE_CRYST_PATH=``.
 
+    For VASP coppies the KPATH into a file called KPOINTS.BS.
+
     Parameters
     ----------
     structure : SimpleNamespace
