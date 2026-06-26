@@ -75,6 +75,9 @@ mpi_executables:
   - pw.x
   - projwfc.x
   - ph.x
+  - fs.x
+  - pw2wannier90.x
+  - wannier90.x
   - vasp_ncl
 
 
@@ -112,12 +115,15 @@ calculations:
         - quantum_espresso/scf.sh
         - quantum_espresso/bands.sh
         - quantum_espresso/project_bands.sh
+        - quantum_espresso/SYSTEM.INFO
+        - quantum_espresso/master.sh
       vasp:
         - vasp/INCAR.SCC
         - vasp/INCAR.BS
         - vasp/KPOINTS.SCC
         - vasp/scf.sh
         - vasp/bands.sh
+        - vasp/master.sh
   relax:
     name: "[R]elax"
     flavors:
@@ -142,10 +148,13 @@ calculations:
         files:
           quantum_espresso:
             - quantum_espresso/relax.sh
+            - quantum_espresso/SYSTEM.INFO
+            - quantum_espresso/master.sh
           vasp:
             - vasp/INCAR.RELAX
             - vasp/KPOINTS.SCC
             - vasp/relax.sh
+            - vasp/master.sh
       variable_cell:
         name: "Variable_cell"
         config:
@@ -167,10 +176,13 @@ calculations:
         files:
           quantum_espresso:
             - quantum_espresso/relax.sh
+            - quantum_espresso/SYSTEM.INFO
+            - quantum_espresso/master.sh
           vasp:
             - vasp/INCAR.RELAX
             - vasp/KPOINTS.SCC
             - vasp/relax.sh
+            - vasp/master.sh
   phonons:
     name: "[P]honons"
     config:
@@ -189,6 +201,8 @@ calculations:
         - quantum_espresso/scf.sh
         - quantum_espresso/ph.sh
         - quantum_espresso/matdyn.sh
+        - quantum_espresso/SYSTEM.INFO
+        - quantum_espresso/master.sh
 
 
 # ------------------------------------------------------------
@@ -202,6 +216,8 @@ calculations:
 # kppra = (number of k-points) × (number of atoms).
 # Used when automatically generating Monkhorst–Pack grids.
 default_kppra: 12000
+# kppra ratio for non-self-consistent grids (x times more dense).
+nscf_kppra_ratio: 4
 
 # Safety factor applied to suggested plane-wave cutoffs
 # read from pseudopotential headers.
