@@ -979,7 +979,7 @@ def set_auto_kgrid(structure: SimpleNamespace, code: str, kppra: int = 9000) -> 
     if "quantum_espresso" in code:
         log.info("Setting KGRID='%s' in SYSTEM.INFO", kgrid_str)
         _replace_setting("SYSTEM.INFO", "KGRID=", f"KGRID='{kgrid_str}'")
-        log.info("Setting NKGRID='%s' in SYSTEM.INFO", kgrid_str)
+        log.info("Setting NKGRID='%s' in SYSTEM.INFO", kgrid_nscf_str)
         _replace_setting("SYSTEM.INFO", "NKGRID=", f"NKGRID='{kgrid_nscf_str}'")
     elif "vasp" in code:
         log.info("Setting KGRID='%s' in KPOINTS.SCC", kgrid_str)
