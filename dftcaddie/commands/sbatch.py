@@ -1,6 +1,6 @@
 """
-dftCaddie | dftcaddie.sbatch_client
-===================================
+dftCaddie | dftcaddie.commands.sbatch
+=====================================
 
 CLI handler for the ``caddie sbatch`` command.
 
@@ -23,7 +23,7 @@ import logging
 
 log = logging.getLogger(__name__)
 
-_all__ = [
+__all__ = [
     "add_arguments",
     "run",
     "apply_header",

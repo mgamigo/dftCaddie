@@ -1,5 +1,5 @@
 """
-dftCaddie | dftcaddie.init_client
+dftCaddie | dftcaddie.commands.init
 ===================================
 
 CLI handler for the ``caddie init`` command.
@@ -18,6 +18,8 @@ apply_init(force=False)
 """
 
 import logging
+import shutil
+from pathlib import Path
 
 log = logging.getLogger(__name__)
 
@@ -62,10 +64,24 @@ def run(args=None):
     int
         Exit code (0 on successful completion).
     """
-    from pathlib import Path
-    import shutil
+    return apply_init(force=args.force)
 
-    pkg_root = Path(__file__).parent
+
+def apply_init(force: bool = False) -> int:
+    """
+    Create and populate the user configuration directory.
+
+    Parameters
+    ----------
+    force : bool, optional
+        If True, overwrite existing files and directories, by default False.
+
+    Returns
+    -------
+    int
+        Exit code (0 on successful completion).
+    """
+    pkg_root = Path(__file__).resolve().parents[1]
     resources = pkg_root / "resources"
 
     user_root = Path.home() / ".config" / "dftcaddie"
@@ -81,14 +97,14 @@ def run(args=None):
 
     def copytree(src: Path, dst: Path):
         if dst.exists():
-            if not args.force:
+            if not force:
                 log.warning("Directory %s already exists. Skipping.", dst)
                 return
             shutil.rmtree(dst)
         shutil.copytree(src, dst)
 
     def copyfile(src: Path, dst: Path):
-        if dst.exists() and not args.force:
+        if dst.exists() and not force:
             log.warning("File %s already exists. Skipping.", dst)
             return
         shutil.copy2(src, dst)

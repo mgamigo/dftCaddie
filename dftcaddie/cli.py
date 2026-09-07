@@ -26,15 +26,9 @@ import sys
 import argparse
 import logging
 
-from dftcaddie import (
-    calc_client,
-    setup_client,
-    pseudo_client,
-    sbatch_client,
-    init_client,
-)
+from dftcaddie.commands import calc, init, pseudo, sbatch, setup
 
-_all__ = [
+__all__ = [
     "main",
 ]
 
@@ -58,16 +52,14 @@ def _configure_logging(verbose: int, quiet: bool) -> None:
 
 
 def _caddie_heading():
-    print(
-        r"""
+    print(r"""
    '\                   .  .                        |>>
      \              .         ' .                   |
     O>>         .                 'o                |
      \       .                                      |
      /\    .                                        |
     / /  .'                  Don’t shoot the caddie |
-^^^^^^^`^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"""
-    )
+^^^^^^^`^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^""")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -105,7 +97,7 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Start a new DFT calculation",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    calc_client.add_arguments(calc_parser)
+    calc.add_arguments(calc_parser)
     # --- setup subcommand ---
     setup_parser = subparsers.add_parser(
         "setup",
@@ -113,29 +105,29 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Configure the calculation for a given system",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    setup_client.add_arguments(setup_parser)
-    # --- calc subcommand ---
+    setup.add_arguments(setup_parser)
+    # --- pseudo subcommand ---
     pseudo_parser = subparsers.add_parser(
         "pseudo",
         help="Set the desired pseudopotentials",
         description="Set the desired pseudopotentials",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    pseudo_client.add_arguments(pseudo_parser)
+    pseudo.add_arguments(pseudo_parser)
     # --- sbatch subcommand ---
     sbatch_parser = subparsers.add_parser(
         "sbatch",
         help="Set the desired sbatch header",
         description="Set the desired sbatch header",
     )
-    sbatch_client.add_arguments(sbatch_parser)
+    sbatch.add_arguments(sbatch_parser)
     # --- init subcommand ---
     init_parser = subparsers.add_parser(
         "init",
         help="Initialize dftCaddie user configuration directory",
         description="Initialize dftCaddie user configuration directory",
     )
-    init_client.add_arguments(init_parser)
+    init.add_arguments(init_parser)
     # ---
     return parser
 
@@ -161,15 +153,15 @@ def main(argv: list[str] | None = None) -> int:
         _caddie_heading()
         # Dispatch
         if args.command == "calc":
-            calc_client.run(args)
+            calc.run(args)
         elif args.command == "setup":
-            setup_client.run(args)
+            setup.run(args)
         elif args.command == "pseudo":
-            pseudo_client.run(args)
+            pseudo.run(args)
         elif args.command == "sbatch":
-            sbatch_client.run(args)
+            sbatch.run(args)
         elif args.command == "init":
-            init_client.run(args)
+            init.run(args)
         else:
             parser.print_help()
             return 0
@@ -179,3 +171,7 @@ def main(argv: list[str] | None = None) -> int:
     print("\n⛳ Caddie's done. Good luck out there...")
 
     return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

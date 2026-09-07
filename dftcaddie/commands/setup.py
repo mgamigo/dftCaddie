@@ -1,6 +1,6 @@
 """
-dftCaddie | dftcaddie.setup_client
-==================================
+dftCaddie | dftcaddie.commands.setup
+====================================
 
 CLI handler for the ``caddie setup`` command.
 
@@ -26,7 +26,7 @@ from dftcaddie.config import default_kppra
 
 log = logging.getLogger(__name__)
 
-_all__ = [
+__all__ = [
     "add_arguments",
     "run",
     "apply_setup",
@@ -89,7 +89,7 @@ def run(args=None):
         Parsed command-line arguments for the ``setup`` subcommand.
     """
     from dftcaddie import utils as ut
-    from dftcaddie.pseudo_client import apply_pseudos
+    from dftcaddie.commands.pseudo import apply_pseudos
 
     kind, flavor, code = ut.resolve_calc_current_dir()
 

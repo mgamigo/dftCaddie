@@ -44,19 +44,16 @@ def test_caddie_subcommand_help_works(subcommand):
 
 
 def test_python_module_cli_invocation_returns_zero():
-    """
-    Some projects don't expose help text through `python -m ...` unless the
-    module has a __main__ entry point. We still assert it is runnable.
-    """
     p = _run([sys.executable, "-m", "dftcaddie.cli", "--help"])
     assert p.returncode == 0, p.stderr
+    assert "DFT Caddie" in p.stdout
 
 
 def test_keyboard_interrupt_exits_cleanly(monkeypatch, capsys):
     def interrupt(_args):
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(cli.calc_client, "run", interrupt)
+    monkeypatch.setattr(cli.calc, "run", interrupt)
 
     assert cli.main(["calc"]) == 130
     captured = capsys.readouterr()

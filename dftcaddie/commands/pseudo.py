@@ -1,6 +1,6 @@
 """
-dftCaddie | dftcaddie.pseudo_client
-==================================
+dftCaddie | dftcaddie.commands.pseudo
+=====================================
 
 CLI handler for the ``caddie pseudo`` command.
 
@@ -24,7 +24,7 @@ import logging
 
 log = logging.getLogger(__name__)
 
-_all__ = [
+__all__ = [
     "add_arguments",
     "run",
     "apply_pseudos",

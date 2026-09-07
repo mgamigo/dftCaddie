@@ -1,6 +1,6 @@
 """
-dftCaddie | dftcaddie.calc_client
-=================================
+dftCaddie | dftcaddie.commands.calc
+===================================
 
 CLI handler for the ``caddie calc`` command.
 
@@ -20,7 +20,7 @@ import logging
 
 log = logging.getLogger(__name__)
 
-_all__ = [
+__all__ = [
     "add_arguments",
     "run",
 ]
@@ -105,8 +105,8 @@ def run(args=None):
     """
     from types import SimpleNamespace
     from dftcaddie.config import calculations, clusters
-    from dftcaddie.setup_client import apply_setup
-    from dftcaddie.pseudo_client import apply_pseudos
+    from dftcaddie.commands.setup import apply_setup
+    from dftcaddie.commands.pseudo import apply_pseudos
     from dftcaddie import utils as ut
     from dftcaddie import file_management as fm
 
@@ -137,7 +137,10 @@ def run(args=None):
                 calculation.flavor = options[0]
                 log.debug("Using only available flavor: %s", options[0])
             else:
-                option_strings = [calculations[calculation.kind]["flavors"][key]["name"] for key in options]
+                option_strings = [
+                    calculations[calculation.kind]["flavors"][key]["name"]
+                    for key in options
+                ]
                 print(
                     f"\nAvailable flavors:\n{ut.format_options(option_strings,brackets=True)}"
                 )
