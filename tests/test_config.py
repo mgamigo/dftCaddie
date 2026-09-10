@@ -1,16 +1,87 @@
 import pathlib
 import os
+import re
 import pytest
 
 from dftcaddie import config
 
 
-def test_pseudo_libraries(monkeypatch: pytest.MonkeyPatch):
-    # Lift the existance condition and skip enviroment variables.
-    monkeypatch.setattr(pathlib.Path, "exists", lambda self: True)
-    monkeypatch.setattr(os.environ, "get", lambda x: False)
-    assert isinstance(config.resolve_pslibrary(), pathlib.PosixPath)
-    assert isinstance(config.resolve_potcar_library(), pathlib.PosixPath)
+@pytest.mark.parametrize(
+    ("key", "resolver"),
+    [
+        ("qe_pslibrary", config.resolve_pslibrary),
+        ("vasp_pseudopotentials", config.resolve_potcar_library),
+    ],
+)
+def test_pseudo_library_configured(tmp_path, monkeypatch, key, resolver):
+    library = tmp_path / "pseudo-library"
+    library.mkdir()
+
+    monkeypatch.setitem(config.CONFIG, key, str(library))
+    monkeypatch.delenv("PSLIBRARY", raising=False)
+    resolver.cache_clear()
+
+    try:
+        assert resolver() == library
+    finally:
+        resolver.cache_clear()
+
+
+@pytest.mark.parametrize(
+    ("key", "resolver", "missing_message"),
+    [
+        (
+            "qe_pslibrary",
+            config.resolve_pslibrary,
+            "QE PSLibrary not defined. Set the $PSLIBRARY environment variable or "
+            "define 'qe_pslibrary' in config.yaml.",
+        ),
+        (
+            "vasp_pseudopotentials",
+            config.resolve_potcar_library,
+            "VASP POTCAR library not defined. Set 'vasp_pseudopotentials' in "
+            "config.yaml.",
+        ),
+    ],
+)
+def test_pseudo_library_missing(monkeypatch, key, resolver, missing_message):
+    monkeypatch.delitem(config.CONFIG, key, raising=False)
+    monkeypatch.delenv("PSLIBRARY", raising=False)
+    resolver.cache_clear()
+
+    try:
+        with pytest.raises(RuntimeError, match=re.escape(missing_message)):
+            resolver()
+    finally:
+        resolver.cache_clear()
+
+
+@pytest.mark.parametrize(
+    ("key", "resolver", "message"),
+    [
+        (
+            "qe_pslibrary",
+            config.resolve_pslibrary,
+            "QE PSLibrary not found at",
+        ),
+        (
+            "vasp_pseudopotentials",
+            config.resolve_potcar_library,
+            "VASP POTCAR library not found at",
+        ),
+    ],
+)
+def test_pseudo_library_path_missing(tmp_path, monkeypatch, key, resolver, message):
+    library = tmp_path / "missing-pseudo-library"
+    monkeypatch.setitem(config.CONFIG, key, str(library))
+    monkeypatch.delenv("PSLIBRARY", raising=False)
+    resolver.cache_clear()
+
+    try:
+        with pytest.raises(RuntimeError, match=re.escape(f"{message} '{library}'")):
+            resolver()
+    finally:
+        resolver.cache_clear()
 
 
 def test_resources_folder_exists():
