@@ -2,10 +2,12 @@ import os
 import sys
 import subprocess
 from pathlib import Path
+from argparse import Namespace
 import pytest
 
 from dftcaddie import cli
 from dftcaddie.cli import _build_parser
+from unittest.mock import Mock
 
 
 def _run(cmd: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess:
@@ -62,3 +64,30 @@ def test_keyboard_interrupt_exits_cleanly(monkeypatch, capsys):
     assert "Traceback" not in captured.err
     assert "KeyboardInterrupt" not in captured.err
     assert "Caddie's done" not in captured.out
+
+
+@pytest.mark.parametrize("subcommand", _get_subcommands())
+def test_dispatch(monkeypatch, subcommand):
+    handlers = {}
+    for name in _get_subcommands():
+        handlers[name] = Mock()
+        monkeypatch.setattr(getattr(cli, name), "run", handlers[name])
+
+    # Isolate dispatch from command-specific required arguments.
+    args = Namespace(command=subcommand, verbose=0, quiet=False)
+    parser = Mock()
+    parser.parse_args.return_value = args
+    monkeypatch.setattr(cli, "_build_parser", lambda: parser)
+
+    assert cli.main([subcommand]) == 0
+
+    for name, handler in handlers.items():
+        if name == subcommand:
+            handler.assert_called_once_with(args)
+        else:
+            handler.assert_not_called()
+
+
+def test_no_command_prints_help(capsys):
+    assert cli.main([]) == 0
+    assert "usage: caddie" in capsys.readouterr().out
