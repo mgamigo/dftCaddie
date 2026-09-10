@@ -1,9 +1,7 @@
 from pathlib import Path
-import os
 
 import pytest
 
-from dftcaddie.config import calculations
 import dftcaddie.utils as ut
 
 
@@ -66,40 +64,6 @@ def test_check_option_exists():
         ut.check_option_exists("bad", ["good", "better"], name="code")
 
 
-CASES = []
-for kind, kind_dict in calculations.items():
-    if "flavors" in kind_dict.keys():
-        for flavor, flavor_dict in kind_dict["flavors"].items():
-            for code, files in flavor_dict["files"].items():
-                CASES.append([kind, flavor, code, files])
-    else:
-        flavor = None
-        for code, files in kind_dict["files"].items():
-            CASES.append([kind, flavor, code, files])
-
-
-@pytest.mark.parametrize("kind,flavor,code,files", CASES)
-def test_resolve_calc_current_dir(
-    kind, flavor, code, files, monkeypatch: pytest.MonkeyPatch
-):
-    monkeypatch.setattr(os, "listdir", lambda x: [os.path.basename(f) for f in files])
-    monkeypatch.setattr(os.path, "isfile", lambda x: True)
-    res_kind, res_flavor, res_code = ut.resolve_calc_current_dir()
-    assert res_kind == kind
-    assert res_code == code
-
-
-def test_resolve_calc_current_dir_raises_if_empty(tmp_path: Path):
-    """No files -> no match -> RuntimeError."""
-    old = Path.cwd()
-    try:
-        os.chdir(tmp_path)
-        with pytest.raises(RuntimeError, match="Could not infer calculation kind/code"):
-            ut.resolve_calc_current_dir()
-    finally:
-        os.chdir(old)
-
-
 def test_get_structure(tmp_path):
     # Copy a minimal structure file into tmp_path
     src = Path(__file__).parent / "data" / "Si.cif"
@@ -120,36 +84,72 @@ def test_get_structure(tmp_path):
     assert len(s.positions) == len(s.symbols)
 
 
-@pytest.mark.parametrize("kind,flavor,code,files", CASES)
-def test_get_config_for_all_cases(
-    kind,
-    flavor,
-    code,
-    files,
+@pytest.fixture
+def calculations(monkeypatch):
+    definitions = {
+        "bands": {
+            "config": [{"name": "soc", "default": False}],
+            "files": {"qe": ["bands.in"]},
+        },
+        "relax": {
+            "flavors": {
+                "fixed": {
+                    "config": [{"name": "soc", "default": False}],
+                    "files": {"qe": ["relax.in"]},
+                },
+                "variable": {
+                    "config": [{"name": "soc", "default": True}],
+                    "files": {"qe": ["relax.in"]},
+                },
+            },
+        },
+    }
+    monkeypatch.setattr(ut, "calculations", definitions)
+    return definitions
+
+
+@pytest.mark.parametrize(
+    ("filename", "expected"),
+    [("bands.in", ("bands", None, "qe")), ("relax.in", ("relax", None, "qe"))],
+)
+def test_resolve_calc_current_dir(
+    calculations, tmp_path, monkeypatch, filename, expected
 ):
-    """
-    If a kind defines config entries, get_config should return a dict with the
-    requested name.
-    """
-    if flavor is None:
-        config = calculations[kind]["config"]
-    else:
-        config = calculations[kind]["flavors"][flavor]["config"]
-    for cfg in config:
-        answer = ut.get_config(kind=kind, config_name=cfg["name"], flavor=flavor)
-        assert answer == cfg
-        # Retrieve even when flavor is not resolved
-        answer = ut.get_config(kind=kind, config_name=cfg["name"])
-        assert isinstance(answer, dict)
-        assert answer.get("name") == cfg.get("name")
+    (tmp_path / filename).touch()
+    monkeypatch.chdir(tmp_path)
+    assert ut.resolve_calc_current_dir() == expected
 
 
-def test_get_config_raises_for_unknown_kind():
-    with pytest.raises(KeyError, match="No calculation kind:"):
-        ut.get_config("___not_a_kind___", "soc")
+def test_resolve_calc_current_dir_raises_if_empty(calculations, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(RuntimeError, match="Could not infer calculation kind/code"):
+        ut.resolve_calc_current_dir()
 
 
-def test_get_config_raises_for_unknown_name():
-    kind = next(iter(calculations.keys()))
-    with pytest.raises(KeyError, match="Configuration .* not found"):
-        ut.get_config(kind, "___not_a_config___")
+def test_resolve_calc_current_dir_raises_if_ambiguous(
+    calculations, tmp_path, monkeypatch
+):
+    calculations["other"] = {"files": {"qe": ["bands.in"]}}
+    (tmp_path / "bands.in").touch()
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(RuntimeError, match="Ambiguous calculation setup"):
+        ut.resolve_calc_current_dir()
+
+
+def test_get_config(calculations):
+    assert ut.get_config("bands", "soc") == {"name": "soc", "default": False}
+    assert ut.get_config("relax", "soc", "variable") == {"name": "soc", "default": True}
+    assert ut.get_config("relax", "soc") == {"name": "soc", "default": False}
+
+
+@pytest.mark.parametrize(
+    ("kind", "name", "flavor", "message"),
+    [
+        ("missing", "soc", None, "No calculation kind:"),
+        ("bands", "missing", None, "Configuration .* not found"),
+        ("relax", "soc", "missing", "No config for calculation kind/flavor:"),
+    ],
+)
+def test_get_config_raises(calculations, kind, name, flavor, message):
+    with pytest.raises(KeyError, match=message):
+        ut.get_config(kind, name, flavor)
