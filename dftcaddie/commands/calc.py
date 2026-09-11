@@ -40,6 +40,8 @@ def add_arguments(parser):
     parser : argparse.ArgumentParser
         Subparser instance to which the ``calc`` arguments are added.
     """
+    from dftcaddie.completion import complete_calculation
+
     parser.add_argument(
         "-o",
         "--overwrite",
@@ -76,19 +78,19 @@ def add_arguments(parser):
         metavar="KIND",
         required=False,
         help="Calculation kind (e.g., bands, relax, phonons)",
-    )
+    ).completer = complete_calculation
     parser.add_argument(
         "--flavor",
         metavar="KIND",
         required=False,
         help="Calculation flavor (e.g., default, single_point)",
-    )
+    ).completer = complete_calculation
     parser.add_argument(
         "--code",
         metavar="CODE",
         required=False,
         help="DFT code to use (e.g., vasp, quantum espresso)",
-    )
+    ).completer = complete_calculation
 
 
 def run(args=None):

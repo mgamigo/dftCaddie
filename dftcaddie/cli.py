@@ -1,3 +1,4 @@
+# PYTHON_ARGCOMPLETE_OK
 """
 dftCaddie | dftcaddie.cli
 =========================
@@ -153,7 +154,10 @@ def main(argv: list[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
 
+    import argcomplete
+
     parser = _build_parser()
+    argcomplete.autocomplete(parser, always_complete_options=False)
     args = parser.parse_args(argv)
     _configure_logging(args.verbose, quiet=args.quiet)
 

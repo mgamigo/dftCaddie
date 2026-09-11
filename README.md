@@ -13,6 +13,32 @@
 
 ## Configuration
 
+### Shell completion
+
+Install the package dependencies in the environment providing `caddie`, then
+enable Bash completion in that shell:
+
+```bash
+eval "$(register-python-argcomplete caddie)"
+```
+
+Add that line to your Bash startup configuration for subsequent sessions,
+after the environment's commands become available on `PATH`.
+`caddie <Tab><Tab>` lists commands. Flags appear only after typing a dash:
+`caddie calc -<Tab><Tab>` suggests short and long flags such as `-s` and `--kind`.
+Values after `--kind`, `--flavor`, `--code`, `--cluster`,
+and `--header` come from the current configuration. Flavors and codes follow
+the selected calculation, and headers follow the selected or detected cluster.
+Structure arguments complete filesystem paths.
+
+New parser commands and flags appear automatically. Changes to configured
+calculation choices are reflected on the next completion request, without
+regenerating a script. New options with custom dynamic values need a completer
+callback; argparse `choices` are handled automatically. Completion never runs
+preparation commands or asks interactive questions.
+
+### Interactive input
+
 Interactive selections use Questionary typed prompts with vertical option lists
 and single-column Tab completion, including over SSH. Enter an exact name or a
 unique prefix, ignoring case; ambiguous prefixes require more characters.

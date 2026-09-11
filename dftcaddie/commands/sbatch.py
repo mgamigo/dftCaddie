@@ -39,20 +39,22 @@ def add_arguments(parser):
     parser : argparse.ArgumentParser
         Subparser instance to which the ``sbatch`` arguments are added.
     """
+    from dftcaddie.completion import complete_sbatch
+
     parser.add_argument(
         "-c",
         "--cluster",
         metavar="CLUSTER",
         required=False,
         help="Cluster name used to generate an SBATCH header.",
-    )
+    ).completer = complete_sbatch
     parser.add_argument(
         "-H",
         "--header",
         metavar="HEADER",
         required=False,
         help="Desired SBATCH header.",
-    )
+    ).completer = complete_sbatch
 
 
 def run(args=None):
