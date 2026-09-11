@@ -1,21 +1,18 @@
 """Shared bundled configuration, independent of user settings."""
 
 from copy import deepcopy
-from pathlib import Path
 
 import pytest
-import yaml
 
+from dftcaddie.config import load_config
 from dftcaddie.checks.workflows import calculation_cases
 
-_RESOURCE_DIR = Path(__file__).resolve().parents[1] / "dftcaddie/resources"
-with (_RESOURCE_DIR / "config.yaml").open() as stream:
-    _BUNDLED_CONFIG = yaml.safe_load(stream)
+_BUNDLED_CONFIG, _BUNDLED_RESOURCES = load_config(default_config=True)
 
 
 @pytest.fixture(scope="session")
 def bundled_resources():
-    return _RESOURCE_DIR
+    return _BUNDLED_RESOURCES
 
 
 @pytest.fixture

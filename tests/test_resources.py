@@ -9,10 +9,11 @@ from dftcaddie.checks.config import validate_config
 
 
 @pytest.fixture(autouse=True)
-def bundled_calculations(monkeypatch, bundled_config, bundled_resources):
-    monkeypatch.setattr(
-        ut.config, "load_config", lambda: (bundled_config, bundled_resources)
-    )
+def bundled_calculations(monkeypatch, tmp_path):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    ut.config.clear_config_cache()
+    yield
+    ut.config.clear_config_cache()
 
 
 def test_resources_folder_exists(bundled_resources):

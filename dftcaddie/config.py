@@ -7,16 +7,19 @@ Importing this module does not read YAML or access configuration values.
 
 Functions
 ---------
-config_paths()
-    Return the active YAML path and the matching resource directory.
 load_config()
-    Read the active configuration on first use and cache it.
+    Read the active or bundled configuration on first use and cache it.
 resolve_pslibrary()
     Resolve and validate the Quantum ESPRESSO pseudopotential library.
 resolve_potcar_library()
     Resolve and validate the VASP POTCAR library.
 clear_config_cache()
     Clear cached configuration and pseudopotential library paths.
+
+Private Utilities
+-----------------
+_config_paths()
+    Return the selected YAML path and the matching resource directory.
 """
 
 from pathlib import Path
@@ -26,9 +29,14 @@ import logging
 log = logging.getLogger(__name__)
 
 
-def config_paths() -> tuple[Path, Path]:
+def _config_paths(default_config: bool = False) -> tuple[Path, Path]:
     """
     Return the selected YAML path and template/header root.
+
+    Parameters
+    ----------
+    default_config : bool, optional
+        If True, ignore the user configuration and return bundled resources.
 
     Returns
     -------
@@ -36,16 +44,25 @@ def config_paths() -> tuple[Path, Path]:
         The active YAML path and the directory used to resolve relative
         template/header paths.
     """
-    path = Path.home() / ".config" / "dftcaddie" / "config.yaml"
-    if not path.exists():
-        path = Path(__file__).parent / "resources" / "config.yaml"
+    resources = Path(__file__).parent / "resources"
+    path = resources / "config.yaml"
+    if not default_config:
+        user_path = Path.home() / ".config" / "dftcaddie" / "config.yaml"
+        if user_path.exists():
+            path = user_path
     return path, path.parent
 
 
-@lru_cache(maxsize=1)
-def load_config() -> tuple[dict, Path]:
+@lru_cache(maxsize=2)
+def load_config(default_config: bool = False) -> tuple[dict, Path]:
     """
     Read the selected configuration on first use and cache it for this process.
+
+    Parameters
+    ----------
+    default_config : bool, optional
+        If True, load the bundled configuration even when a user
+        ``~/.config/dftcaddie/config.yaml`` exists.
 
     Returns
     -------
@@ -64,7 +81,7 @@ def load_config() -> tuple[dict, Path]:
     """
     import yaml
 
-    path, source = config_paths()
+    path, source = _config_paths(default_config=default_config)
     with path.open() as stream:
         data = yaml.safe_load(stream)
     if data is None:

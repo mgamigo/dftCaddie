@@ -96,9 +96,9 @@ def apply_check(workflows: bool = False) -> int:
     """
     import yaml
     from dftcaddie.checks.config import validate_config
-    from dftcaddie.config import config_paths
+    from dftcaddie.config import _config_paths
 
-    path, source = config_paths()
+    path, source = _config_paths()
     print(f"Configuration: {path}")
     try:
         with path.open() as stream:

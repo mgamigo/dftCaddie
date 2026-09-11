@@ -126,6 +126,23 @@ def test_load_config_prefers_user_config(tmp_path, monkeypatch):
     assert config.load_config() == ({"default_kppra": 42}, user_dir)
 
 
+def test_load_config_can_force_bundled_defaults(tmp_path, monkeypatch):
+    from pathlib import Path
+    import yaml
+
+    user_dir = tmp_path / ".config" / "dftcaddie"
+    user_dir.mkdir(parents=True)
+    (user_dir / "config.yaml").write_text("default_kppra: 42\n")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+    data, source = config.load_config(default_config=True)
+
+    bundled = Path(config.__file__).parent / "resources"
+    assert source == bundled
+    with (bundled / "config.yaml").open() as stream:
+        assert data == yaml.safe_load(stream)
+
+
 def test_pslibrary_environment_takes_precedence(tmp_path, monkeypatch):
     library = tmp_path / "environment-library"
     library.mkdir()
@@ -168,12 +185,12 @@ def test_config_is_cached_until_explicitly_cleared(tmp_path, monkeypatch):
     assert config.resolve_pslibrary() == second
 
 
-def test_config_paths_use_user_config_when_present(tmp_path):
+def test_private_config_paths_use_user_config_when_present(tmp_path):
     source = tmp_path / ".config" / "dftcaddie"
     source.mkdir(parents=True)
     path = source / "config.yaml"
     path.write_text("default_kppra: 42\n")
-    assert config.config_paths() == (path, source)
+    assert config._config_paths() == (path, source)
     assert config.load_config() == ({"default_kppra": 42}, source)
 
 
