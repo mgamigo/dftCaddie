@@ -21,6 +21,8 @@ check_workflows()
 
 Private Utilities
 -----------------
+_run_worker()
+    Manage the shared subprocess, streamed results, timeouts, and cleanup.
 _require()
     Raise a ValueError when a workflow assertion fails.
 _snapshot()
@@ -30,7 +32,21 @@ _worker()
 _prepare_fixtures()
     Install the temporary configuration, structure, and synthetic libraries.
 _run_case()
-    Execute one calculation in its own temporary working directory.
+    Dispatch a scenario in its own temporary working directory.
+_CommandRunner
+    Execute commands and track their failure stage.
+_check_automatic()
+    Compare automatic preparation with the equivalent staged commands.
+_check_calc_output()
+    Check templates, calculation detection, and master script wiring.
+_check_setup_output()
+    Check the structure, k-grid, and high-symmetry k-path.
+_check_pseudo_output()
+    Check pseudo selection, cutoffs, and spin-orbit settings.
+_check_sbatch_headers()
+    Check all configured headers preserve the job body.
+_check_reconfiguration()
+    Check changed settings, preserved notes, and repeatability.
 """
 
 from copy import deepcopy
@@ -186,21 +202,51 @@ def check_workflows(
         if structure_path
         else (Path(__file__).parent / "data/Si.cif")
     )
+    return _run_worker(
+        {
+            "data": clean,
+            "source": str(source),
+            "checks": checks,
+            "structure": str(structure),
+        },
+        timeout,
+        progress,
+    )
+
+
+# Worker process management --------------------------------------------------
+
+
+def _run_worker(payload, timeout, progress):
+    """
+    Run a batch in one isolated process and forward results as they arrive.
+
+    Parameters
+    ----------
+    payload : dict
+        Validated configuration, resource paths, and requested checks.
+    timeout : float
+        Maximum wait for each result.
+    progress : callable or None
+        Callback receiving each result immediately.
+
+    Returns
+    -------
+    list of WorkflowResult
+        Ordered outcomes, including failures if the worker stops early.
+    """
+    results = []
+
+    def record(result):
+        results.append(result)
+        if progress is not None:
+            progress(result)
+
     # One process and resource installation for the entire batch.
     with TemporaryDirectory(prefix="dftcaddie-check-") as root:
         root = Path(root)
         request = root / "request.yaml"
-        request.write_text(
-            yaml.safe_dump(
-                {
-                    "data": clean,
-                    "source": str(source),
-                    "cases": [selected_case for selected_case, _ in checks],
-                    "checks": checks,
-                    "structure": str(structure),
-                }
-            )
-        )
+        request.write_text(yaml.safe_dump(payload))
         env = dict(os.environ)
         env.pop("PSLIBRARY", None)
         env["HOME"] = str(root / "home")
@@ -210,7 +256,7 @@ def check_workflows(
         )
         jobs = [
             (f"{kind}/{flavor or 'default'}/{code}", selected)
-            for (kind, flavor, code), selected in checks
+            for (kind, flavor, code), selected in payload["checks"]
         ]
         messages = Queue()
 
@@ -276,6 +322,45 @@ def check_workflows(
     return results
 
 
+def _worker(request):
+    """
+    Prepare one isolated worker and stream a JSON result for each case.
+
+    Parameters
+    ----------
+    request : path-like
+        YAML batch request written by ``check_workflows``.
+    """
+    import builtins
+    import socket
+
+    payload = yaml.safe_load(Path(request).read_text())
+    root = Path.cwd()
+
+    def unexpected_input(prompt):
+        """Fail on an unexpected interactive prompt."""
+        raise ValueError(f"Interactive choice required: {prompt}")
+
+    builtins.input = unexpected_input
+    socket.gethostname = lambda: ""
+    # Reserve stdout for results; command output goes to the worker log.
+    with redirect_stdout(sys.stderr):
+        fixtures = _prepare_fixtures(payload, root)
+    for index, ((kind, flavor, code), selected) in enumerate(payload["checks"]):
+        payload["scenario"] = selected
+        payload["case"] = (kind, flavor, code)
+        payload["label"] = f"{kind}/{flavor or 'default'}/{code}"
+        try:
+            with redirect_stdout(sys.stderr):
+                result = _run_case(payload, root / f"case-{index}", fixtures)
+        finally:
+            os.chdir(root)
+        print(json.dumps(asdict(result)), flush=True)
+
+
+# Shared fixtures and assertion utilities ------------------------------------
+
+
 def _require(condition, message):
     """
     Raise an error when a workflow condition is not satisfied.
@@ -329,7 +414,7 @@ def _prepare_fixtures(payload, root):
     structure.write_bytes(Path(payload["structure"]).read_bytes())
     qe = root / "qe"
     names = {}
-    if any(case[2] == "quantum_espresso" for case in payload["cases"]):
+    if any(case[2] == "quantum_espresso" for case, _ in payload["checks"]):
         pattern = data["suggested_qe_pseudos"]["Si"]
         for exchange in ("pbe", "rel-pbe"):
             name = pattern.replace("$fct", exchange).replace("*", "kjpaw") + ".UPF"
@@ -357,9 +442,26 @@ def _prepare_fixtures(payload, root):
     return structure, names, potcar
 
 
+# Scenario execution ---------------------------------------------------------
+
+
+class _CommandRunner:
+    """Run preparation commands while tracking the current failure stage."""
+
+    def __init__(self):
+        self.stage = "fixtures"
+
+    def __call__(self, *args):
+        """Invoke caddie and raise on a nonzero exit status."""
+        from dftcaddie import cli
+
+        self.stage = args[0]
+        _require(cli.main(list(args)) == 0, f"Command failed: {args[0]}")
+
+
 def _run_case(payload, root, fixtures):
     """
-    Run one workflow using shared fixtures and a fresh calculation directory.
+    Dispatch one scenario in a fresh directory and report its outcome.
 
     Parameters
     ----------
@@ -373,15 +475,14 @@ def _run_case(payload, root, fixtures):
     Returns
     -------
     WorkflowResult
-        Outcome with the failing command or assertion stage when applicable.
+        Outcome including the command or assertion stage on failure.
     """
-    from dftcaddie import cli, utils
-
-    stage = "fixtures"
+    run = _CommandRunner()
+    scenario = payload["scenario"]
     try:
         data = payload["data"]
         kind, flavor, code = payload["case"]
-        structure, names, potcar = fixtures
+        structure, _, _ = fixtures
         _require(
             code in ("quantum_espresso", "vasp"),
             f"No workflow checks implemented for {code}.",
@@ -390,248 +491,287 @@ def _run_case(payload, root, fixtures):
         working.mkdir(parents=True)
         os.chdir(working)
 
-        def run(*args):
-            """
-            Run one caddie subcommand and fail on nonzero status.
-            """
-            nonlocal stage
-            stage = " ".join(args[:1])
-            _require(cli.main(list(args)) == 0, f"Command failed: {args[0]}")
-
         flags = ["--kind", kind, "--code", code]
-        if flavor is not None:
-            flags += ["--flavor", flavor]
         definition = data["calculations"][kind]
         if flavor is not None:
+            flags += ["--flavor", flavor]
             definition = definition["flavors"][flavor]
 
-        scenario = payload["scenario"]
         if scenario in ("automatic", "auto"):
-            # Automatic one-shot preparation must match the staged commands.
-            option = "--auto" if scenario == "auto" else "--pseudo"
-            run("calc", *flags, "--structure", str(structure), option)
-            automatic = _snapshot()
-            (root / "staged").mkdir()
-            os.chdir(root / "staged")
-            run("calc", *flags)
-            extra = ["--autokgrid", "--kpath"] if scenario == "auto" else []
-            run("setup", str(structure), "--pseudo", *extra)
-            stage = "compare"
-            _require(
-                _snapshot() == automatic,
-                "Automatic and staged preparation produced different files.",
-            )
+            _check_automatic(run, flags, structure, root, scenario)
         else:
-            # caddie calc: templates, script wiring, and calculation detection.
+            # Prepare and verify each step before continuing to the next command.
             run("calc", *flags)
-            for filename in definition["files"][code]:
-                _require(
-                    Path(Path(filename).name).is_file(),
-                    f"Missing generated template: {filename}",
-                )
-            resolved_kind, _, resolved_code = utils.resolve_calc_current_dir()
-            _require(
-                (resolved_kind, resolved_code) == (kind, code),
-                "Generated files resolve to a different calculation.",
-            )
-            master = Path("master.sh").read_text()
-            _require("bash master.sh" not in master, "Master script invokes itself.")
-            for filename in definition["files"][code]:
-                name = Path(filename).name
-                if name.endswith(".sh") and name != "master.sh":
-                    _require(
-                        master.count(f"bash {name}\n") == 1,
-                        f"Missing or duplicate script: {name}",
-                    )
+            master = _check_calc_output(definition, kind, code)
 
-            # caddie setup: structure, k-grid, and high-symmetry k-path edits.
             run("setup", str(structure), "--autokgrid", "--kppra", "64", "--kpath")
-            stage = "setup output"
-            if code == "quantum_espresso":
-                text = Path("SYSTEM.INFO").read_text()
-                for expected in (
-                    "NAME='Si8'",
-                    "ATM_NUM=8\n",
-                    "ATM_TYPES=1\n",
-                    "KGRID='2 2 2'",
-                ):
-                    _require(
-                        expected in text, f"Missing structure/grid setting: {expected}"
-                    )
-                path = Path.home() / ".config/dftcaddie/kpaths/quantum_espresso/SG227"
-                _require(path.read_text().strip() in text, "Incorrect QE k-path.")
-            else:
-                import numpy as np
-                from ase.io import read
+            run.stage = "setup output"
+            _check_setup_output(code, structure)
 
-                actual, expected = read("POSCAR"), read(structure)
-                _require(
-                    actual.get_chemical_symbols() == expected.get_chemical_symbols(),
-                    "POSCAR species differ.",
-                )
-                _require(
-                    np.allclose(actual.cell, expected.cell), "POSCAR lattice differs."
-                )
-                _require(
-                    np.allclose(
-                        actual.get_scaled_positions(), expected.get_scaled_positions()
-                    ),
-                    "POSCAR positions differ.",
-                )
-                _require(
-                    "2 2 2" in Path("KPOINTS.SCC").read_text(), "Incorrect VASP grid."
-                )
-                path = Path.home() / ".config/dftcaddie/kpaths/vasp/SG227"
-                _require(
-                    Path("KPOINTS.BS").read_bytes() == path.read_bytes(),
-                    "Incorrect VASP k-path.",
-                )
-
-            # caddie pseudo: pseudo selection, cutoffs, and SOC settings.
             run("pseudo", str(structure), "--configure", "--relativistic")
-            stage = "pseudo output"
-            ratio = data["default_cutoff_ratio"]
-            if code == "quantum_espresso":
-                text = Path("SYSTEM.INFO").read_text()
-                _require(text.count(names["rel-pbe"]) == 1, "Incorrect QE species.")
-                _require(
-                    f"CUTOFF={int(40 * ratio)}\n" in text
-                    and f"ECUTRHO={int(160 * ratio)}\n" in text,
-                    "Incorrect QE cutoffs.",
-                )
-            else:
-                _require(Path("POTCAR").read_text() == potcar, "Incorrect POTCAR.")
-                incars = list(Path.cwd().glob("INCAR*"))
-                _require(incars, "No INCAR generated.")
-                for incar in incars:
-                    text = incar.read_text()
-                    _require(
-                        f"ENCUT = {int(200 * ratio)}" in text
-                        and "LSORBIT = TRUE" in text,
-                        f"Incorrect cutoff/SOC in {incar.name}.",
-                    )
+            run.stage = "pseudo output"
+            _check_pseudo_output(code, data, fixtures)
 
-            # caddie sbatch: every configured header preserves the job body.
-            body = master[master.index("#Actual JOBS") :]
-            for cluster, entry in data["clusters"].items():
-                for header in entry["headers"]:
-                    run("sbatch", "--cluster", cluster, "--header", header["name"])
-                    result = Path("master.sh").read_text()
-                    _require(
-                        result.endswith(body),
-                        "Header replacement changed the job body.",
-                    )
-                    _require(
-                        result.count("# === DFTCADDIE SBATCH HEADER END ===") == 1,
-                        "Duplicate SBATCH header boundary.",
-                    )
-
+            _check_sbatch_headers(run, data, master)
             if scenario == "reconfiguration":
-                # Repeated configuration should update owned settings only.
-                grid = Path(
-                    "SYSTEM.INFO" if code == "quantum_espresso" else "KPOINTS.SCC"
-                )
-                old_grid = grid.read_bytes()
-                Path("notes.txt").write_text("Keep my calculation notes.\n")
+                _check_reconfiguration(run, code, data, fixtures)
 
-                def reconfigure():
-                    """
-                    Apply the second-pass setup, pseudo, and sbatch commands.
-                    """
-                    run("setup", str(structure), "--autokgrid", "--kppra", "4096")
-                    run("pseudo", str(structure), "--configure")
-                    run(
-                        "sbatch",
-                        "--cluster",
-                        "local",
-                        "--header",
-                        data["clusters"]["local"]["headers"][0]["name"],
-                    )
-
-                reconfigure()
-                stage = "reconfiguration output"
-                _require(grid.read_bytes() != old_grid, "Grid did not change.")
-                _require(
-                    Path("notes.txt").read_text() == "Keep my calculation notes.\n",
-                    "Unrelated notes changed.",
-                )
-                if code == "quantum_espresso":
-                    text = Path("SYSTEM.INFO").read_text()
-                    _require(
-                        names["pbe"] in text and names["rel-pbe"] not in text,
-                        "Pseudo selection was not replaced.",
-                    )
-                    _require(
-                        "noncolin=.false." in Path("scf.sh").read_text(),
-                        "SOC was not disabled.",
-                    )
-                else:
-                    _require(
-                        Path("POTCAR").read_text() == potcar,
-                        "POTCAR changed unexpectedly.",
-                    )
-                    _require(
-                        "LSORBIT = FALSE" in Path("INCAR.SCC").read_text(),
-                        "SOC was not disabled.",
-                    )
-                before = _snapshot()
-                reconfigure()
-                stage = "repeat"
-                _require(
-                    _snapshot() == before, "Repeating configuration changed files."
-                )
-        result = WorkflowResult(
-            payload["label"],
-            True,
-            scenario,
-            "Preparation completed.",
-            payload["scenario"],
+        return WorkflowResult(
+            payload["label"], True, scenario, "Preparation completed.", scenario
         )
     except (Exception, SystemExit) as exc:
-        result = WorkflowResult(
-            payload["label"],
-            False,
-            stage,
-            f"{type(exc).__name__}: {exc}",
-            payload["scenario"],
+        return WorkflowResult(
+            payload["label"], False, run.stage, f"{type(exc).__name__}: {exc}", scenario
         )
-    return result
 
 
-def _worker(request):
+def _check_automatic(run, flags, structure, root, scenario):
     """
-    Prepare one isolated worker and stream a JSON result for each case.
+    Compare automatic preparation with the equivalent staged commands.
 
     Parameters
     ----------
-    request : path-like
-        YAML batch request written by ``check_workflows``.
+    run : _CommandRunner
+        Command executor and current failure stage.
+    flags : list of str
+        Calculation selection arguments.
+    structure : pathlib.Path
+        Shared silicon CIF.
+    root : pathlib.Path
+        Parent for the separate comparison directory.
+    scenario : str
+        automatic (pseudo setup) or auto (full automatic setup).
     """
-    import builtins
-    import socket
+    option = "--auto" if scenario == "auto" else "--pseudo"
+    run("calc", *flags, "--structure", str(structure), option)
+    automatic = _snapshot()
+    (root / "staged").mkdir()
+    os.chdir(root / "staged")
+    run("calc", *flags)
+    extra = ["--autokgrid", "--kpath"] if scenario == "auto" else []
+    run("setup", str(structure), "--pseudo", *extra)
+    run.stage = "compare"
+    _require(
+        _snapshot() == automatic,
+        "Automatic and staged preparation produced different files.",
+    )
 
-    payload = yaml.safe_load(Path(request).read_text())
-    root = Path.cwd()
 
-    def unexpected_input(prompt):
-        """Fail on an unexpected interactive prompt."""
-        raise ValueError(f"Interactive choice required: {prompt}")
+def _check_calc_output(definition, kind, code):
+    """
+    Check generated templates, calculation detection, and master script wiring.
 
-    builtins.input = unexpected_input
-    socket.gethostname = lambda: ""
-    # Reserve stdout for results; command output goes to the worker log.
-    with redirect_stdout(sys.stderr):
-        fixtures = _prepare_fixtures(payload, root)
-    for index, ((kind, flavor, code), selected) in enumerate(payload["checks"]):
-        payload["scenario"] = selected
-        payload["case"] = (kind, flavor, code)
-        payload["label"] = f"{kind}/{flavor or 'default'}/{code}"
-        try:
-            with redirect_stdout(sys.stderr):
-                result = _run_case(payload, root / f"case-{index}", fixtures)
-        finally:
-            os.chdir(root)
-        print(json.dumps(asdict(result)), flush=True)
+    Parameters
+    ----------
+    definition : dict
+        Selected calculation definition.
+    kind, code : str
+        Expected calculation kind and backend.
+
+    Returns
+    -------
+    str
+        Original master script for later job-body comparisons.
+    """
+    from dftcaddie import utils
+
+    for filename in definition["files"][code]:
+        _require(
+            Path(Path(filename).name).is_file(),
+            f"Missing generated template: {filename}",
+        )
+    resolved_kind, _, resolved_code = utils.resolve_calc_current_dir()
+    _require(
+        (resolved_kind, resolved_code) == (kind, code),
+        "Generated files resolve to a different calculation.",
+    )
+    master = Path("master.sh").read_text()
+    _require("bash master.sh" not in master, "Master script invokes itself.")
+    for filename in definition["files"][code]:
+        name = Path(filename).name
+        if name.endswith(".sh") and name != "master.sh":
+            _require(
+                master.count(f"bash {name}\n") == 1,
+                f"Missing or duplicate script: {name}",
+            )
+    return master
+
+
+def _check_setup_output(code, structure):
+    """
+    Check the generated structure, k-grid, and high-symmetry k-path.
+
+    Parameters
+    ----------
+    code : str
+        Calculation backend.
+    structure : pathlib.Path
+        Reference silicon CIF.
+    """
+    if code == "quantum_espresso":
+        text = Path("SYSTEM.INFO").read_text()
+        for expected in (
+            "NAME='Si8'",
+            "ATM_NUM=8\n",
+            "ATM_TYPES=1\n",
+            "KGRID='2 2 2'",
+        ):
+            _require(expected in text, f"Missing structure/grid setting: {expected}")
+        path = Path.home() / ".config/dftcaddie/kpaths/quantum_espresso/SG227"
+        _require(path.read_text().strip() in text, "Incorrect QE k-path.")
+    else:
+        import numpy as np
+        from ase.io import read
+
+        actual, expected = read("POSCAR"), read(structure)
+        _require(
+            actual.get_chemical_symbols() == expected.get_chemical_symbols(),
+            "POSCAR species differ.",
+        )
+        _require(np.allclose(actual.cell, expected.cell), "POSCAR lattice differs.")
+        _require(
+            np.allclose(actual.get_scaled_positions(), expected.get_scaled_positions()),
+            "POSCAR positions differ.",
+        )
+        _require("2 2 2" in Path("KPOINTS.SCC").read_text(), "Incorrect VASP grid.")
+        path = Path.home() / ".config/dftcaddie/kpaths/vasp/SG227"
+        _require(
+            Path("KPOINTS.BS").read_bytes() == path.read_bytes(),
+            "Incorrect VASP k-path.",
+        )
+
+
+def _check_pseudo_output(code, data, fixtures):
+    """
+    Check pseudo selection, cutoff values, and enabled spin-orbit coupling.
+
+    Parameters
+    ----------
+    code : str
+        Calculation backend.
+    data : dict
+        Configuration containing the cutoff ratio.
+    fixtures : tuple
+        Shared structure path, pseudo filenames, and POTCAR contents.
+    """
+    _, names, potcar = fixtures
+    ratio = data["default_cutoff_ratio"]
+    if code == "quantum_espresso":
+        text = Path("SYSTEM.INFO").read_text()
+        _require(text.count(names["rel-pbe"]) == 1, "Incorrect QE species.")
+        _require(
+            f"CUTOFF={int(40 * ratio)}\n" in text
+            and f"ECUTRHO={int(160 * ratio)}\n" in text,
+            "Incorrect QE cutoffs.",
+        )
+    else:
+        _require(Path("POTCAR").read_text() == potcar, "Incorrect POTCAR.")
+        incars = list(Path.cwd().glob("INCAR*"))
+        _require(incars, "No INCAR generated.")
+        for incar in incars:
+            text = incar.read_text()
+            _require(
+                f"ENCUT = {int(200 * ratio)}" in text and "LSORBIT = TRUE" in text,
+                f"Incorrect cutoff/SOC in {incar.name}.",
+            )
+
+
+def _check_sbatch_headers(run, data, master):
+    """
+    Check every configured SBATCH header while preserving the job body.
+
+    Parameters
+    ----------
+    run : _CommandRunner
+        Command executor and current failure stage.
+    data : dict
+        Configuration containing clusters and headers.
+    master : str
+        Master script captured after calculation creation.
+    """
+    body = master[master.index("#Actual JOBS") :]
+    for cluster, entry in data["clusters"].items():
+        for header in entry["headers"]:
+            run("sbatch", "--cluster", cluster, "--header", header["name"])
+            result = Path("master.sh").read_text()
+            _require(
+                result.endswith(body),
+                "Header replacement changed the job body.",
+            )
+            _require(
+                result.count("# === DFTCADDIE SBATCH HEADER END ===") == 1,
+                "Duplicate SBATCH header boundary.",
+            )
+
+
+def _check_reconfiguration(run, code, data, fixtures):
+    """
+    Check changed settings, preserved notes, and repeatable reconfiguration.
+
+    Parameters
+    ----------
+    run : _CommandRunner
+        Command executor and current failure stage.
+    code : str
+        Calculation backend.
+    data : dict
+        Configuration containing the local SBATCH header.
+    fixtures : tuple
+        Shared structure path, pseudo filenames, and POTCAR contents.
+
+    Notes
+    -----
+    This scenario currently checks bands-specific output filenames.
+    """
+    structure, names, potcar = fixtures
+    grid = Path("SYSTEM.INFO" if code == "quantum_espresso" else "KPOINTS.SCC")
+    old_grid = grid.read_bytes()
+    Path("notes.txt").write_text("Keep my calculation notes.\n")
+
+    def reconfigure():
+        """
+        Apply the second-pass setup, pseudo, and sbatch commands.
+        """
+        run("setup", str(structure), "--autokgrid", "--kppra", "4096")
+        run("pseudo", str(structure), "--configure")
+        run(
+            "sbatch",
+            "--cluster",
+            "local",
+            "--header",
+            data["clusters"]["local"]["headers"][0]["name"],
+        )
+
+    reconfigure()
+    run.stage = "reconfiguration output"
+    _require(grid.read_bytes() != old_grid, "Grid did not change.")
+    _require(
+        Path("notes.txt").read_text() == "Keep my calculation notes.\n",
+        "Unrelated notes changed.",
+    )
+    if code == "quantum_espresso":
+        text = Path("SYSTEM.INFO").read_text()
+        _require(
+            names["pbe"] in text and names["rel-pbe"] not in text,
+            "Pseudo selection was not replaced.",
+        )
+        _require(
+            "noncolin=.false." in Path("scf.sh").read_text(),
+            "SOC was not disabled.",
+        )
+    else:
+        _require(
+            Path("POTCAR").read_text() == potcar,
+            "POTCAR changed unexpectedly.",
+        )
+        _require(
+            "LSORBIT = FALSE" in Path("INCAR.SCC").read_text(),
+            "SOC was not disabled.",
+        )
+    before = _snapshot()
+    reconfigure()
+    run.stage = "repeat"
+    _require(_snapshot() == before, "Repeating configuration changed files.")
 
 
 if __name__ == "__main__":
