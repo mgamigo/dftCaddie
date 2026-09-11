@@ -9,6 +9,7 @@ from dataclasses import dataclass, asdict
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
@@ -113,8 +114,6 @@ def check_workflows(
             )
             env = dict(os.environ)
             env.pop("PSLIBRARY", None)
-            env["DFTCADDIE_CONFIG"] = str(root / "config.yaml")
-            env["DFTCADDIE_SOURCE_DIR"] = str(source)
             env["HOME"] = str(root / "home")
             # Also support source checkouts not installed into this interpreter.
             env["PYTHONPATH"] = os.pathsep.join(
@@ -209,9 +208,13 @@ def _worker(request, output):
         (vasp / "POTCAR").write_text(potcar)
         data["qe_pslibrary"] = str(qe)
         data["vasp_pseudopotentials"] = str(root / "vasp")
-        Path(os.environ["DFTCADDIE_CONFIG"]).write_text(
-            yaml.safe_dump(data, sort_keys=False)
-        )
+        user_config = Path.home() / ".config" / "dftcaddie"
+        user_config.mkdir(parents=True)
+        for directory in ("templates", "sbatch_headers"):
+            shutil.copytree(
+                Path(payload["source"]) / directory, user_config / directory
+            )
+        (user_config / "config.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
 
         def unexpected_input(prompt):
             raise ValueError(f"Interactive choice required: {prompt}")

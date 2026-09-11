@@ -1,3 +1,4 @@
+import os
 import re
 import pytest
 
@@ -87,8 +88,6 @@ def isolated_config(monkeypatch, tmp_path):
     from pathlib import Path
 
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.delenv("DFTCADDIE_CONFIG", raising=False)
-    monkeypatch.delenv("DFTCADDIE_SOURCE_DIR", raising=False)
     monkeypatch.delenv("PSLIBRARY", raising=False)
     for resolver in (
         config.load_config,
@@ -155,9 +154,10 @@ def test_config_is_cached_until_explicitly_cleared(tmp_path, monkeypatch):
     second = tmp_path / "second"
     first.mkdir()
     second.mkdir()
-    path = tmp_path / "config.yaml"
+    user_dir = tmp_path / ".config" / "dftcaddie"
+    user_dir.mkdir(parents=True)
+    path = user_dir / "config.yaml"
     path.write_text(yaml.safe_dump({"qe_pslibrary": str(first)}))
-    monkeypatch.setenv("DFTCADDIE_CONFIG", str(path))
     initial = config.load_config()
     assert config.resolve_pslibrary() == first
     path.write_text(yaml.safe_dump({"qe_pslibrary": str(second)}))
@@ -168,12 +168,11 @@ def test_config_is_cached_until_explicitly_cleared(tmp_path, monkeypatch):
     assert config.resolve_pslibrary() == second
 
 
-def test_explicit_config_and_source_paths(tmp_path, monkeypatch):
-    path = tmp_path / "selected.yaml"
-    source = tmp_path / "resources"
+def test_config_paths_use_user_config_when_present(tmp_path):
+    source = tmp_path / ".config" / "dftcaddie"
+    source.mkdir(parents=True)
+    path = source / "config.yaml"
     path.write_text("default_kppra: 42\n")
-    monkeypatch.setenv("DFTCADDIE_CONFIG", str(path))
-    monkeypatch.setenv("DFTCADDIE_SOURCE_DIR", str(source))
     assert config.config_paths() == (path, source)
     assert config.load_config() == ({"default_kppra": 42}, source)
 
@@ -183,15 +182,17 @@ def test_invalid_yaml_does_not_break_imports_or_help(tmp_path, monkeypatch, cont
     import subprocess
     import sys
 
-    path = tmp_path / "invalid.yaml"
+    user_dir = tmp_path / ".config" / "dftcaddie"
+    user_dir.mkdir(parents=True)
+    path = user_dir / "config.yaml"
     path.write_text(contents)
-    monkeypatch.setenv("DFTCADDIE_CONFIG", str(path))
     script = (
         "from dftcaddie import config, utils, file_management; "
         "assert config.load_config.cache_info().currsize == 0"
     )
+    env = dict(os.environ, HOME=str(tmp_path))
     result = subprocess.run(
-        [sys.executable, "-c", script], capture_output=True, text=True
+        [sys.executable, "-c", script], env=env, capture_output=True, text=True
     )
     assert result.returncode == 0, result.stderr
     for args, expected in [
@@ -201,6 +202,7 @@ def test_invalid_yaml_does_not_break_imports_or_help(tmp_path, monkeypatch, cont
     ]:
         result = subprocess.run(
             [sys.executable, "-m", "dftcaddie.cli", *args],
+            env=env,
             capture_output=True,
             text=True,
         )

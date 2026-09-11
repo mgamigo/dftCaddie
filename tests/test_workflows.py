@@ -56,10 +56,12 @@ def test_custom_resources_and_defaults_are_used(
     data["default_cutoff_ratio"] = 2.3
     original = deepcopy(data)
     monkeypatch.setenv("PSLIBRARY", "/not-the-selected-library")
-    # Poison the caller's selection: workers must load the explicit input.
-    invalid = tmp_path / "invalid.yaml"
+    # Poison the caller's config: workers must load the explicit input.
+    user_config = tmp_path / ".config" / "dftcaddie"
+    user_config.mkdir(parents=True)
+    invalid = user_config / "config.yaml"
     invalid.write_text("invalid: [")
-    monkeypatch.setenv("DFTCADDIE_CONFIG", str(invalid))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     before = Path.cwd()
     result = checker.check_workflows(
         data, source, case=("bands", None, "quantum_espresso")

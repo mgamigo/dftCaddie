@@ -9,7 +9,6 @@ Importing this module does not read YAML or access configuration values.
 from pathlib import Path
 from functools import lru_cache
 import logging
-import os
 
 log = logging.getLogger(__name__)
 
@@ -21,19 +20,13 @@ def config_paths() -> tuple[Path, Path]:
     Returns
     -------
     tuple of pathlib.Path
-        DFTCADDIE_CONFIG overrides the default user/bundled file selection.
-        DFTCADDIE_SOURCE_DIR optionally overrides its resource root. Workflow
-        workers use these overrides to load an isolated configuration snapshot.
+        The active YAML path and the directory used to resolve relative
+        template/header paths.
     """
-    override = os.environ.get("DFTCADDIE_CONFIG")
-    if override:
-        path = Path(override).expanduser().resolve()
-    else:
-        path = Path.home() / ".config" / "dftcaddie" / "config.yaml"
-        if not path.exists():
-            path = Path(__file__).parent / "resources" / "config.yaml"
-    source = os.environ.get("DFTCADDIE_SOURCE_DIR")
-    return path, Path(source).expanduser().resolve() if source else path.parent
+    path = Path.home() / ".config" / "dftcaddie" / "config.yaml"
+    if not path.exists():
+        path = Path(__file__).parent / "resources" / "config.yaml"
+    return path, path.parent
 
 
 @lru_cache(maxsize=1)
