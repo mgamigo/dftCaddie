@@ -60,10 +60,24 @@ def test_keyboard_interrupt_exits_cleanly(monkeypatch, capsys):
     assert cli.main(["calc"]) == 130
     captured = capsys.readouterr()
 
-    assert "See you on the back nine ⛳" in captured.err
+    assert "👋 Caddie has left the course." in captured.err
     assert "Traceback" not in captured.err
     assert "KeyboardInterrupt" not in captured.err
-    assert "Caddie's done" not in captured.out
+    assert "May your jobs converge" not in captured.out
+
+
+def test_calc_prints_heading(monkeypatch, capsys):
+    monkeypatch.setattr(cli.calc, "run", Mock(return_value=0))
+
+    assert cli.main(["calc", "--kind", "bands", "--code", "quantum_espresso"]) == 0
+    assert "Don’t shoot the caddie" in capsys.readouterr().out
+
+
+def test_non_calc_command_omits_heading(monkeypatch, capsys):
+    monkeypatch.setattr(cli.config, "run", Mock(return_value=0))
+
+    assert cli.main(["config", "check"]) == 0
+    assert "Don’t shoot the caddie" not in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("subcommand", _get_subcommands())
@@ -90,4 +104,6 @@ def test_dispatch(monkeypatch, subcommand):
 
 def test_no_command_prints_help(capsys):
     assert cli.main([]) == 0
-    assert "usage: caddie" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "Don’t shoot the caddie" in output
+    assert "usage: caddie" in output

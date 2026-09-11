@@ -18,6 +18,8 @@ _configure_logging():
     Configure root logging level for the CLI.
 _caddie_heading()
     Heading for the client.
+_show_heading()
+    Return whether the welcome heading should be printed.
 _build_parser()
     Build the caddie parser.
 """
@@ -60,6 +62,11 @@ def _caddie_heading():
      /\    .                                        |
     / /  .'                  Don’t shoot the caddie |
 ^^^^^^^`^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^""")
+
+
+def _show_heading(args) -> bool:
+    """Return whether the welcome heading should be printed."""
+    return args.command in (None, "calc")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -150,7 +157,8 @@ def main(argv: list[str] | None = None) -> int:
     _configure_logging(args.verbose, quiet=args.quiet)
 
     try:
-        _caddie_heading()
+        if _show_heading(args):
+            _caddie_heading()
         # Dispatch
         if args.command == "calc":
             calc.run(args)
@@ -168,9 +176,9 @@ def main(argv: list[str] | None = None) -> int:
             parser.print_help()
             return 0
     except KeyboardInterrupt:
-        print("\nSee you on the back nine ⛳", file=sys.stderr)
+        print("\n👋 Caddie has left the course.", file=sys.stderr)
         return 130
-    print("\n⛳ Caddie's done. Good luck out there...")
+    print("\n⛳ Setup complete. May your jobs converge.")
 
     return 0
 

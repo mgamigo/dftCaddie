@@ -27,6 +27,10 @@ _require()
     Raise a ValueError when a workflow assertion fails.
 _snapshot()
     Capture current-directory file contents for later comparison.
+_has_code_family()
+    Return whether a code name includes a backend family.
+_has_managed_workflow()
+    Return whether setup and pseudo checks are implemented for any code family.
 _worker()
     Prepare shared fixtures and stream results from an isolated worker.
 _prepare_fixtures()
@@ -139,9 +143,9 @@ def check_workflows(
     -------
     list of WorkflowResult
         Failures include the stage and error message; remaining cases continue.
-        Unsupported backends and unexpected interactive prompts fail explicitly.
-        Results follow request order and identify their scenario independently
-        of the success or failure stage.
+        Unexpected interactive prompts fail explicitly. Backends without
+        implemented setup/pseudo checks still run generic staged checks and
+        skip code-specific scenarios successfully.
     """
     if checks is not None:
         if case is not None or scenario != "staged":
@@ -393,6 +397,45 @@ def _snapshot():
     return {p.name: p.read_bytes() for p in Path.cwd().iterdir() if p.is_file()}
 
 
+def _has_code_family(code, family):
+    """
+    Return whether a code name includes a backend family.
+
+    Parameters
+    ----------
+    code : str
+        Calculation backend from the configuration.
+    family : str
+        Backend family to search for.
+
+    Returns
+    -------
+    bool
+        True when the backend family name is contained in code.
+    """
+    return family in code
+
+
+def _has_managed_workflow(code):
+    """
+    Return whether setup and pseudo checks are implemented for any code family.
+
+    Parameters
+    ----------
+    code : str
+        Calculation backend from the configuration.
+
+    Returns
+    -------
+    bool
+        True for codes containing a backend family with structure, pseudo, and
+        reconfiguration assertions.
+    """
+    return any(
+        _has_code_family(code, family) for family in ("quantum_espresso", "vasp")
+    )
+
+
 def _prepare_fixtures(payload, root):
     """
     Create the shared structure, synthetic libraries, and user configuration.
@@ -414,7 +457,9 @@ def _prepare_fixtures(payload, root):
     structure.write_bytes(Path(payload["structure"]).read_bytes())
     qe = root / "qe"
     names = {}
-    if any(case[2] == "quantum_espresso" for case, _ in payload["checks"]):
+    if any(
+        _has_code_family(case[2], "quantum_espresso") for case, _ in payload["checks"]
+    ):
         pattern = data["suggested_qe_pseudos"]["Si"]
         for exchange in ("pbe", "rel-pbe"):
             name = pattern.replace("$fct", exchange).replace("*", "kjpaw") + ".UPF"
@@ -483,10 +528,6 @@ def _run_case(payload, root, fixtures):
         data = payload["data"]
         kind, flavor, code = payload["case"]
         structure, _, _ = fixtures
-        _require(
-            code in ("quantum_espresso", "vasp"),
-            f"No workflow checks implemented for {code}.",
-        )
         working = root / "calculation"
         working.mkdir(parents=True)
         os.chdir(working)
@@ -497,13 +538,34 @@ def _run_case(payload, root, fixtures):
             flags += ["--flavor", flavor]
             definition = definition["flavors"][flavor]
 
+        if not _has_managed_workflow(code) and scenario != "staged":
+            return WorkflowResult(
+                payload["label"],
+                True,
+                scenario,
+                f"Skipped code-specific workflow checks for {code}.",
+                scenario,
+            )
+
         if scenario in ("automatic", "auto"):
             _check_automatic(run, flags, structure, root, scenario)
         else:
-            # Prepare and verify each step before continuing to the next command.
+            # Generic checks: every configured backend should copy templates,
+            # resolve the calculation, wire scripts, and accept SBATCH headers.
             run("calc", *flags)
             master = _check_calc_output(definition, kind, code)
+            _check_sbatch_headers(run, data, master)
 
+            if not _has_managed_workflow(code):
+                return WorkflowResult(
+                    payload["label"],
+                    True,
+                    scenario,
+                    "Generic preparation completed; code-specific checks skipped.",
+                    scenario,
+                )
+
+            # Managed backend checks: these commands edit known input formats.
             run("setup", str(structure), "--autokgrid", "--kppra", "64", "--kpath")
             run.stage = "setup output"
             _check_setup_output(code, structure)
@@ -512,7 +574,6 @@ def _run_case(payload, root, fixtures):
             run.stage = "pseudo output"
             _check_pseudo_output(code, data, fixtures)
 
-            _check_sbatch_headers(run, data, master)
             if scenario == "reconfiguration":
                 _check_reconfiguration(run, code, data, fixtures)
 
@@ -608,7 +669,7 @@ def _check_setup_output(code, structure):
     structure : pathlib.Path
         Reference silicon CIF.
     """
-    if code == "quantum_espresso":
+    if _has_code_family(code, "quantum_espresso"):
         text = Path("SYSTEM.INFO").read_text()
         for expected in (
             "NAME='Si8'",
@@ -619,7 +680,7 @@ def _check_setup_output(code, structure):
             _require(expected in text, f"Missing structure/grid setting: {expected}")
         path = Path.home() / ".config/dftcaddie/kpaths/quantum_espresso/SG227"
         _require(path.read_text().strip() in text, "Incorrect QE k-path.")
-    else:
+    if _has_code_family(code, "vasp"):
         import numpy as np
         from ase.io import read
 
@@ -656,7 +717,7 @@ def _check_pseudo_output(code, data, fixtures):
     """
     _, names, potcar = fixtures
     ratio = data["default_cutoff_ratio"]
-    if code == "quantum_espresso":
+    if _has_code_family(code, "quantum_espresso"):
         text = Path("SYSTEM.INFO").read_text()
         _require(text.count(names["rel-pbe"]) == 1, "Incorrect QE species.")
         _require(
@@ -664,7 +725,7 @@ def _check_pseudo_output(code, data, fixtures):
             and f"ECUTRHO={int(160 * ratio)}\n" in text,
             "Incorrect QE cutoffs.",
         )
-    else:
+    if _has_code_family(code, "vasp"):
         _require(Path("POTCAR").read_text() == potcar, "Incorrect POTCAR.")
         incars = list(Path.cwd().glob("INCAR*"))
         _require(incars, "No INCAR generated.")
@@ -724,7 +785,9 @@ def _check_reconfiguration(run, code, data, fixtures):
     This scenario currently checks bands-specific output filenames.
     """
     structure, names, potcar = fixtures
-    grid = Path("SYSTEM.INFO" if code == "quantum_espresso" else "KPOINTS.SCC")
+    grid = Path(
+        "SYSTEM.INFO" if _has_code_family(code, "quantum_espresso") else "KPOINTS.SCC"
+    )
     old_grid = grid.read_bytes()
     Path("notes.txt").write_text("Keep my calculation notes.\n")
 
@@ -749,7 +812,7 @@ def _check_reconfiguration(run, code, data, fixtures):
         Path("notes.txt").read_text() == "Keep my calculation notes.\n",
         "Unrelated notes changed.",
     )
-    if code == "quantum_espresso":
+    if _has_code_family(code, "quantum_espresso"):
         text = Path("SYSTEM.INFO").read_text()
         _require(
             names["pbe"] in text and names["rel-pbe"] not in text,
@@ -759,7 +822,7 @@ def _check_reconfiguration(run, code, data, fixtures):
             "noncolin=.false." in Path("scf.sh").read_text(),
             "SOC was not disabled.",
         )
-    else:
+    if _has_code_family(code, "vasp"):
         _require(
             Path("POTCAR").read_text() == potcar,
             "POTCAR changed unexpectedly.",
