@@ -1,7 +1,21 @@
-"""Reusable validation of configuration data and referenced resources.
+"""
+dftCaddie | dftcaddie.checks.config
+====================================
+
+Reusable validation of configuration data and referenced resources.
 
 This module does not import the active configuration, so it can inspect invalid
 user files and can also be called by tests with bundled or temporary resources.
+
+Classes
+-------
+ConfigIssue
+    Validation error or warning with a severity, location, and message.
+
+Functions
+---------
+validate_config()
+    Check configuration structure, resources, and calculation distinguishability.
 """
 
 from dataclasses import dataclass
@@ -49,9 +63,34 @@ def validate_config(data, source_dir: Path, *, environ=None) -> list[ConfigIssue
     environ = os.environ if environ is None else environ
 
     def error(location, message):
+        """
+        Append a validation error to the current issue list.
+
+        Parameters
+        ----------
+        location : str
+            Dotted configuration path where the problem was found.
+        message : str
+            Human-readable explanation of the problem.
+        """
         issues.append(ConfigIssue("error", location, message))
 
-    def mapping(value, location):
+    def check_mapping(value, location):
+        """
+        Check that a value is a nonempty mapping with string keys.
+
+        Parameters
+        ----------
+        value : object
+            Candidate mapping value.
+        location : str
+            Dotted configuration path for error reporting.
+
+        Returns
+        -------
+        bool
+            True when the value is valid.
+        """
         if not isinstance(value, dict) or not value:
             error(location, "Expected a nonempty mapping.")
             return False
@@ -60,19 +99,63 @@ def validate_config(data, source_dir: Path, *, environ=None) -> list[ConfigIssue
             return False
         return True
 
-    def string(value, location):
+    def check_string(value, location):
+        """
+        Check that a value is a nonempty string.
+
+        Parameters
+        ----------
+        value : object
+            Candidate string value.
+        location : str
+            Dotted configuration path for error reporting.
+
+        Returns
+        -------
+        bool
+            True when the value is valid.
+        """
         if not isinstance(value, str) or not value.strip():
             error(location, "Expected a nonempty string.")
             return False
         return True
 
-    def strings(value, location):
+    def check_string_list(value, location):
+        """
+        Check that a value is a nonempty list of nonempty strings.
+
+        Parameters
+        ----------
+        value : object
+            Candidate list value.
+        location : str
+            Dotted configuration path for error reporting.
+
+        Returns
+        -------
+        bool
+            True when every item is valid.
+        """
         if not isinstance(value, list) or not value:
             error(location, "Expected a nonempty list of strings.")
             return False
-        return all([string(item, f"{location}[{i}]") for i, item in enumerate(value)])
+        return all(
+            [check_string(item, f"{location}[{i}]") for i, item in enumerate(value)]
+        )
 
-    def file(path, location, *, nonempty=False):
+    def check_file(path, location, *, nonempty=False):
+        """
+        Check that a referenced file exists and optionally has content.
+
+        Parameters
+        ----------
+        path : pathlib.Path
+            File path to inspect.
+        location : str
+            Dotted configuration path for error reporting.
+        nonempty : bool, optional
+            If True, empty files are reported as errors.
+        """
         try:
             if not path.is_file():
                 error(location, f"Missing file: {path}")
@@ -81,27 +164,31 @@ def validate_config(data, source_dir: Path, *, environ=None) -> list[ConfigIssue
         except (OSError, ValueError) as exc:
             error(location, f"Cannot inspect {path}: {exc}")
 
-    if not mapping(data, "config"):
+    # Root document ---------------------------------------------------------
+    if not check_mapping(data, "config"):
         return issues
 
+    # Scalar defaults -------------------------------------------------------
     for key in ("default_kppra", "nscf_kppra_ratio", "default_cutoff_ratio"):
         value = data.get(key)
         if type(value) not in (int, float) or not math.isfinite(value) or value <= 0:
             error(key, "Expected a finite positive number.")
 
-    strings(data.get("mpi_executables"), "mpi_executables")
+    # Global executables and pseudo filename patterns -----------------------
+    check_string_list(data.get("mpi_executables"), "mpi_executables")
     pseudos = data.get("suggested_qe_pseudos")
-    if mapping(pseudos, "suggested_qe_pseudos"):
+    if check_mapping(pseudos, "suggested_qe_pseudos"):
         for symbol, pattern in pseudos.items():
-            string(pattern, f"suggested_qe_pseudos.{symbol}")
+            check_string(pattern, f"suggested_qe_pseudos.{symbol}")
 
+    # Cluster definitions and SBATCH headers --------------------------------
     clusters = data.get("clusters")
-    if mapping(clusters, "clusters"):
+    if check_mapping(clusters, "clusters"):
         if "local" not in clusters:
             error("clusters", "Missing fallback cluster 'local'.")
         for name, cluster in clusters.items():
             location = f"clusters.{name}"
-            if not mapping(cluster, location):
+            if not check_mapping(cluster, location):
                 continue
             hostname = cluster.get("hostname")
             if not isinstance(hostname, str) or (name != "local" and not hostname):
@@ -109,7 +196,7 @@ def validate_config(data, source_dir: Path, *, environ=None) -> list[ConfigIssue
                     location + ".hostname",
                     "Expected a hostname (empty only for local).",
                 )
-            string(cluster.get("mpi_command"), location + ".mpi_command")
+            check_string(cluster.get("mpi_command"), location + ".mpi_command")
             headers = cluster.get("headers")
             if not isinstance(headers, list) or not headers:
                 error(location + ".headers", "Expected a nonempty list.")
@@ -117,35 +204,38 @@ def validate_config(data, source_dir: Path, *, environ=None) -> list[ConfigIssue
             names = set()
             for i, header in enumerate(headers):
                 entry = f"{location}.headers[{i}]"
-                if not mapping(header, entry):
+                if not check_mapping(header, entry):
                     continue
                 name = header.get("name")
-                if string(name, entry + ".name"):
+                if check_string(name, entry + ".name"):
                     if name in names:
                         error(entry, f"Duplicate header name: {name}")
                     names.add(name)
                 filename = header.get("file")
-                if string(filename, entry + ".file"):
-                    file(source_dir / "sbatch_headers" / filename, entry)
+                if check_string(filename, entry + ".file"):
+                    check_file(source_dir / "sbatch_headers" / filename, entry)
 
+    # Calculation menus, template mappings, and resolver ambiguity ----------
     calculations = data.get("calculations")
     signatures = {}
     codes_used = set()
-    if mapping(calculations, "calculations"):
+    if check_mapping(calculations, "calculations"):
         for kind, definition in calculations.items():
             location = f"calculations.{kind}"
-            if not mapping(definition, location):
+            if not check_mapping(definition, location):
                 continue
-            string(definition.get("name"), location + ".name")
+            check_string(definition.get("name"), location + ".name")
             variants = definition.get("flavors", {None: definition})
-            if "flavors" in definition and not mapping(variants, location + ".flavors"):
+            if "flavors" in definition and not check_mapping(
+                variants, location + ".flavors"
+            ):
                 continue
             first_names = None
             for flavor, variant in variants.items():
                 entry = location if flavor is None else f"{location}.flavors.{flavor}"
-                if not mapping(variant, entry):
+                if not check_mapping(variant, entry):
                     continue
-                string(variant.get("name"), entry + ".name")
+                check_string(variant.get("name"), entry + ".name")
                 settings = variant.get("config")
                 names = set()
                 codes = None
@@ -154,15 +244,15 @@ def validate_config(data, source_dir: Path, *, environ=None) -> list[ConfigIssue
                 else:
                     for i, setting in enumerate(settings):
                         setting_path = f"{entry}.config[{i}]"
-                        if not mapping(setting, setting_path):
+                        if not check_mapping(setting, setting_path):
                             continue
                         name = setting.get("name")
-                        if not string(name, setting_path + ".name"):
+                        if not check_string(name, setting_path + ".name"):
                             continue
                         if name in names:
                             error(setting_path, f"Duplicate setting name: {name}")
                         names.add(name)
-                        string(setting.get("prompt"), setting_path + ".prompt")
+                        check_string(setting.get("prompt"), setting_path + ".prompt")
                         options = setting.get("options")
                         if not isinstance(options, list) or not options:
                             error(
@@ -184,7 +274,7 @@ def validate_config(data, source_dir: Path, *, environ=None) -> list[ConfigIssue
                                 setting_path + ".default",
                                 "Default is not one of the options.",
                             )
-                        if name == "code" and strings(
+                        if name == "code" and check_string_list(
                             options, setting_path + ".options"
                         ):
                             codes = set(options)
@@ -199,17 +289,17 @@ def validate_config(data, source_dir: Path, *, environ=None) -> list[ConfigIssue
                         + ", ".join(sorted(names - first_names)),
                     )
                 files = variant.get("files")
-                if not mapping(files, entry + ".files"):
+                if not check_mapping(files, entry + ".files"):
                     continue
                 if codes is not None and codes != set(files):
                     error(entry, "Code options and template mappings differ.")
                 for code, filenames in files.items():
                     codes_used.add(code)
                     files_path = f"{entry}.files.{code}"
-                    if not strings(filenames, files_path):
+                    if not check_string_list(filenames, files_path):
                         continue
                     for filename in filenames:
-                        file(source_dir / "templates" / filename, files_path)
+                        check_file(source_dir / "templates" / filename, files_path)
                     signature = frozenset(Path(filename).name for filename in filenames)
                     if len(signature) != len(filenames):
                         error(files_path, "Template basenames must be unique.")
@@ -223,16 +313,18 @@ def validate_config(data, source_dir: Path, *, environ=None) -> list[ConfigIssue
                             f"Ambiguous calculation files: same as {previous[2]}.",
                         )
 
+    # Packaged high-symmetry k-path resources -------------------------------
     kpaths = Path(__file__).resolve().parents[1] / "resources" / "kpaths"
     for code in sorted(codes_used):
         if code in ("quantum_espresso", "vasp", "wannier90"):
             for group in range(1, 231):
-                file(
+                check_file(
                     kpaths / code / f"SG{group}",
                     f"kpaths.{code}.SG{group}",
                     nonempty=True,
                 )
 
+    # Optional external pseudopotential libraries ---------------------------
     for key, environment_key in (
         ("qe_pslibrary", "PSLIBRARY"),
         ("vasp_pseudopotentials", None),
@@ -246,7 +338,7 @@ def validate_config(data, source_dir: Path, *, environ=None) -> list[ConfigIssue
                     "warning", key, "Optional pseudopotential library not configured."
                 )
             )
-        elif string(root, location):
+        elif check_string(root, location):
             try:
                 path = Path(root).expanduser()
                 if not path.is_dir():
