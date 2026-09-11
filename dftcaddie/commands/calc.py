@@ -36,27 +36,6 @@ def add_arguments(parser):
         Subparser instance to which the ``calc`` arguments are added.
     """
     parser.add_argument(
-        "-k",
-        "--kind",
-        metavar="KIND",
-        required=False,
-        help="Calculation kind (e.g., bands, relax, phonons)",
-    )
-    parser.add_argument(
-        "-f",
-        "--flavor",
-        metavar="KIND",
-        required=False,
-        help="Calculation flavor (e.g., default, single_point)",
-    )
-    parser.add_argument(
-        "-c",
-        "--code",
-        metavar="CODE",
-        required=False,
-        help="DFT code to use (e.g., vasp, quantum espresso)",
-    )
-    parser.add_argument(
         "-o",
         "--overwrite",
         action="store_true",
@@ -82,11 +61,30 @@ def add_arguments(parser):
         help="Set up default pseudopotentials",
     )
     parser.add_argument(
-        "-i",
-        "--init",
+        "-a",
+        "--auto",
         action="store_true",
-        help="Initialize full setup from scratch (structure must be provided).",
+        help="Run the full automatic setup from scratch (structure must be provided).",
     )
+    parser.add_argument(
+        "--kind",
+        metavar="KIND",
+        required=False,
+        help="Calculation kind (e.g., bands, relax, phonons)",
+    )
+    parser.add_argument(
+        "--flavor",
+        metavar="KIND",
+        required=False,
+        help="Calculation flavor (e.g., default, single_point)",
+    )
+    parser.add_argument(
+        "--code",
+        metavar="CODE",
+        required=False,
+        help="DFT code to use (e.g., vasp, quantum espresso)",
+    )
+
 
 
 def run(args=None):
@@ -115,7 +113,7 @@ def run(args=None):
     calculation = SimpleNamespace(**vars(args))
     details = calculation.details
     del calculation.details
-    if calculation.init:
+    if calculation.auto:
         calculation.pseudo = True
 
     calculation.cluster = ut.resolve_cluster(clusters)
@@ -199,8 +197,8 @@ def run(args=None):
             kind=calculation.kind,
             code=calculation.code,
             structure=structure,
-            autokgrid=calculation.init,
-            kpath=calculation.init,
+            autokgrid=calculation.auto,
+            kpath=calculation.auto,
         )
         if calculation.pseudo:
             apply_pseudos(

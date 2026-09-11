@@ -91,7 +91,7 @@ def check_workflows(
     case : tuple, optional
         One (kind, flavor, code) to check; otherwise check every calculation.
     scenario : str, optional
-        staged, automatic, init, or reconfiguration.
+        staged, automatic, auto, or reconfiguration.
     structure_path : path-like, optional
         Silicon CIF fixture. Defaults to the packaged copy of tests/data/Si.cif.
     timeout : float, optional
@@ -103,7 +103,7 @@ def check_workflows(
         Failures include the stage and error message; remaining cases continue.
         Unsupported backends and unexpected interactive prompts fail explicitly.
     """
-    if scenario not in ("staged", "automatic", "init", "reconfiguration"):
+    if scenario not in ("staged", "automatic", "auto", "reconfiguration"):
         raise ValueError(f"Unknown workflow scenario: {scenario}")
 
     # Preflight configuration without requiring real external pseudo libraries.
@@ -342,15 +342,15 @@ def _worker(request, output):
             definition = definition["flavors"][flavor]
 
         scenario = payload["scenario"]
-        if scenario in ("automatic", "init"):
+        if scenario in ("automatic", "auto"):
             # Automatic one-shot preparation must match the staged commands.
-            option = "--init" if scenario == "init" else "--pseudo"
+            option = "--auto" if scenario == "auto" else "--pseudo"
             run("calc", *flags, "--structure", str(structure), option)
             automatic = _snapshot()
             (root / "staged").mkdir()
             os.chdir(root / "staged")
             run("calc", *flags)
-            extra = ["--autokgrid", "--kpath"] if scenario == "init" else []
+            extra = ["--autokgrid", "--kpath"] if scenario == "auto" else []
             run("setup", str(structure), "--pseudo", *extra)
             stage = "compare"
             _require(

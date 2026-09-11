@@ -12,7 +12,17 @@ from dftcaddie.commands import calc, setup, pseudo
     "flavor,expected", [("fixed_cell", "relax"), ("variable_cell", "vc-relax")]
 )
 def test_calc_relax_flavor(parse_args, flavor, expected):
-    calc.run(parse_args("calc", "-k", "relax", "-f", flavor, "-c", "quantum_espresso"))
+    calc.run(
+        parse_args(
+            "calc",
+            "--kind",
+            "relax",
+            "--flavor",
+            flavor,
+            "--code",
+            "quantum_espresso",
+        )
+    )
     assert f"calculation='{expected}'" in Path("relax.sh").read_text()
 
 
@@ -25,7 +35,9 @@ def test_calc_interactive_details(parse_args, monkeypatch):
 
 
 def test_calc_overwrite(parse_args):
-    args = parse_args("calc", "-k", "bands", "-c", "quantum_espresso", "--overwrite")
+    args = parse_args(
+        "calc", "--kind", "bands", "--code", "quantum_espresso", "--overwrite"
+    )
     calc.run(args)
     Path("bands.sh").write_text("old contents\n")
     calc.run(args)
@@ -36,9 +48,9 @@ def test_calc_overwrite(parse_args):
 @pytest.mark.parametrize(
     "flags",
     [
-        ("-k", "unknown"),
-        ("-k", "bands", "-c", "unknown"),
-        ("-k", "relax", "-f", "unknown"),
+        ("--kind", "unknown"),
+        ("--kind", "bands", "--code", "unknown"),
+        ("--kind", "relax", "--flavor", "unknown"),
     ],
 )
 def test_calc_rejects_invalid_selection(parse_args, flags):
@@ -55,7 +67,15 @@ def test_calc_structure_without_pseudo(parse_args, monkeypatch):
     monkeypatch.setattr(setup, "apply_setup", setup_step)
     monkeypatch.setattr(pseudo, "apply_pseudos", pseudo_step)
     calc.run(
-        parse_args("calc", "-k", "bands", "-c", "quantum_espresso", "-s", "Si.cif")
+        parse_args(
+            "calc",
+            "--kind",
+            "bands",
+            "--code",
+            "quantum_espresso",
+            "-s",
+            "Si.cif",
+        )
     )
     setup_step.assert_called_once_with(
         kind="bands",
@@ -65,3 +85,40 @@ def test_calc_structure_without_pseudo(parse_args, monkeypatch):
         kpath=False,
     )
     pseudo_step.assert_not_called()
+
+
+@pytest.mark.parametrize("flag", ["-a", "--auto"])
+def test_calc_auto_runs_full_setup(parse_args, monkeypatch, flag):
+    structure = SimpleNamespace(symbols=["Si"])
+    setup_step, pseudo_step = Mock(), Mock()
+    monkeypatch.setattr(utils, "get_structure", lambda path: structure)
+    monkeypatch.setattr(setup, "apply_setup", setup_step)
+    monkeypatch.setattr(pseudo, "apply_pseudos", pseudo_step)
+
+    calc.run(
+        parse_args(
+            "calc",
+            "--kind",
+            "bands",
+            "--code",
+            "quantum_espresso",
+            "--structure",
+            "Si.cif",
+            flag,
+        )
+    )
+
+    setup_step.assert_called_once_with(
+        kind="bands",
+        code="quantum_espresso",
+        structure=structure,
+        autokgrid=True,
+        kpath=True,
+    )
+    pseudo_step.assert_called_once_with(
+        kind_calc="bands",
+        code="quantum_espresso",
+        symbols=structure.symbols,
+        relativistic=True,
+        configure=True,
+    )

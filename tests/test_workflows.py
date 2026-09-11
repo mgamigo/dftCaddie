@@ -32,7 +32,7 @@ def test_staged_calculation(workflow_check, calculation_case):
 
 
 @pytest.mark.parametrize("code", ["quantum_espresso", "vasp"])
-@pytest.mark.parametrize("scenario", ["automatic", "init"])
+@pytest.mark.parametrize("scenario", ["automatic", "auto"])
 def test_automatic_matches_staged(workflow_check, code, scenario):
     results = workflow_check(("bands", None, code), scenario)
     assert len(results) == 1
