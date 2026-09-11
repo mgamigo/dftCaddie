@@ -296,6 +296,26 @@ def test_set_crystal_structure_updates_system_info(tmp_path: Path, monkeypatch):
 
 
 # -------------------------
+# set_high_symmetry_path
+# -------------------------
+
+
+def test_set_high_symmetry_path_uses_active_resource_root(
+    tmp_path: Path, monkeypatch, config_data
+):
+    monkeypatch.chdir(tmp_path)
+    system = tmp_path / "SYSTEM.INFO"
+    system.write_text("QE_CRYST_PATH=\nold path\nEOL\n", encoding="utf-8")
+    kpath = tmp_path / "kpaths" / "quantum_espresso" / "SG1"
+    kpath.parent.mkdir(parents=True)
+    kpath.write_text("CUSTOM_KPATH\n", encoding="utf-8")
+
+    fm.set_high_symmetry_path(SimpleNamespace(space_group=1), "quantum_espresso")
+
+    assert system.read_text(encoding="utf-8") == "QE_CRYST_PATH=\nCUSTOM_KPATH\nEOL\n"
+
+
+# -------------------------
 # configure_qe_cutoffs_from_pseudos
 # -------------------------
 

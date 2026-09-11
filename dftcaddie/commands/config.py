@@ -144,11 +144,13 @@ def apply_init(force: bool = False) -> int:
     user_root = Path.home() / ".config" / "dftcaddie"
     templates_src = resources / "templates"
     headers_src = resources / "sbatch_headers"
+    kpaths_src = resources / "kpaths"
     config_src = resources / "config.yaml"
 
     config_dst = user_root / "config.yaml"
     templates_dst = user_root / "templates"
     headers_dst = user_root / "sbatch_headers"
+    kpaths_dst = user_root / "kpaths"
 
     user_root.mkdir(parents=True, exist_ok=True)
 
@@ -169,6 +171,7 @@ def apply_init(force: bool = False) -> int:
     copyfile(config_src, config_dst)
     copytree(templates_src, templates_dst)
     copytree(headers_src, headers_dst)
+    copytree(kpaths_src, kpaths_dst)
 
     print(f"\nUser configuration initialized at {user_root}")
     return 0

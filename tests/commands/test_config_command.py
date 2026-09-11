@@ -15,6 +15,7 @@ def test_init_command_copies_default_resources_to_user_config(tmp_path, monkeypa
     assert (user_config / "config.yaml").is_file()
     assert (user_config / "templates").is_dir()
     assert (user_config / "sbatch_headers").is_dir()
+    assert (user_config / "kpaths").is_dir()
 
 
 @pytest.mark.parametrize("force", [False, True])
@@ -25,6 +26,7 @@ def test_init_existing_resources(parse_args, isolated_command_environment, force
         "config.yaml",
         "templates/quantum_espresso/master.sh",
         "sbatch_headers/local.default",
+        "kpaths/quantum_espresso/SG227",
     ]
     for relative in paths:
         (root / relative).write_text("custom content\n")
@@ -41,7 +43,7 @@ def test_init_existing_resources(parse_args, isolated_command_environment, force
 def test_init_copies_exact_resource_contents(parse_args, isolated_command_environment):
     config_command.run(parse_args("config", "init"))
     destination = Path.home() / ".config" / "dftcaddie"
-    for entry in ["config.yaml", "templates", "sbatch_headers"]:
+    for entry in ["config.yaml", "templates", "sbatch_headers", "kpaths"]:
         source = isolated_command_environment / entry
         files = [source] if source.is_file() else source.rglob("*")
         for path in files:

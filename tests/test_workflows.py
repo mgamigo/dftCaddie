@@ -52,6 +52,7 @@ def test_custom_resources_and_defaults_are_used(
     source = tmp_path / "resources"
     shutil.copytree(bundled_resources / "templates", source / "templates")
     shutil.copytree(bundled_resources / "sbatch_headers", source / "sbatch_headers")
+    shutil.copytree(bundled_resources / "kpaths", source / "kpaths")
     data = bundled_config
     data["default_cutoff_ratio"] = 2.3
     original = deepcopy(data)

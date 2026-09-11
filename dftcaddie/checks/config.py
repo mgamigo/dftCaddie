@@ -42,7 +42,7 @@ def validate_config(data, source_dir: Path, *, environ=None) -> list[ConfigIssue
     data : object
         Parsed YAML content. Invalid types are reported as errors.
     source_dir : pathlib.Path
-        Root for templates and SBATCH headers, matching the configuration loader.
+        Root for templates, SBATCH headers, and k-path resources.
     environ : mapping, optional
         Environment used to resolve PSLIBRARY. Defaults to os.environ.
 
@@ -54,9 +54,8 @@ def validate_config(data, source_dir: Path, *, environ=None) -> list[ConfigIssue
 
     Notes
     -----
-    No files are modified and no external programs are executed. K-paths are
-    checked in the package directory because setup currently reads them there.
-    Checks cover configuration consistency, not scientific input correctness.
+    No files are modified and no external programs are executed. Checks cover
+    configuration consistency, not scientific input correctness.
     """
     issues = []
     source_dir = Path(source_dir)
@@ -313,8 +312,8 @@ def validate_config(data, source_dir: Path, *, environ=None) -> list[ConfigIssue
                             f"Ambiguous calculation files: same as {previous[2]}.",
                         )
 
-    # Packaged high-symmetry k-path resources -------------------------------
-    kpaths = Path(__file__).resolve().parents[1] / "resources" / "kpaths"
+    # High-symmetry k-path resources ----------------------------------------
+    kpaths = source_dir / "kpaths"
     for code in sorted(codes_used):
         if code in ("quantum_espresso", "vasp", "wannier90"):
             for group in range(1, 231):

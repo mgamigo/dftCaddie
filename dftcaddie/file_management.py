@@ -733,10 +733,11 @@ def set_high_symmetry_path(structure: SimpleNamespace, code: str) -> None:
     )
     FOUND = False
 
+    _, source = config.load_config()
+    kpaths_dir = os.path.join(source, "kpaths")
+
     if "quantum_espresso" in code:
-        source_dir = os.path.join(
-            os.path.dirname(__file__), "resources", "kpaths", "quantum_espresso"
-        )
+        source_dir = os.path.join(kpaths_dir, "quantum_espresso")
         path_file = os.path.join(source_dir, f"SG{structure.space_group}")
 
         log.debug("Reading k-path template: %s", path_file)
@@ -748,17 +749,13 @@ def set_high_symmetry_path(structure: SimpleNamespace, code: str) -> None:
     if "vasp" in code:
         import shutil
 
-        source_dir = os.path.join(
-            os.path.dirname(__file__), "resources", "kpaths", "vasp"
-        )
+        source_dir = os.path.join(kpaths_dir, "vasp")
         path_file = os.path.join(source_dir, f"SG{structure.space_group}")
         shutil.copy(path_file, "KPOINTS.BS")
         FOUND = True
 
     if "wannier" in code:
-        source_dir = os.path.join(
-            os.path.dirname(__file__), "resources", "kpaths", "wannier90"
-        )
+        source_dir = os.path.join(kpaths_dir, "wannier90")
         path_file = os.path.join(source_dir, f"SG{structure.space_group}")
 
         log.debug("Reading k-path template: %s", path_file)

@@ -31,7 +31,7 @@ log = logging.getLogger(__name__)
 
 def _config_paths(default_config: bool = False) -> tuple[Path, Path]:
     """
-    Return the selected YAML path and template/header root.
+    Return the selected YAML path and resource root.
 
     Parameters
     ----------
@@ -42,7 +42,7 @@ def _config_paths(default_config: bool = False) -> tuple[Path, Path]:
     -------
     tuple[Path, Path]
         The active YAML path and the directory used to resolve relative
-        template/header paths.
+        template, SBATCH header, and k-path resources.
     """
     resources = Path(__file__).parent / "resources"
     path = resources / "config.yaml"
@@ -67,7 +67,7 @@ def load_config(default_config: bool = False) -> tuple[dict, Path]:
     Returns
     -------
     tuple of dict and pathlib.Path
-        Parsed settings and the template/header root.
+        Parsed settings and the resource root.
 
     Raises
     ------

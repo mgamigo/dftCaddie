@@ -295,7 +295,7 @@ def _worker(request, output):
         # Active user config seen by the CLI inside this isolated HOME.
         user_config = Path.home() / ".config" / "dftcaddie"
         user_config.mkdir(parents=True)
-        for directory in ("templates", "sbatch_headers"):
+        for directory in ("templates", "sbatch_headers", "kpaths"):
             shutil.copytree(
                 Path(payload["source"]) / directory, user_config / directory
             )
@@ -394,10 +394,7 @@ def _worker(request, output):
                     _require(
                         expected in text, f"Missing structure/grid setting: {expected}"
                     )
-                path = (
-                    Path(__file__).resolve().parents[1]
-                    / "resources/kpaths/quantum_espresso/SG227"
-                )
+                path = Path.home() / ".config/dftcaddie/kpaths/quantum_espresso/SG227"
                 _require(path.read_text().strip() in text, "Incorrect QE k-path.")
             else:
                 import numpy as np
@@ -420,9 +417,7 @@ def _worker(request, output):
                 _require(
                     "2 2 2" in Path("KPOINTS.SCC").read_text(), "Incorrect VASP grid."
                 )
-                path = (
-                    Path(__file__).resolve().parents[1] / "resources/kpaths/vasp/SG227"
-                )
+                path = Path.home() / ".config/dftcaddie/kpaths/vasp/SG227"
                 _require(
                     Path("KPOINTS.BS").read_bytes() == path.read_bytes(),
                     "Incorrect VASP k-path.",
