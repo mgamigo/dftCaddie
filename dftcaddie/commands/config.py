@@ -1,6 +1,6 @@
 """
 dftCaddie | dftcaddie.commands.config
-===================================
+=====================================
 
 CLI handler for the ``caddie config`` command.
 
@@ -50,10 +50,10 @@ def add_arguments(parser):
         action="store_true",
         help="Overwrite existing user configuration.",
     )
-    check = commands.add_parser(
+    check_parser = commands.add_parser(
         "check", help="Validate active configuration and resources"
     )
-    check.add_argument(
+    check_parser.add_argument(
         "--workflows",
         action="store_true",
         help="Also prepare every calculation in temporary directories using synthetic pseudos.",

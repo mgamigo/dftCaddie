@@ -68,13 +68,6 @@ def load_config() -> tuple[dict, Path]:
     return data, source
 
 
-def clear_config_cache() -> None:
-    """Clear cached settings and resolved pseudopotential paths."""
-    load_config.cache_clear()
-    resolve_pslibrary.cache_clear()
-    resolve_potcar_library.cache_clear()
-
-
 @lru_cache(maxsize=1)
 def resolve_pslibrary() -> Path:
     """
@@ -175,3 +168,10 @@ def resolve_potcar_library() -> Path:
 
     log.info("Using VASP POTCARs from %s", path)
     return path
+
+
+def clear_config_cache() -> None:
+    """Clear cached settings and resolved pseudopotential paths."""
+    load_config.cache_clear()
+    resolve_pslibrary.cache_clear()
+    resolve_potcar_library.cache_clear()
