@@ -4,6 +4,19 @@ dftCaddie | dftcaddie.config
 
 Select configuration paths, load settings on demand, and resolve libraries.
 Importing this module does not read YAML or access configuration values.
+
+Functions
+---------
+config_paths()
+    Return the active YAML path and the matching resource directory.
+load_config()
+    Read the active configuration on first use and cache it.
+resolve_pslibrary()
+    Resolve and validate the Quantum ESPRESSO pseudopotential library.
+resolve_potcar_library()
+    Resolve and validate the VASP POTCAR library.
+clear_config_cache()
+    Clear cached configuration and pseudopotential library paths.
 """
 
 from pathlib import Path
@@ -19,7 +32,7 @@ def config_paths() -> tuple[Path, Path]:
 
     Returns
     -------
-    tuple of pathlib.Path
+    tuple[Path, Path]
         The active YAML path and the directory used to resolve relative
         template/header paths.
     """
@@ -164,7 +177,18 @@ def resolve_potcar_library() -> Path:
 
 
 def clear_config_cache() -> None:
-    """Clear cached settings and resolved pseudopotential paths."""
+    """
+    Clear cached settings and resolved pseudopotential paths.
+
+    This is mainly useful in long-running Python sessions, such as IPython, when
+    ``~/.config/dftcaddie/config.yaml`` or ``$PSLIBRARY`` has changed after the
+    first configuration lookup.
+
+    Returns
+    -------
+    None
+        The cache is cleared in-place.
+    """
     load_config.cache_clear()
     resolve_pslibrary.cache_clear()
     resolve_potcar_library.cache_clear()
