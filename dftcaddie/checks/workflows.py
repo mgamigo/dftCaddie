@@ -1,7 +1,32 @@
-"""Shared workflow checks for pytest and the configuration CLI.
+"""
+dftCaddie | dftcaddie.checks.workflows
+=======================================
+
+Shared workflow checks for pytest and the configuration CLI.
 
 Only Python preparation commands run. Each case executes in a separate process
 and temporary working directory, using synthetic potentials and a real Si CIF.
+
+Classes
+-------
+WorkflowResult
+    Outcome of one checked calculation workflow.
+
+Functions
+---------
+calculation_cases()
+    Yield every declared calculation kind/flavor/code combination.
+check_workflows()
+    Run one or more calculation workflows in isolated temporary directories.
+
+Private Utilities
+-----------------
+_require()
+    Raise a ValueError when a workflow assertion fails.
+_snapshot()
+    Capture current-directory file contents for later comparison.
+_worker()
+    Execute one isolated workflow request and write a JSON result.
 """
 
 from copy import deepcopy
@@ -30,7 +55,20 @@ class WorkflowResult:
 
 
 def calculation_cases(data):
-    """Yield (kind, flavor, code) for every declared template set."""
+    """
+    Yield every declared calculation kind, flavor, and code combination.
+
+    Parameters
+    ----------
+    data : dict
+        Parsed configuration data containing the ``calculations`` section.
+
+    Yields
+    ------
+    tuple
+        ``(kind, flavor, code)`` for each configured template set. ``flavor`` is
+        None for calculations without a flavor layer.
+    """
     for kind, definition in data["calculations"].items():
         for flavor, variant in definition.get("flavors", {None: definition}).items():
             for code in variant["files"]:
@@ -67,6 +105,8 @@ def check_workflows(
     """
     if scenario not in ("staged", "automatic", "init", "reconfiguration"):
         raise ValueError(f"Unknown workflow scenario: {scenario}")
+
+    # Preflight configuration without requiring real external pseudo libraries.
     source = Path(source_dir).resolve()
     clean = deepcopy(data)
     if isinstance(clean, dict):
@@ -88,6 +128,8 @@ def check_workflows(
                 )
             ]
         cases = [tuple(case)]
+
+    # Choose the structure fixture used by every isolated workflow worker.
     structure = (
         Path(structure_path).resolve()
         if structure_path
@@ -95,6 +137,7 @@ def check_workflows(
     )
     results = []
     for kind, flavor, code in cases:
+        # Run each case in a fresh Python process and temporary working tree.
         label = f"{kind}/{flavor or 'default'}/{code}"
         with TemporaryDirectory(prefix="dftcaddie-check-") as root:
             root = Path(root)
@@ -159,18 +202,56 @@ def check_workflows(
 
 
 def _require(condition, message):
+    """
+    Raise an error when a workflow condition is not satisfied.
+
+    Parameters
+    ----------
+    condition : bool
+        Condition expected to be true.
+    message : str
+        Error message used when the condition is false.
+
+    Raises
+    ------
+    ValueError
+        If condition is false.
+    """
     if not condition:
         raise ValueError(message)
 
 
 def _snapshot():
+    """
+    Capture the file contents in the current working directory.
+
+    Returns
+    -------
+    dict
+        Mapping from filename to raw file bytes for regular files in cwd.
+    """
     return {p.name: p.read_bytes() for p in Path.cwd().iterdir() if p.is_file()}
 
 
 def _worker(request, output):
+    """
+    Execute one workflow check request in an isolated subprocess.
+
+    The worker creates synthetic pseudopotential libraries, writes a temporary
+    user configuration under the isolated HOME, runs the CLI commands, and
+    serializes the result.
+
+    Parameters
+    ----------
+    request : path-like
+        YAML request file written by ``check_workflows``.
+    output : path-like
+        JSON result file to write.
+    """
     import builtins
     import socket
 
+    # Request payload and common fixture files ------------------------------
     payload = yaml.safe_load(Path(request).read_text())
     stage = "fixtures"
     try:
@@ -182,6 +263,8 @@ def _worker(request, output):
             f"No workflow checks implemented for {code}.",
         )
         Path("home").mkdir()
+
+        # Real input structure plus synthetic QE/VASP pseudopotential trees.
         structure = root / "Si.cif"
         structure.write_bytes(Path(payload["structure"]).read_bytes())
         qe = root / "qe"
@@ -208,6 +291,8 @@ def _worker(request, output):
         (vasp / "POTCAR").write_text(potcar)
         data["qe_pslibrary"] = str(qe)
         data["vasp_pseudopotentials"] = str(root / "vasp")
+
+        # Active user config seen by the CLI inside this isolated HOME.
         user_config = Path.home() / ".config" / "dftcaddie"
         user_config.mkdir(parents=True)
         for directory in ("templates", "sbatch_headers"):
@@ -217,6 +302,19 @@ def _worker(request, output):
         (user_config / "config.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
 
         def unexpected_input(prompt):
+            """
+            Fail if the workflow unexpectedly needs interactive input.
+
+            Parameters
+            ----------
+            prompt : str
+                Prompt text requested by the CLI.
+
+            Raises
+            ------
+            ValueError
+                Always raised with the unexpected prompt.
+            """
             raise ValueError(f"Interactive choice required: {prompt}")
 
         builtins.input = unexpected_input
@@ -229,6 +327,9 @@ def _worker(request, output):
         os.chdir(working)
 
         def run(*args):
+            """
+            Run one caddie subcommand and fail on nonzero status.
+            """
             nonlocal stage
             stage = " ".join(args[:1])
             _require(cli.main(list(args)) == 0, f"Command failed: {args[0]}")
@@ -242,6 +343,7 @@ def _worker(request, output):
 
         scenario = payload["scenario"]
         if scenario in ("automatic", "init"):
+            # Automatic one-shot preparation must match the staged commands.
             option = "--init" if scenario == "init" else "--pseudo"
             run("calc", *flags, "--structure", str(structure), option)
             automatic = _snapshot()
@@ -256,6 +358,7 @@ def _worker(request, output):
                 "Automatic and staged preparation produced different files.",
             )
         else:
+            # caddie calc: templates, script wiring, and calculation detection.
             run("calc", *flags)
             for filename in definition["files"][code]:
                 _require(
@@ -276,6 +379,8 @@ def _worker(request, output):
                         master.count(f"bash {name}\n") == 1,
                         f"Missing or duplicate script: {name}",
                     )
+
+            # caddie setup: structure, k-grid, and high-symmetry k-path edits.
             run("setup", str(structure), "--autokgrid", "--kppra", "64", "--kpath")
             stage = "setup output"
             if code == "quantum_espresso":
@@ -322,6 +427,8 @@ def _worker(request, output):
                     Path("KPOINTS.BS").read_bytes() == path.read_bytes(),
                     "Incorrect VASP k-path.",
                 )
+
+            # caddie pseudo: pseudo selection, cutoffs, and SOC settings.
             run("pseudo", str(structure), "--configure", "--relativistic")
             stage = "pseudo output"
             ratio = data["default_cutoff_ratio"]
@@ -344,6 +451,8 @@ def _worker(request, output):
                         and "LSORBIT = TRUE" in text,
                         f"Incorrect cutoff/SOC in {incar.name}.",
                     )
+
+            # caddie sbatch: every configured header preserves the job body.
             body = master[master.index("#Actual JOBS") :]
             for cluster, entry in data["clusters"].items():
                 for header in entry["headers"]:
@@ -359,6 +468,7 @@ def _worker(request, output):
                     )
 
             if scenario == "reconfiguration":
+                # Repeated configuration should update owned settings only.
                 grid = Path(
                     "SYSTEM.INFO" if code == "quantum_espresso" else "KPOINTS.SCC"
                 )
@@ -366,6 +476,9 @@ def _worker(request, output):
                 Path("notes.txt").write_text("Keep my calculation notes.\n")
 
                 def reconfigure():
+                    """
+                    Apply the second-pass setup, pseudo, and sbatch commands.
+                    """
                     run("setup", str(structure), "--autokgrid", "--kppra", "4096")
                     run("pseudo", str(structure), "--configure")
                     run(

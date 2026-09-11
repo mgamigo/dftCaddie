@@ -54,6 +54,7 @@ def add_arguments(parser):
         "check", help="Validate active configuration and resources"
     )
     check_parser.add_argument(
+        "-w",
         "--workflows",
         action="store_true",
         help="Also prepare every calculation in temporary directories using synthetic pseudos.",
