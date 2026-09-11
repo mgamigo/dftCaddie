@@ -116,11 +116,13 @@ def apply_check(workflows: bool = False) -> int:
     if workflows:
         from dftcaddie.checks.workflows import check_workflows
 
-        print("Workflow checks use silicon and synthetic pseudos; no DFT jobs are run.")
-        for result in check_workflows(data, source):
+        def print_workflow_result(result):
             label = "OK" if result.success else "ERROR"
             print(f"{label}: {result.case}: {result.stage}: {result.message}")
-            errors += not result.success
+
+        print("Workflow checks use silicon and synthetic pseudos; no DFT jobs are run.")
+        results = check_workflows(data, source, progress=print_workflow_result)
+        errors += sum(not result.success for result in results)
     return 1 if errors else 0
 
 

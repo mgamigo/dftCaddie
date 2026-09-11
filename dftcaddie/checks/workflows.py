@@ -4,8 +4,8 @@ dftCaddie | dftcaddie.checks.workflows
 
 Shared workflow checks for pytest and the configuration CLI.
 
-Only Python preparation commands run. Each case executes in a separate process
-and temporary working directory, using synthetic potentials and a real Si CIF.
+Only Python preparation commands run. A shared worker process uses synthetic
+potentials and a real Si CIF, with a fresh working directory for each case.
 
 Classes
 -------
@@ -26,18 +26,25 @@ _require()
 _snapshot()
     Capture current-directory file contents for later comparison.
 _worker()
-    Execute one isolated workflow request and write a JSON result.
+    Prepare shared fixtures and stream results from an isolated worker.
+_prepare_fixtures()
+    Install the temporary configuration, structure, and synthetic libraries.
+_run_case()
+    Execute one calculation in its own temporary working directory.
 """
 
 from copy import deepcopy
+from contextlib import redirect_stdout
 from dataclasses import dataclass, asdict
 import json
 import os
 from pathlib import Path
+from queue import Empty, Queue
 import shutil
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
+from threading import Thread
 
 import yaml
 
@@ -52,6 +59,7 @@ class WorkflowResult:
     success: bool
     stage: str
     message: str
+    scenario: str = "staged"
 
 
 def calculation_cases(data):
@@ -76,7 +84,15 @@ def calculation_cases(data):
 
 
 def check_workflows(
-    data, source_dir, *, case=None, scenario="staged", structure_path=None, timeout=60
+    data,
+    source_dir,
+    *,
+    case=None,
+    scenario="staged",
+    checks=None,
+    structure_path=None,
+    timeout=60,
+    progress=None,
 ) -> list[WorkflowResult]:
     """
     Exercise preparation against explicitly supplied configuration and resources.
@@ -92,19 +108,41 @@ def check_workflows(
         One (kind, flavor, code) to check; otherwise check every calculation.
     scenario : str, optional
         staged, automatic, auto, or reconfiguration.
+    checks : iterable of tuple, optional
+        Explicit ``(case, scenario)`` pairs to run in one worker, each in a
+        fresh directory. Cannot be combined with case or a nondefault scenario.
     structure_path : path-like, optional
         Silicon CIF fixture. Defaults to the packaged copy of tests/data/Si.cif.
     timeout : float, optional
-        Maximum seconds per worker. A timeout becomes a failed result.
+        Maximum seconds waiting for each result, including worker startup for
+        the first case. A timeout stops the worker and fails remaining cases.
+    progress : callable, optional
+        Function called with each ``WorkflowResult`` as soon as it is available.
 
     Returns
     -------
     list of WorkflowResult
         Failures include the stage and error message; remaining cases continue.
         Unsupported backends and unexpected interactive prompts fail explicitly.
+        Results follow request order and identify their scenario independently
+        of the success or failure stage.
     """
-    if scenario not in ("staged", "automatic", "auto", "reconfiguration"):
-        raise ValueError(f"Unknown workflow scenario: {scenario}")
+    if checks is not None:
+        if case is not None or scenario != "staged":
+            raise ValueError("checks cannot be combined with case or scenario.")
+        checks = [
+            (tuple(selected_case), selected) for selected_case, selected in checks
+        ]
+    for selected in ([scenario] if checks is None else [s for _, s in checks]):
+        if selected not in ("staged", "automatic", "auto", "reconfiguration"):
+            raise ValueError(f"Unknown workflow scenario: {selected}")
+
+    results = []
+
+    def record(result):
+        results.append(result)
+        if progress is not None:
+            progress(result)
 
     # Preflight configuration without requiring real external pseudo libraries.
     source = Path(source_dir).resolve()
@@ -115,89 +153,126 @@ def check_workflows(
     issues = validate_config(clean, source, environ={})
     errors = [issue for issue in issues if issue.level == "error"]
     if errors:
-        return [
-            WorkflowResult("configuration", False, issue.location, issue.message)
-            for issue in errors
-        ]
+        for issue in errors:
+            record(
+                WorkflowResult("configuration", False, issue.location, issue.message)
+            )
+        return results
     cases = list(calculation_cases(clean))
-    if case is not None:
-        if tuple(case) not in cases:
-            return [
+    if checks is None:
+        checks = (
+            [(tuple(case), scenario)]
+            if case is not None
+            else [(selected_case, scenario) for selected_case in cases]
+        )
+    for selected_case, selected in checks:
+        if selected_case not in cases:
+            record(
                 WorkflowResult(
-                    str(case), False, "configuration", "Unknown calculation case."
+                    str(selected_case),
+                    False,
+                    "configuration",
+                    "Unknown calculation case.",
+                    selected,
                 )
-            ]
-        cases = [tuple(case)]
+            )
+            return results
+    if not checks:
+        return results
 
-    # Choose the structure fixture used by every isolated workflow worker.
+    # Choose the structure fixture shared by every case.
     structure = (
         Path(structure_path).resolve()
         if structure_path
         else (Path(__file__).parent / "data/Si.cif")
     )
-    results = []
-    for kind, flavor, code in cases:
-        # Run each case in a fresh Python process and temporary working tree.
-        label = f"{kind}/{flavor or 'default'}/{code}"
-        with TemporaryDirectory(prefix="dftcaddie-check-") as root:
-            root = Path(root)
-            request = root / "request.yaml"
-            output = root / "result.json"
-            request.write_text(
-                yaml.safe_dump(
-                    {
-                        "data": clean,
-                        "source": str(source),
-                        "case": [kind, flavor, code],
-                        "scenario": scenario,
-                        "structure": str(structure),
-                        "label": label,
-                    }
-                )
+    # One process and resource installation for the entire batch.
+    with TemporaryDirectory(prefix="dftcaddie-check-") as root:
+        root = Path(root)
+        request = root / "request.yaml"
+        request.write_text(
+            yaml.safe_dump(
+                {
+                    "data": clean,
+                    "source": str(source),
+                    "cases": [selected_case for selected_case, _ in checks],
+                    "checks": checks,
+                    "structure": str(structure),
+                }
             )
-            env = dict(os.environ)
-            env.pop("PSLIBRARY", None)
-            env["HOME"] = str(root / "home")
-            # Also support source checkouts not installed into this interpreter.
-            env["PYTHONPATH"] = os.pathsep.join(
-                [str(Path(__file__).resolve().parents[2]), env.get("PYTHONPATH", "")]
-            )
-            try:
-                process = subprocess.run(
+        )
+        env = dict(os.environ)
+        env.pop("PSLIBRARY", None)
+        env["HOME"] = str(root / "home")
+        # Also support source checkouts not installed into this interpreter.
+        env["PYTHONPATH"] = os.pathsep.join(
+            [str(Path(__file__).resolve().parents[2]), env.get("PYTHONPATH", "")]
+        )
+        jobs = [
+            (f"{kind}/{flavor or 'default'}/{code}", selected)
+            for (kind, flavor, code), selected in checks
+        ]
+        messages = Queue()
+
+        def read_results(stream):
+            for line in stream:
+                messages.put(line)
+            messages.put(None)
+
+        try:
+            with (
+                (root / "worker.log").open("w+") as log,
+                subprocess.Popen(
                     [
                         sys.executable,
                         "-m",
                         "dftcaddie.checks.workflows",
                         str(request),
-                        str(output),
                     ],
                     cwd=root,
                     env=env,
                     stdin=subprocess.DEVNULL,
-                    capture_output=True,
+                    stdout=subprocess.PIPE,
+                    stderr=log,
                     text=True,
-                    timeout=timeout,
+                ) as process,
+            ):
+                reader = Thread(
+                    target=read_results, args=(process.stdout,), daemon=True
                 )
-                if process.returncode != 0 or not output.is_file():
-                    results.append(
-                        WorkflowResult(
-                            label,
-                            False,
-                            "worker",
-                            process.stderr[-2000:]
-                            or f"Worker exited with status {process.returncode}.",
+                reader.start()
+                failure = None
+                try:
+                    for label, selected in jobs:
+                        if failure is None:
+                            try:
+                                line = messages.get(timeout=timeout)
+                                if line is None:
+                                    log.seek(0)
+                                    failure = (
+                                        log.read()[-2000:]
+                                        or "Worker exited without a result."
+                                    )
+                                else:
+                                    result = WorkflowResult(**json.loads(line))
+                            except Empty:
+                                failure = f"Timed out after {timeout}s; worker stopped."
+                            except (ValueError, TypeError) as exc:
+                                failure = f"Invalid worker result: {exc}"
+                            if failure is None:
+                                record(result)
+                                continue
+                        record(
+                            WorkflowResult(label, False, "worker", failure, selected)
                         )
-                    )
-                else:
-                    results.append(WorkflowResult(**json.loads(output.read_text())))
-            except subprocess.TimeoutExpired:
-                results.append(
-                    WorkflowResult(
-                        label, False, "worker", f"Timed out after {timeout}s."
-                    )
-                )
-            except OSError as exc:
-                results.append(WorkflowResult(label, False, "worker", str(exc)))
+                finally:
+                    if process.poll() is None:
+                        process.kill()
+                    process.wait()
+                    reader.join()
+        except OSError as exc:
+            for label, selected in jobs[len(results) :]:
+                record(WorkflowResult(label, False, "worker", str(exc), selected))
     return results
 
 
@@ -233,97 +308,86 @@ def _snapshot():
     return {p.name: p.read_bytes() for p in Path.cwd().iterdir() if p.is_file()}
 
 
-def _worker(request, output):
+def _prepare_fixtures(payload, root):
     """
-    Execute one workflow check request in an isolated subprocess.
-
-    The worker creates synthetic pseudopotential libraries, writes a temporary
-    user configuration under the isolated HOME, runs the CLI commands, and
-    serializes the result.
+    Create the shared structure, synthetic libraries, and user configuration.
 
     Parameters
     ----------
-    request : path-like
-        YAML request file written by ``check_workflows``.
-    output : path-like
-        JSON result file to write.
-    """
-    import builtins
-    import socket
+    payload : dict
+        Batch request containing configuration, resources, and structure paths.
+    root : pathlib.Path
+        Temporary worker directory.
 
-    # Request payload and common fixture files ------------------------------
-    payload = yaml.safe_load(Path(request).read_text())
+    Returns
+    -------
+    tuple
+        Structure path, QE pseudo filenames, and synthetic POTCAR contents.
+    """
+    data = payload["data"]
+    structure = root / "Si.cif"
+    structure.write_bytes(Path(payload["structure"]).read_bytes())
+    qe = root / "qe"
+    names = {}
+    if any(case[2] == "quantum_espresso" for case in payload["cases"]):
+        pattern = data["suggested_qe_pseudos"]["Si"]
+        for exchange in ("pbe", "rel-pbe"):
+            name = pattern.replace("$fct", exchange).replace("*", "kjpaw") + ".UPF"
+            _require(Path(name).name == name, "Si pseudo pattern must be a filename.")
+            directory = qe / exchange / "PSEUDOPOTENTIALS"
+            directory.mkdir(parents=True)
+            (directory / name).write_text(
+                "Suggested minimum cutoff for wavefunctions: 40 Ry\n"
+                "Suggested minimum cutoff for charge density: 160 Ry\n"
+            )
+            names[exchange] = name
+    vasp = root / "vasp/PAW_PBE/Si"
+    vasp.mkdir(parents=True)
+    potcar = "Synthetic Si potential for testing only\n ENMAX = 200.0; ENMIN = 150.0\n"
+    (vasp / "POTCAR").write_text(potcar)
+    data["qe_pslibrary"] = str(qe)
+    data["vasp_pseudopotentials"] = str(root / "vasp")
+
+    # Install editable resources once for the active worker configuration.
+    user_config = Path.home() / ".config" / "dftcaddie"
+    user_config.mkdir(parents=True)
+    for directory in ("templates", "sbatch_headers", "kpaths"):
+        shutil.copytree(Path(payload["source"]) / directory, user_config / directory)
+    (user_config / "config.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
+    return structure, names, potcar
+
+
+def _run_case(payload, root, fixtures):
+    """
+    Run one workflow using shared fixtures and a fresh calculation directory.
+
+    Parameters
+    ----------
+    payload : dict
+        Selected case, scenario, label, and configuration.
+    root : pathlib.Path
+        Directory reserved for this case.
+    fixtures : tuple
+        Shared structure path, pseudo filenames, and POTCAR contents.
+
+    Returns
+    -------
+    WorkflowResult
+        Outcome with the failing command or assertion stage when applicable.
+    """
+    from dftcaddie import cli, utils
+
     stage = "fixtures"
     try:
-        root = Path.cwd()
         data = payload["data"]
         kind, flavor, code = payload["case"]
+        structure, names, potcar = fixtures
         _require(
             code in ("quantum_espresso", "vasp"),
             f"No workflow checks implemented for {code}.",
         )
-        Path("home").mkdir()
-
-        # Real input structure plus synthetic QE/VASP pseudopotential trees.
-        structure = root / "Si.cif"
-        structure.write_bytes(Path(payload["structure"]).read_bytes())
-        qe = root / "qe"
-        names = {}
-        if code == "quantum_espresso":
-            pattern = data["suggested_qe_pseudos"]["Si"]
-            for exchange in ("pbe", "rel-pbe"):
-                name = pattern.replace("$fct", exchange).replace("*", "kjpaw") + ".UPF"
-                _require(
-                    Path(name).name == name, "Si pseudo pattern must be a filename."
-                )
-                directory = qe / exchange / "PSEUDOPOTENTIALS"
-                directory.mkdir(parents=True)
-                (directory / name).write_text(
-                    "Suggested minimum cutoff for wavefunctions: 40 Ry\n"
-                    "Suggested minimum cutoff for charge density: 160 Ry\n"
-                )
-                names[exchange] = name
-        vasp = root / "vasp/PAW_PBE/Si"
-        vasp.mkdir(parents=True)
-        potcar = (
-            "Synthetic Si potential for testing only\n ENMAX = 200.0; ENMIN = 150.0\n"
-        )
-        (vasp / "POTCAR").write_text(potcar)
-        data["qe_pslibrary"] = str(qe)
-        data["vasp_pseudopotentials"] = str(root / "vasp")
-
-        # Active user config seen by the CLI inside this isolated HOME.
-        user_config = Path.home() / ".config" / "dftcaddie"
-        user_config.mkdir(parents=True)
-        for directory in ("templates", "sbatch_headers", "kpaths"):
-            shutil.copytree(
-                Path(payload["source"]) / directory, user_config / directory
-            )
-        (user_config / "config.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
-
-        def unexpected_input(prompt):
-            """
-            Fail if the workflow unexpectedly needs interactive input.
-
-            Parameters
-            ----------
-            prompt : str
-                Prompt text requested by the CLI.
-
-            Raises
-            ------
-            ValueError
-                Always raised with the unexpected prompt.
-            """
-            raise ValueError(f"Interactive choice required: {prompt}")
-
-        builtins.input = unexpected_input
-        # Deterministic fallback cluster, independent of the caller's hostname.
-        socket.gethostname = lambda: ""
-        from dftcaddie import cli, utils
-
         working = root / "calculation"
-        working.mkdir()
+        working.mkdir(parents=True)
         os.chdir(working)
 
         def run(*args):
@@ -520,13 +584,54 @@ def _worker(request, output):
             payload["label"],
             True,
             scenario,
-            "Preparation completed with synthetic pseudos.",
+            "Preparation completed.",
+            payload["scenario"],
         )
     except (Exception, SystemExit) as exc:
         result = WorkflowResult(
-            payload["label"], False, stage, f"{type(exc).__name__}: {exc}"
+            payload["label"],
+            False,
+            stage,
+            f"{type(exc).__name__}: {exc}",
+            payload["scenario"],
         )
-    Path(output).write_text(json.dumps(asdict(result)))
+    return result
+
+
+def _worker(request):
+    """
+    Prepare one isolated worker and stream a JSON result for each case.
+
+    Parameters
+    ----------
+    request : path-like
+        YAML batch request written by ``check_workflows``.
+    """
+    import builtins
+    import socket
+
+    payload = yaml.safe_load(Path(request).read_text())
+    root = Path.cwd()
+
+    def unexpected_input(prompt):
+        """Fail on an unexpected interactive prompt."""
+        raise ValueError(f"Interactive choice required: {prompt}")
+
+    builtins.input = unexpected_input
+    socket.gethostname = lambda: ""
+    # Reserve stdout for results; command output goes to the worker log.
+    with redirect_stdout(sys.stderr):
+        fixtures = _prepare_fixtures(payload, root)
+    for index, ((kind, flavor, code), selected) in enumerate(payload["checks"]):
+        payload["scenario"] = selected
+        payload["case"] = (kind, flavor, code)
+        payload["label"] = f"{kind}/{flavor or 'default'}/{code}"
+        try:
+            with redirect_stdout(sys.stderr):
+                result = _run_case(payload, root / f"case-{index}", fixtures)
+        finally:
+            os.chdir(root)
+        print(json.dumps(asdict(result)), flush=True)
 
 
 if __name__ == "__main__":

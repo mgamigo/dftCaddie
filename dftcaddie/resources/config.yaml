@@ -23,8 +23,8 @@
 # Absolute paths to your pseudopotential libraries.
 # These folders must contain the raw QE / VASP pseudo files.
 
-qe_pslibrary: ~/Software/pslibrary
-vasp_pseudopotentials: ~/Software/vasp/pseudos
+#qe_pslibrary: ~/Software/pslibrary
+#vasp_pseudopotentials: ~/Software/vasp/pseudos
 
 
 # ------------------------------------------------------------
