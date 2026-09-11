@@ -6,30 +6,17 @@ import shutil
 import subprocess
 
 import pytest
-import yaml
 
 from dftcaddie.checks import workflows as checker
-from dftcaddie.checks.workflows import calculation_cases, check_workflows
-
-RESOURCES = Path(__file__).resolve().parents[1] / "dftcaddie/resources"
-with (RESOURCES / "config.yaml").open() as stream:
-    BUNDLED = yaml.safe_load(stream)
-
-
-@pytest.fixture(
-    params=list(calculation_cases(BUNDLED)),
-    ids=lambda case: "/".join(x or "default" for x in case),
-)
-def calculation_case(request):
-    return request.param
+from dftcaddie.checks.workflows import check_workflows
 
 
 @pytest.fixture
-def workflow_check():
+def workflow_check(bundled_config, bundled_resources):
     def check(case, scenario="staged"):
         return check_workflows(
-            BUNDLED,
-            RESOURCES,
+            bundled_config,
+            bundled_resources,
             case=case,
             scenario=scenario,
             structure_path=Path(__file__).resolve().parent / "data/Si.cif",
@@ -59,15 +46,13 @@ def test_reconfigure_and_repeat(workflow_check, code):
     assert results[0].success, results[0]
 
 
-def bundled_data():
-    return deepcopy(BUNDLED)
-
-
-def test_custom_resources_and_defaults_are_used(tmp_path, monkeypatch):
+def test_custom_resources_and_defaults_are_used(
+    tmp_path, monkeypatch, bundled_config, bundled_resources
+):
     source = tmp_path / "resources"
-    shutil.copytree(RESOURCES / "templates", source / "templates")
-    shutil.copytree(RESOURCES / "sbatch_headers", source / "sbatch_headers")
-    data = bundled_data()
+    shutil.copytree(bundled_resources / "templates", source / "templates")
+    shutil.copytree(bundled_resources / "sbatch_headers", source / "sbatch_headers")
+    data = bundled_config
     data["default_cutoff_ratio"] = 2.3
     original = deepcopy(data)
     monkeypatch.setenv("PSLIBRARY", "/not-the-selected-library")
@@ -97,24 +82,24 @@ def test_custom_resources_and_defaults_are_used(tmp_path, monkeypatch):
     assert invalid.read_text() == "invalid: ["
 
 
-def test_timeout_is_reported(monkeypatch):
+def test_timeout_is_reported(monkeypatch, bundled_config, bundled_resources):
     def timeout(*args, **kwargs):
         raise subprocess.TimeoutExpired(args[0], kwargs["timeout"])
 
     monkeypatch.setattr(checker.subprocess, "run", timeout)
     results = checker.check_workflows(
-        bundled_data(), RESOURCES, case=("bands", None, "vasp"), timeout=0.1
+        bundled_config, bundled_resources, case=("bands", None, "vasp"), timeout=0.1
     )
     assert not results[0].success
     assert "Timed out" in results[0].message
 
 
-def test_invalid_schema_is_reported_without_running(monkeypatch):
+def test_invalid_schema_is_reported_without_running(monkeypatch, bundled_resources):
     def unexpected_run(*args, **kwargs):
         raise AssertionError("Invalid configuration should not start a worker")
 
     monkeypatch.setattr(checker.subprocess, "run", unexpected_run)
-    results = checker.check_workflows([], RESOURCES)
+    results = checker.check_workflows([], bundled_resources)
     assert results and all(not result.success for result in results)
 
 

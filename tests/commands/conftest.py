@@ -2,17 +2,17 @@ from pathlib import Path
 import socket
 
 import pytest
-import yaml
 
 from dftcaddie import config
 from dftcaddie.cli import _build_parser
 
 
 @pytest.fixture(autouse=True)
-def isolated_command_environment(tmp_path, monkeypatch):
-    resources = Path(__file__).resolve().parents[2] / "dftcaddie" / "resources"
-    with (resources / "config.yaml").open() as stream:
-        data = yaml.safe_load(stream)
+def isolated_command_environment(
+    tmp_path, monkeypatch, bundled_config, bundled_resources
+):
+    resources = bundled_resources
+    data = bundled_config
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setattr(socket, "gethostname", lambda: "test-host")
