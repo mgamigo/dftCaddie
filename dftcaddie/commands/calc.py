@@ -58,7 +58,7 @@ def add_arguments(parser):
         "-p",
         "--pseudo",
         action="store_true",
-        help="Set up default pseudopotentials",
+        help="Set up default pseudopotentials (requires --structure FILE)",
     )
     parser.add_argument(
         "-a",
@@ -86,7 +86,6 @@ def add_arguments(parser):
     )
 
 
-
 def run(args=None):
     """
     Resolve calculation options and prepare DFT input files.
@@ -101,84 +100,39 @@ def run(args=None):
     args : argparse.Namespace
         Parsed command-line arguments for the ``calc`` subcommand.
     """
-    from types import SimpleNamespace
+    from dftcaddie.calculation import resolve_calculation
     from dftcaddie.config import load_config
     from dftcaddie.commands.setup import apply_setup
     from dftcaddie.commands.pseudo import apply_pseudos
     from dftcaddie import utils as ut
     from dftcaddie import file_management as fm
+    from dftcaddie import prompts
 
     settings, _ = load_config()
-    calculations, clusters = settings["calculations"], settings["clusters"]
-    calculation = SimpleNamespace(**vars(args))
-    details = calculation.details
-    del calculation.details
-    if calculation.auto:
-        calculation.pseudo = True
 
-    calculation.cluster = ut.resolve_cluster(clusters)
-    log.debug("Resolved cluster: %s", calculation.cluster)
+    def prompt(label, options, labels):
+        return prompts.select(
+            label,
+            options,
+            labels,
+            hint="Supply --kind, --flavor and --code as needed; omit --details to use configured defaults.",
+        )
 
-    # Select calculation type
-    options = list(calculations.keys())
-    if calculation.kind is None:
-        option_strings = [calculations[key]["name"] for key in options]
-        print(f"\nAvailable Calculation Types:\n{ut.format_options(option_strings)}")
-        user_input = input("Choose a calculation type: ").strip().lower()
-        calculation.kind = ut.resolve_user_input(user_input, options)
-    ut.check_option_exists(calculation.kind, options)
-    log.debug("Calculation kind: %s", calculation.kind)
-
-    # Solve flavor if present
-    if "flavors" in calculations[calculation.kind].keys():
-        options = list(calculations[calculation.kind]["flavors"].keys())
-        if calculation.flavor is None:
-            if len(options) == 1:
-                calculation.flavor = options[0]
-                log.debug("Using only available flavor: %s", options[0])
-            else:
-                option_strings = [
-                    calculations[calculation.kind]["flavors"][key]["name"]
-                    for key in options
-                ]
-                print(
-                    f"\nAvailable flavors:\n{ut.format_options(option_strings,brackets=True)}"
-                )
-                user_input = input("Choose flavor: ").strip().lower()
-                calculation.flavor = ut.resolve_user_input(user_input, options)
-        ut.check_option_exists(calculation.flavor, options)
-        log.info("Calculation flavor: %s", calculation.flavor)
-
-    # Additional configuration
-    if calculation.flavor is None:
-        config = calculations[calculation.kind]["config"]
-        del calculation.flavor
-    else:
-        index = options.index(calculation.flavor)
-        config = calculations[calculation.kind]["flavors"][calculation.flavor]["config"]
-    for setting in config:
-        options = setting["options"]
-        value = getattr(calculation, setting["name"], None)
-        log.debug("Resolving setting: %s", setting["name"])
-        if value is None:
-            if "default" in setting and not details:
-                value = setting["default"]
-                log.debug("Using default value: %s", value)
-            elif len(options) == 1:
-                value = options[0]
-                log.debug("Single option available: %s", value)
-            else:
-                print(f"\n{setting['prompt']}")
-                print(ut.format_options(options, brackets=True))
-                user_input = input("Select: ").strip().lower()
-                value = ut.resolve_user_input(user_input, options)
-            setattr(calculation, setting["name"], value)
-        ut.check_option_exists(value, options, setting["name"])
-        log.debug("Setting %s : %s", setting["name"], value)
+    try:
+        spec = resolve_calculation(
+            vars(args),
+            settings,
+            cluster=ut.resolve_cluster(settings["clusters"]),
+            prompt=prompt,
+            details=args.details,
+        )
+    except ValueError as exc:
+        log.error("%s", exc)
+        raise SystemExit(1) from exc
+    calculation = spec.as_namespace()
 
     # Proceed with the operation using the user's selected options
     print(f"\nSummary\n-------")
-    keys = list(calculation.__dict__.keys())
     for key, value in calculation.__dict__.items():
         print(f"{key.title()}: {value}")
     print(f"-------")
@@ -192,7 +146,7 @@ def run(args=None):
     fm.change_mpi_command(scripts, calculation.cluster)
     fm.configure_input_files(calculation)
     if calculation.structure is not None:
-        structure = ut.get_structure(args.structure)
+        structure = ut.get_structure(spec.structure)
         apply_setup(
             kind=calculation.kind,
             code=calculation.code,
@@ -205,6 +159,6 @@ def run(args=None):
                 kind_calc=calculation.kind,
                 code=calculation.code,
                 symbols=structure.symbols,
-                relativistic=calculation.soc,
+                relativistic=spec.soc,
                 configure=True,
             )

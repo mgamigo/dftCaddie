@@ -13,6 +13,27 @@
 
 ## Configuration
 
+Interactive selections use Questionary typed prompts with vertical option lists
+and single-column Tab completion, including over SSH. Enter an exact name or a
+unique prefix, ignoring case; ambiguous prefixes require more characters.
+Existing shortcut labels such as `[B]ands` are displayed as `Bands`;
+configuration keys are also accepted. Boolean settings and overwrites use
+yes/no confirmations.
+
+For scripts and agents, supply calculation choices explicitly, for example:
+
+```bash
+caddie calc --kind bands --code quantum_espresso --auto --structure Si.cif
+caddie sbatch --cluster local --header default
+```
+
+Configured defaults still apply. If a choice or overwrite confirmation is
+needed without an interactive terminal, the command exits with status 1 and
+instructions. Use `--overwrite` to explicitly allow replacement of calculation
+templates. All overwrite confirmations happen before copying; declining one
+or cancelling a prompt stops preparation with status 130. `--auto` and
+`--pseudo` require `--structure FILE`.
+
 `caddie config init` copies editable defaults to `~/.config/dftcaddie`.
 Use `caddie config init --force` to replace existing config, templates, and headers.
 

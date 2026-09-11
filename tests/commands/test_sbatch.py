@@ -19,7 +19,7 @@ def test_explicit_cluster_and_header(parse_args, monkeypatch):
 def test_detected_cluster_and_interactive_header(parse_args, monkeypatch):
     operation = Mock()
     monkeypatch.setattr(utils, "resolve_cluster", lambda clusters: "cluster2")
-    monkeypatch.setattr("builtins.input", lambda prompt: "3")
+    monkeypatch.setattr("dftcaddie.prompts.select", lambda *args, **kwargs: "small")
     monkeypatch.setattr(sbatch, "apply_header", operation)
     sbatch.run(parse_args("sbatch"))
     operation.assert_called_once_with(cluster="cluster2", header=2)

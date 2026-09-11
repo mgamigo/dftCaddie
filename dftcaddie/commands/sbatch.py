@@ -60,7 +60,7 @@ def run(args=None):
     Dispatch the ``caddie sbatch`` workflow.
 
     This function selects a cluster (from CLI or inferred via hostname) and an
-    SBATCH header preset (from CLI or an interactive numbered menu), then updates
+    SBATCH header preset (from CLI or an interactive selection menu), then updates
     ``master.sh`` by removing
 
     Parameters
@@ -70,6 +70,7 @@ def run(args=None):
     """
     from dftcaddie import utils as ut
     from dftcaddie.config import load_config
+    from dftcaddie import prompts
 
     clusters = load_config()[0]["clusters"]
 
@@ -82,10 +83,11 @@ def run(args=None):
     headers = clusters[args.cluster]["headers"]
     options = [item["name"] for item in headers]
     if args.header is None:
-        print(f"\nAvailable sbatch headers for Cluster={args.cluster}:")
-        print(ut.format_options(options, numbers=True))
-        user_input = input("Choose a sbatch header: ").strip().lower()
-        args.header = ut.resolve_user_input(user_input, options)
+        args.header = prompts.select(
+            f"Choose a sbatch header for {args.cluster}:",
+            options,
+            hint=f"Supply --header with one of: {', '.join(options)}.",
+        )
     ut.check_option_exists(args.header, options, "Headings")
     log.info("Sbatch header is: %s", args.header)
 

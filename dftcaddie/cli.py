@@ -29,6 +29,7 @@ import argparse
 import logging
 
 from dftcaddie.commands import calc, config, pseudo, sbatch, setup
+from dftcaddie.prompts import InputRequired
 
 __all__ = [
     "main",
@@ -175,6 +176,9 @@ def main(argv: list[str] | None = None) -> int:
         else:
             parser.print_help()
             return 0
+    except InputRequired as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
     except KeyboardInterrupt:
         print("\n👋 Caddie has left the course.", file=sys.stderr)
         return 130

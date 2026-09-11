@@ -8,6 +8,25 @@ from dftcaddie import utils
 from dftcaddie.commands import calc, setup, pseudo
 
 
+@pytest.mark.parametrize("flag", ["-a", "--auto", "-p", "--pseudo"])
+def test_calc_requires_structure_before_prompting_or_writing(
+    parse_args, monkeypatch, flag, caplog
+):
+    def unexpected_prompt(prompt):
+        pytest.fail("Invalid requests must not prompt")
+
+    monkeypatch.setattr("builtins.input", unexpected_prompt)
+    Path("notes.txt").write_text("Keep these notes.\n")
+    before = {p.name: p.read_bytes() for p in Path.cwd().iterdir() if p.is_file()}
+    with pytest.raises(SystemExit) as error:
+        calc.run(parse_args("calc", flag))
+    assert error.value.code == 1
+    assert "require --structure FILE" in caplog.text
+    assert {
+        p.name: p.read_bytes() for p in Path.cwd().iterdir() if p.is_file()
+    } == before
+
+
 @pytest.mark.parametrize(
     "flavor,expected", [("fixed_cell", "relax"), ("variable_cell", "vc-relax")]
 )
@@ -27,8 +46,10 @@ def test_calc_relax_flavor(parse_args, flavor, expected):
 
 
 def test_calc_interactive_details(parse_args, monkeypatch):
-    answers = iter(["bands", "quantum_espresso", "no"])
-    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+    answers = iter(["bands", "quantum_espresso", False])
+    monkeypatch.setattr(
+        "dftcaddie.prompts.select", lambda *args, **kwargs: next(answers)
+    )
     calc.run(parse_args("calc", "--details"))
     assert "noncolin=.false." in Path("scf.sh").read_text()
     assert "lspinorb=.false." in Path("scf.sh").read_text()

@@ -5,14 +5,6 @@ import pytest
 import dftcaddie.utils as ut
 
 
-def test_bool_maps():
-    """Sanity: yes/no maps are consistent."""
-    assert ut.affirmation2bool["yes"] is True
-    assert ut.affirmation2bool["no"] is False
-    assert ut.bool2affirmation[True] == "yes"
-    assert ut.bool2affirmation[False] == "no"
-
-
 def test_resolve_cluster(monkeypatch: pytest.MonkeyPatch):
 
     clusters = {
@@ -28,33 +20,6 @@ def test_resolve_cluster(monkeypatch: pytest.MonkeyPatch):
     assert ut.resolve_cluster(clusters) == "marconi"
     monkeypatch.setattr(socket, "gethostname", lambda: "somewhere-else")
     assert ut.resolve_cluster(clusters) == "local"
-
-
-def test_format_options():
-    options = ["bands", "relax"]
-    assert ut.format_options(options) == "bands, relax"
-    assert ut.format_options(options, brackets=True) == "[B]ands, [R]elax"
-    assert ut.format_options(options, numbers=True) == "[1] Bands, [2] Relax"
-    options = [True, False]
-    assert ut.format_options(options) == "yes, no"
-    assert ut.format_options(options, brackets=True) == "[Y]es, [N]o"
-    assert ut.format_options(options, numbers=True) == "[1] Yes, [2] No"
-
-
-@pytest.mark.parametrize("options", [["vasp", "quantum_espresso"], ["bands", "relax"]])
-def test_resolve_user_input_full_match(options: list[str]):
-    # Exact match should return the input.
-    assert ut.resolve_user_input(options[0], options) == options[0]
-    # Test numbers as way to resolve input
-    for i, opt in enumerate(options):
-        assert ut.resolve_user_input(i + 1, options) == opt
-    # Prefix match should return the first matching option.
-    for opt in options:
-        partial_input = opt[0]
-        assert ut.resolve_user_input(partial_input, options) == opt
-    # Boolean options should accept yes/no and return bool.
-    assert ut.resolve_user_input("yes", [True, False]) is True
-    assert ut.resolve_user_input("no", [True, False]) is False
 
 
 def test_check_option_exists():

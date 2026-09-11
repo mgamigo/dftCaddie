@@ -8,7 +8,7 @@ This module collects small helpers used across the CLI clients and file
 management routines, including:
 
 - resolving the target cluster from the hostname,
-- formatting and validating interactive option selections,
+- validating explicit option selections,
 - inferring the current calculation kind/code from a working directory,
 - reading basic structure data from a structure file,
 - retrieving calculation configuration entries.
@@ -17,10 +17,6 @@ Functions
 ---------
 resolve_cluster()
     Identify the cluster key based on the machine hostname.
-format_options()
-    Format a list of options for CLI display.
-resolve_user_input()
-    Resolve a user selection against a list of allowed options.
 check_option_exists()
     Validate that a value is contained in a list of allowed options.
 resolve_calc_current_dir()
@@ -41,19 +37,12 @@ from dftcaddie import config
 log = logging.getLogger(__name__)
 
 __all__ = [
-    "affirmation2bool",
-    "bool2affirmation",
     "resolve_cluster",
-    "format_options",
-    "resolve_user_input",
     "check_option_exists",
     "resolve_calc_current_dir",
     "get_structure",
     "get_config",
 ]
-
-affirmation2bool = {"yes": True, "no": False}
-bool2affirmation = {True: "yes", False: "no"}
 
 
 def resolve_cluster(clusters: dict) -> str:
@@ -80,106 +69,6 @@ def resolve_cluster(clusters: dict) -> str:
         if clusters[k]["hostname"] in hostname:
             return k
     return "local"
-
-
-def format_options(
-    options: list[str] | list[bool], brackets: bool = False, numbers: bool = False
-) -> str:
-    """
-    Formats a list of strings into a comma-separated string, with optional
-    bracket or numbered notation.
-
-    Parameters
-    ----------
-    options : list[str]
-        A list of strings representing options to be formatted.
-    brackets : bool, optional
-        If True, encloses the first character of each option in brackets
-        (default is False).
-    numbers : bool, optional
-        If True, each options are numbered. Preferred for many options.
-
-    Returns
-    -------
-    str
-        A formatted, comma-separated string of options.
-
-    Notes
-    -----
-    - If options are booleans, they are written as "Yes/No"
-    """
-    if isinstance(options[0], bool):
-        options = [bool2affirmation[key] for key in options]
-    if brackets:
-        options = [f"[{x[0].upper()}]{x[1:]}" for x in options]
-    elif numbers:
-        options = [
-            f"[{i}] {x[0].upper()}{x[1:]}" for i, x in enumerate(options, start=1)
-        ]
-    return ", ".join(options)
-
-
-def resolve_user_input(
-    user_input: str | int, options: list[str] | list[bool]
-) -> str | bool:
-    """
-    Resolve user input to find its matched value in a list of options first by
-    full match, then by partial match.
-
-    Parameters
-    ----------
-    user_input : str | int
-        The user's input string to match against the list of options.
-        Or integer (starting by 1) indicating option.
-    options : list[str]
-        A list of strings representing possible options to match.
-
-    Returns
-    -------
-    str | bool
-        The matched option itself.
-
-    Notes
-    -----
-    - If no match is found, an error message is printed and execution is
-    terminated.
-    - If options are booleans, yes/no user input is read as True/False.
-    """
-    # Handle numbered input.
-    try:
-        user_input = int(user_input)
-    except ValueError:
-        pass
-    if isinstance(user_input, int):
-        return options[user_input - 1]
-
-    # Handle boolean options
-    boolean = False
-    if isinstance(options[0], bool):
-        boolean = True
-        options = [bool2affirmation[key] for key in options]
-
-    # Try full match first
-    if user_input in options:
-        matched_option = user_input
-    else:
-        # Try partial match (based on starting characters)
-        partial_matches = [
-            option for option in options if option.startswith(user_input)
-        ]
-
-        if len(partial_matches) >= 1:
-            matched_option = partial_matches[0]  # Return the first partial match
-        else:
-            # Print error and terminate process if no match is found
-            print(
-                f"Error: No match found for input: '{user_input}'. Exiting the process."
-            )
-            sys.exit(1)  # Exit with a status code indicating an error
-    if boolean:
-        return affirmation2bool[matched_option]
-    else:
-        return matched_option
 
 
 def check_option_exists(

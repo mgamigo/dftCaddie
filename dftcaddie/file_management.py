@@ -320,49 +320,47 @@ def resolve_files(calculation: SimpleNamespace) -> list[str]:
 
 def copy_input_files(files: list[str], overwrite: bool = False):
     """
-    Copies specified input files into the current working directory.
-    Prompts users to confirm overwriting if files already exist at
-    the destination.
+    Validate templates and collect overwrite decisions before copying files.
 
     Parameters
     ----------
-    files : list[str]
-        List of files to be copied.
-    overwrite: bool, optional
-        Whether overwritting is done without prompting (Default False).
+    files : list of str
+        Template paths relative to the configured templates directory.
+    overwrite : bool, optional
+        Replace existing files without prompting.
 
-    Notes
-    -----
-    - User confirmation is required if files exist at the destination.
+    Returns
+    -------
+    list of str
+        Copied template paths.
+
+    Raises
+    ------
+    FileNotFoundError
+        A required template is missing.
+    KeyboardInterrupt
+        An overwrite was declined or the user cancelled.
     """
     import shutil
+    from pathlib import Path
+    from dftcaddie import prompts
 
-    # Copy the files
     _, source = config.load_config()
-    source_dir = os.path.join(source, "templates")
-    copied = []
-    for file in files:
-        file_name = os.path.basename(file)
-        source_path = os.path.join(source_dir, file)
-        destination_path = os.path.join(os.getcwd(), file_name)
-        if not os.path.exists(source_path):
-            log.error(
-                "Input file '%s' does not exist in the library: %s",
-                file,
-                source_path,
-            )
-            continue
-        if os.path.exists(destination_path) and not overwrite:
-            confirmation = input(
-                f"The file '{file_name}' already exists. Do you want to overwrite it? (yes/no): "
-            )
-            if confirmation.strip().lower() not in ("yes", "y"):
-                log.info("Skipped overwriting '%s'", file_name)
-                continue
-        shutil.copy(source_path, destination_path)
-        copied.append(file)
-        log.debug("Copied '%s'", file)
-
+    sources = [Path(source) / "templates" / file for file in files]
+    destinations = [Path.cwd() / Path(file).name for file in files]
+    for path in sources:
+        if not path.is_file():
+            raise FileNotFoundError(f"Required template not found: {path}")
+    if not overwrite:
+        for destination in destinations:
+            if destination.exists() and not prompts.confirm(
+                f"Overwrite '{destination.name}'?",
+                hint="Use --overwrite to replace existing files, or choose an empty directory.",
+            ):
+                raise KeyboardInterrupt
+    for source_path, destination in zip(sources, destinations):
+        shutil.copy(source_path, destination)
+        log.debug("Copied '%s'", source_path)
     return files
 
 
