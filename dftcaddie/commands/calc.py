@@ -14,6 +14,11 @@ add_arguments()
     Register command-line arguments for the ``calc`` subcommand.
 run()
     Resolve calculation options and prepare DFT input files.
+
+Private Utilities
+-----------------
+run.prompt()
+    Collect a missing choice through the shared Questionary interface.
 """
 
 import logging
@@ -111,6 +116,30 @@ def run(args=None):
     settings, _ = load_config()
 
     def prompt(label, options, labels):
+        """
+        Collect a missing calculation choice with a noninteractive error hint.
+
+        Parameters
+        ----------
+        label : str
+            Question describing the missing setting.
+        options : list of str or list of bool
+            Available configuration values.
+        labels : list of str or None
+            Optional display names corresponding to options.
+
+        Returns
+        -------
+        str or bool
+            The selected configuration value.
+
+        Raises
+        ------
+        InputRequired
+            The choice is required without an interactive terminal.
+        KeyboardInterrupt
+            The user cancels or input ends.
+        """
         return prompts.select(
             label,
             options,
