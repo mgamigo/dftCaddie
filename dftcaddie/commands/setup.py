@@ -22,7 +22,6 @@ apply_setup
 
 import logging
 from types import SimpleNamespace
-from dftcaddie.config import default_kppra
 
 log = logging.getLogger(__name__)
 
@@ -57,8 +56,8 @@ def add_arguments(parser):
         "--kppra",
         metavar="INT",
         type=int,
-        default=default_kppra,
-        help="Target number of k-points per atom (used with --autokgrid).",
+        default=None,
+        help="Target number of k-points per atom (default: config.yaml).",
     )
     parser.add_argument(
         "-kp",
@@ -127,7 +126,7 @@ def apply_setup(
     code: str,
     structure: SimpleNamespace,
     autokgrid: bool = False,
-    kppra: int = default_kppra,
+    kppra: int | None = None,
     kpath: bool = False,
 ) -> int:
     """
@@ -164,6 +163,10 @@ def apply_setup(
     """
     from dftcaddie import file_management as fm
 
+    if kppra is None:
+        from dftcaddie.config import load_config
+
+        kppra = load_config()[0]["default_kppra"]
     fm.set_crystal_structure(structure, code)
     if autokgrid:
         fm.set_auto_kgrid(structure, code, kppra)

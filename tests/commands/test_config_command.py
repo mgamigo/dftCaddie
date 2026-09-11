@@ -3,13 +3,13 @@ from pathlib import Path
 
 import pytest
 
-from dftcaddie.commands import init
+from dftcaddie.commands import config as config_command
 
 
 def test_init_command_copies_default_resources_to_user_config(tmp_path, monkeypatch):
-    monkeypatch.setattr(init.Path, "home", lambda: tmp_path)
+    monkeypatch.setattr(config_command.Path, "home", lambda: tmp_path)
 
-    assert init.run(SimpleNamespace(force=False)) == 0
+    assert config_command.run(SimpleNamespace(config_action="init", force=False)) == 0
 
     user_config = tmp_path / ".config" / "dftcaddie"
     assert (user_config / "config.yaml").is_file()
@@ -19,7 +19,7 @@ def test_init_command_copies_default_resources_to_user_config(tmp_path, monkeypa
 
 @pytest.mark.parametrize("force", [False, True])
 def test_init_existing_resources(parse_args, isolated_command_environment, force):
-    init.run(parse_args("init"))
+    config_command.run(parse_args("config", "init"))
     root = Path.home() / ".config" / "dftcaddie"
     paths = [
         "config.yaml",
@@ -28,7 +28,7 @@ def test_init_existing_resources(parse_args, isolated_command_environment, force
     ]
     for relative in paths:
         (root / relative).write_text("custom content\n")
-    init.run(parse_args("init", *(["--force"] if force else [])))
+    config_command.run(parse_args("config", "init", *(["--force"] if force else [])))
     for relative in paths:
         expected = (
             (isolated_command_environment / relative).read_bytes()
@@ -39,7 +39,7 @@ def test_init_existing_resources(parse_args, isolated_command_environment, force
 
 
 def test_init_copies_exact_resource_contents(parse_args, isolated_command_environment):
-    init.run(parse_args("init"))
+    config_command.run(parse_args("config", "init"))
     destination = Path.home() / ".config" / "dftcaddie"
     for entry in ["config.yaml", "templates", "sbatch_headers"]:
         source = isolated_command_environment / entry

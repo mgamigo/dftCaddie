@@ -36,3 +36,4 @@ caddie = "dftcaddie.cli:main"
 
 [tool.setuptools.package-data]
 dftcaddie = ["resources/**/*"]
+"dftcaddie.checks" = ["data/*.cif"]

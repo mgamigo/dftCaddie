@@ -6,6 +6,13 @@ import pytest
 import dftcaddie.file_management as fm
 
 
+@pytest.fixture
+def config_data(tmp_path, monkeypatch):
+    data = {}
+    monkeypatch.setattr(fm.config, "load_config", lambda: (data, tmp_path))
+    return data
+
+
 # -------------------------
 # Helpers: private utilities
 # -------------------------
@@ -87,7 +94,7 @@ def test_populate_master_script_adds_only_sh_and_not_self(tmp_path: Path):
 # -------------------------
 
 
-def test_set_master_preamble_prepends_header(tmp_path: Path, monkeypatch):
+def test_set_master_preamble_prepends_header(tmp_path: Path, monkeypatch, config_data):
     # Create fake "package data" dir structure next to file_management.py
     # We monkeypatch fm.__file__ so its dirname points to our tmp tree.
     pkg_root = tmp_path / "pkg"
@@ -99,9 +106,11 @@ def test_set_master_preamble_prepends_header(tmp_path: Path, monkeypatch):
     master = tmp_path / "master.sh"
     master.write_text("#!/bin/bash\necho hi\n", encoding="utf-8")
 
-    monkeypatch.setattr(fm, "SOURCE_DIR", str(pkg_root / "resources"))
     monkeypatch.setattr(
-        fm,
+        fm.config, "load_config", lambda: (config_data, pkg_root / "resources")
+    )
+    monkeypatch.setitem(
+        config_data,
         "clusters",
         {"mycluster": {"headers": [{"name": "default", "file": "header.txt"}]}},
     )
@@ -147,16 +156,18 @@ def test_remove_master_preamble_removes_header_block(tmp_path: Path):
 # -------------------------
 
 
-def test_change_mpi_command_replaces_existing_prefix(tmp_path: Path, monkeypatch):
+def test_change_mpi_command_replaces_existing_prefix(
+    tmp_path: Path, monkeypatch, config_data
+):
     script = tmp_path / "run.sh"
     script.write_text(
         "srun pw.x -in in.pwi\n" "mpirun -np 4 pw.x -in in2.pwi\n" "echo done\n",
         encoding="utf-8",
     )
 
-    monkeypatch.setattr(fm, "mpi_executables", ["pw.x"])
-    monkeypatch.setattr(
-        fm,
+    monkeypatch.setitem(config_data, "mpi_executables", ["pw.x"])
+    monkeypatch.setitem(
+        config_data,
         "clusters",
         {
             "c1": {"mpi_command": "srun"},
@@ -177,13 +188,15 @@ def test_change_mpi_command_replaces_existing_prefix(tmp_path: Path, monkeypatch
 
 
 def test_change_mpi_command_no_matching_executable_no_change(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch, config_data
 ):
     script = tmp_path / "run.sh"
     script.write_text("echo hello\n", encoding="utf-8")
 
-    monkeypatch.setattr(fm, "mpi_executables", ["pw.x"])
-    monkeypatch.setattr(fm, "clusters", {"target": {"mpi_command": "srun -n 8"}})
+    monkeypatch.setitem(config_data, "mpi_executables", ["pw.x"])
+    monkeypatch.setitem(
+        config_data, "clusters", {"target": {"mpi_command": "srun -n 8"}}
+    )
 
     fm.change_mpi_command(str(script), "target")
     assert script.read_text(encoding="utf-8") == "echo hello\n"
@@ -220,12 +233,6 @@ def test_set_spin_orbit_coupling_edits_all_sh_scripts(tmp_path: Path, monkeypatc
     )
     (tmp_path / "b.sh").write_text(
         "  noncolin=.false.\n  lspinorb=.false.\n", encoding="utf-8"
-    )
-
-    monkeypatch.setattr(
-        fm,
-        "calculations",
-        {"bands": {"files": {"quantum_espresso": ["a.sh", "b.sh", "SYSTEM.INFO"]}}},
     )
 
     fm.set_spin_orbit_coupling(soc=True, code="quantum_espresso")
@@ -353,15 +360,15 @@ def test_configure_qe_cutoffs_from_pseudos_raises_if_missing_values(
 
 
 def test_get_qe_pseudo_paths_uses_resolve_pslibrary_and_glob(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch, config_data
 ):
     root = tmp_path / "pslib"
     pseudo_dir = root / "pbe" / "PSEUDOPOTENTIALS"
     pseudo_dir.mkdir(parents=True)
 
     # Make the template realistic (no "XXXXXX" hacks)
-    monkeypatch.setattr(
-        fm,
+    monkeypatch.setitem(
+        config_data,
         "suggested_qe_pseudos",
         {"Si": "Si.$fct-*.UPF"},
     )

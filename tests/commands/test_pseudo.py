@@ -52,7 +52,7 @@ def test_pseudos_without_configure_preserve_cutoffs(monkeypatch, code):
 
 @pytest.mark.parametrize("code", ["quantum_espresso", "vasp"])
 def test_missing_library_does_not_write_files(monkeypatch, code):
-    monkeypatch.setattr(config, "CONFIG", {})
+    monkeypatch.setattr(config, "load_config", lambda: ({}, Path.cwd()))
     with pytest.raises(RuntimeError, match="not defined"):
         pseudo.apply_pseudos("bands", code, ["Si"], False)
     assert list(Path.cwd().iterdir()) == []

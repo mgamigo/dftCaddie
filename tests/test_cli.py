@@ -70,7 +70,7 @@ def test_keyboard_interrupt_exits_cleanly(monkeypatch, capsys):
 def test_dispatch(monkeypatch, subcommand):
     handlers = {}
     for name in _get_subcommands():
-        handlers[name] = Mock()
+        handlers[name] = Mock(return_value=0)
         monkeypatch.setattr(getattr(cli, name), "run", handlers[name])
 
     # Isolate dispatch from command-specific required arguments.

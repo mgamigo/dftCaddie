@@ -4,9 +4,8 @@ import socket
 import pytest
 import yaml
 
-from dftcaddie import config, file_management as fm, utils
+from dftcaddie import config
 from dftcaddie.cli import _build_parser
-from dftcaddie.commands import setup
 
 
 @pytest.fixture(autouse=True)
@@ -17,15 +16,7 @@ def isolated_command_environment(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setattr(socket, "gethostname", lambda: "test-host")
-    monkeypatch.setattr(config, "CONFIG", data)
-    monkeypatch.setattr(config, "SOURCE_DIR", resources)
-    monkeypatch.setattr(fm, "SOURCE_DIR", resources)
-    for name in ("calculations", "clusters", "mpi_executables"):
-        monkeypatch.setattr(config, name, data[name])
-        monkeypatch.setattr(fm, name, data[name])
-    monkeypatch.setattr(utils, "calculations", data["calculations"])
-    monkeypatch.setattr(setup, "default_kppra", data["default_kppra"])
-    monkeypatch.setattr(config, "default_cutoff_ratio", data["default_cutoff_ratio"])
+    monkeypatch.setattr(config, "load_config", lambda: (data, resources))
     monkeypatch.delenv("PSLIBRARY", raising=False)
     for resolver in (config.resolve_pslibrary, config.resolve_potcar_library):
         resolver.cache_clear()

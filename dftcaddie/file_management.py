@@ -68,14 +68,7 @@ from types import SimpleNamespace
 from typing import Iterable
 import os
 
-from dftcaddie.config import (
-    calculations,
-    clusters,
-    mpi_executables,
-    suggested_qe_pseudos,
-    nscf_kppra_ratio,
-    SOURCE_DIR,
-)
+from dftcaddie import config
 
 log = logging.getLogger(__name__)
 
@@ -312,6 +305,7 @@ def resolve_files(calculation: SimpleNamespace) -> list[str]:
         List of files that are relevant for the calculation.
     """
     # Resolve needed files.
+    calculations = config.load_config()[0]["calculations"]
     log.debug("Resolving needed files ...")
     if "flavor" in calculation.__dict__.keys():
         files_to_copy = list(
@@ -344,7 +338,8 @@ def copy_input_files(files: list[str], overwrite: bool = False):
     import shutil
 
     # Copy the files
-    source_dir = os.path.join(SOURCE_DIR, "templates")
+    _, source = config.load_config()
+    source_dir = os.path.join(source, "templates")
     copied = []
     for file in files:
         file_name = os.path.basename(file)
@@ -465,6 +460,8 @@ def set_master_preamble(master_script_path: str, cluster: str, header: int = 0) 
         Exit code (0 on successful completion).
     """
 
+    settings, source = config.load_config()
+    clusters = settings["clusters"]
     header_name = clusters[cluster]["headers"][header]["name"]
     log.info(
         "Adding cluster preamble for '%s/%s' to '%s' ...",
@@ -473,7 +470,7 @@ def set_master_preamble(master_script_path: str, cluster: str, header: int = 0) 
         master_script_path,
     )
 
-    source_dir = os.path.join(SOURCE_DIR, "sbatch_headers")
+    source_dir = os.path.join(source, "sbatch_headers")
     header_file = clusters[cluster]["headers"][header]["file"]
     file_path = os.path.join(source_dir, header_file)
 
@@ -509,6 +506,9 @@ def change_mpi_command(file_path: str | list, cluster: str) -> None:
         The name of the cluster whose MPI command should be used in the script.
     """
     log.info("Changing mpi commands ...")
+    settings, _ = config.load_config()
+    clusters = settings["clusters"]
+    mpi_executables = settings["mpi_executables"]
     mpi_command = clusters[cluster]["mpi_command"]
     commands = {clusters[key]["mpi_command"] for key in clusters}
     commands = sorted(commands, key=len, reverse=True)
@@ -811,6 +811,7 @@ def get_qe_pseudo_paths(
     from pathlib import Path
 
     ps_library = resolve_pslibrary()
+    suggested_qe_pseudos = config.load_config()[0]["suggested_qe_pseudos"]
 
     exchange_folder = f"rel-{exchange}" if relativistic else exchange
     source_path = os.path.join(ps_library, exchange_folder, "PSEUDOPOTENTIALS")
@@ -972,6 +973,7 @@ def set_auto_kgrid(structure: SimpleNamespace, code: str, kppra: int = 9000) -> 
 
     log.info("Computing automatic k-grid (kppra=%d, n_atoms=%d)", kppra, n_atoms)
     kgrid = auto_kgrid(lattice, n_atoms=n_atoms, kppra=kppra)
+    nscf_kppra_ratio = config.load_config()[0]["nscf_kppra_ratio"]
     kgrid_nscf = auto_kgrid(lattice, n_atoms=n_atoms, kppra=nscf_kppra_ratio * kppra)
     kgrid_str = " ".join(map(str, kgrid))
     kgrid_nscf_str = " ".join(map(str, kgrid_nscf))

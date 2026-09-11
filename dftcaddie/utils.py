@@ -36,7 +36,7 @@ import sys
 import os
 from types import SimpleNamespace
 
-from dftcaddie.config import calculations
+from dftcaddie import config
 
 log = logging.getLogger(__name__)
 
@@ -232,6 +232,7 @@ def resolve_calc_current_dir() -> tuple[str, str, str]:
         If no matching calculation setup is found or if the match is ambiguous.
     """
     present_files = set(f for f in os.listdir(".") if os.path.isfile(f))
+    calculations = config.load_config()[0]["calculations"]
 
     matches = []
 
@@ -381,6 +382,7 @@ def get_config(kind: str, config_name: str, flavor: str = None) -> dict:
     KeyError
         If the calculation kind or configuration name is not found.
     """
+    calculations = config.load_config()[0]["calculations"]
     if flavor is not None:
         try:
             configs = calculations[kind]["flavors"][flavor]["config"]

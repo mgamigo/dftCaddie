@@ -166,9 +166,11 @@ def apply_pseudos(
     """
 
     from dftcaddie import file_management as fm
-    from dftcaddie.config import default_cutoff_ratio
+    from dftcaddie.config import load_config
     import warnings
 
+    if configure:
+        default_cutoff_ratio = load_config()[0]["default_cutoff_ratio"]
     if "quantum_espresso" in code:
         pseudos = fm.get_qe_pseudo_paths(
             symbols=symbols,

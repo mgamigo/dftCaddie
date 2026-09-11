@@ -104,7 +104,9 @@ def calculations(monkeypatch):
             },
         },
     }
-    monkeypatch.setattr(ut, "calculations", definitions)
+    monkeypatch.setattr(
+        ut.config, "load_config", lambda: ({"calculations": definitions}, None)
+    )
     return definitions
 
 

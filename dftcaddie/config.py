@@ -2,28 +2,77 @@
 dftCaddie | dftcaddie.config
 ============================
 
-This module defines configuration variables used throughout the dftCaddie
-application, providing flexible support for different calculation types,
-DFT codes, and necessary input files.
+Select configuration paths, load settings on demand, and resolve libraries.
+Importing this module does not read YAML or access configuration values.
 """
 
 from pathlib import Path
 from functools import lru_cache
-import yaml
 import logging
+import os
 
 log = logging.getLogger(__name__)
 
 
+def config_paths() -> tuple[Path, Path]:
+    """
+    Return the selected YAML path and template/header root.
+
+    Returns
+    -------
+    tuple of pathlib.Path
+        DFTCADDIE_CONFIG overrides the default user/bundled file selection.
+        DFTCADDIE_SOURCE_DIR optionally overrides its resource root. Workflow
+        workers use these overrides to load an isolated configuration snapshot.
+    """
+    override = os.environ.get("DFTCADDIE_CONFIG")
+    if override:
+        path = Path(override).expanduser().resolve()
+    else:
+        path = Path.home() / ".config" / "dftcaddie" / "config.yaml"
+        if not path.exists():
+            path = Path(__file__).parent / "resources" / "config.yaml"
+    source = os.environ.get("DFTCADDIE_SOURCE_DIR")
+    return path, Path(source).expanduser().resolve() if source else path.parent
+
+
 @lru_cache(maxsize=1)
-def _load_config() -> dict:
-    CONFIG_FILE = Path.home() / ".config" / "dftcaddie" / "config.yaml"
-    SOURCE_DIR = Path.home() / ".config" / "dftcaddie"
-    if not CONFIG_FILE.exists():
-        CONFIG_FILE = Path(__file__).parent / "resources" / "config.yaml"
-        SOURCE_DIR = Path(__file__).parent / "resources"
-    with open(CONFIG_FILE, "r") as f:
-        return yaml.safe_load(f) or {}, SOURCE_DIR
+def load_config() -> tuple[dict, Path]:
+    """
+    Read the selected configuration on first use and cache it for this process.
+
+    Returns
+    -------
+    tuple of dict and pathlib.Path
+        Parsed settings and the template/header root.
+
+    Raises
+    ------
+    ValueError
+        If the YAML root is not a mapping. Syntax and file errors propagate.
+
+    Notes
+    -----
+    Call clear_config_cache() after changing configuration paths or files in
+    a long-running interactive session.
+    """
+    import yaml
+
+    path, source = config_paths()
+    with path.open() as stream:
+        data = yaml.safe_load(stream)
+    if data is None:
+        data = {}
+    if not isinstance(data, dict):
+        raise ValueError(f"Configuration must be a YAML mapping: {path}")
+    return data, source
+
+
+def clear_config_cache() -> None:
+    """Clear cached settings and resolved pseudopotential paths."""
+    load_config.cache_clear()
+    resolve_pslibrary.cache_clear()
+    resolve_potcar_library.cache_clear()
 
 
 @lru_cache(maxsize=1)
@@ -67,7 +116,7 @@ def resolve_pslibrary() -> Path:
     # ------------------------------------------------------------
     # 2. Config file
     # ------------------------------------------------------------
-    root = CONFIG.get("qe_pslibrary")
+    root = load_config()[0].get("qe_pslibrary")
 
     if root:
         path = Path(root).expanduser()
@@ -108,7 +157,7 @@ def resolve_potcar_library() -> Path:
     RuntimeError
         If the path is not defined or does not exist.
     """
-    root = CONFIG.get("vasp_pseudopotentials")
+    root = load_config()[0].get("vasp_pseudopotentials")
 
     if not root:
         raise RuntimeError(
@@ -126,15 +175,3 @@ def resolve_potcar_library() -> Path:
 
     log.info("Using VASP POTCARs from %s", path)
     return path
-
-
-CONFIG, SOURCE_DIR = _load_config()
-
-default_kppra = CONFIG["default_kppra"]
-nscf_kppra_ratio = CONFIG["nscf_kppra_ratio"]
-default_cutoff_ratio = CONFIG["default_cutoff_ratio"]
-
-suggested_qe_pseudos = CONFIG["suggested_qe_pseudos"]
-mpi_executables = CONFIG["mpi_executables"]
-clusters = CONFIG["clusters"]
-calculations = CONFIG["calculations"]

@@ -22,7 +22,9 @@ CASES = [
 
 @pytest.fixture(autouse=True)
 def bundled_calculations(monkeypatch):
-    monkeypatch.setattr(ut, "calculations", CALCULATIONS)
+    monkeypatch.setattr(
+        ut.config, "load_config", lambda: (BUNDLED_CONFIG, RESOURCE_DIR)
+    )
 
 
 def test_resources_folder_exists():

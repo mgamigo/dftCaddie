@@ -69,7 +69,9 @@ def run(args=None):
         Parsed command-line arguments for the ``sbatch`` subcommand.
     """
     from dftcaddie import utils as ut
-    from dftcaddie.config import clusters
+    from dftcaddie.config import load_config
+
+    clusters = load_config()[0]["clusters"]
 
     if args.cluster is None:
         args.cluster = ut.resolve_cluster(clusters)
@@ -114,7 +116,7 @@ def apply_header(cluster: str, header: int) -> int:
     ----------
     cluster : str
         Cluster key used to select the SBATCH header presets (from
-        ``dftcaddie.config.clusters``).
+        the active configuration).
     header : int
         Index of the selected header preset for the given cluster (0-based).
 
