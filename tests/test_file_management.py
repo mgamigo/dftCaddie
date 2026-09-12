@@ -321,6 +321,22 @@ def test_set_spin_orbit_coupling_edits_all_sh_scripts(tmp_path: Path, monkeypatc
     )
 
 
+def test_set_spin_orbit_coupling_configures_qe_and_wannier90(
+    tmp_path: Path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    script = tmp_path / "wannier90_in.sh"
+    script.write_text(
+        "noncolin=.false.\nlspinorb=.false.\nspinors=false\n", encoding="utf-8"
+    )
+
+    fm.set_spin_orbit_coupling(soc=True, code="quantum_espresso/wannier90")
+
+    assert script.read_text(encoding="utf-8") == (
+        "noncolin=.true.\nlspinorb=.true.\nspinors=true\n"
+    )
+
+
 # -------------------------
 # set_crystal_structure
 # -------------------------

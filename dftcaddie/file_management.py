@@ -567,7 +567,9 @@ def set_spin_orbit_coupling(
     Enable or disable spin-orbit coupling settings in input scripts.
 
     For Quantum ESPRESSO calculations, this updates the ``noncolin`` and
-    ``lspinorb`` flags in the ``.sh`` scripts.
+    ``lspinorb`` flags in the ``.sh`` scripts. For Wannier90 calculations,
+    it updates the ``spinors`` flag independently, allowing combined
+    Quantum ESPRESSO/Wannier90 workflows to configure both inputs.
 
     For VASP it sets LSORBIT accordingly in ``INCAR`` files.
 
@@ -590,26 +592,38 @@ def set_spin_orbit_coupling(
         else [os.path.basename(file) for file in files]
     )
 
+    configured = False
+
     if "quantum_espresso" in code:
+        configured = True
         scripts = [file for file in editable if file.endswith(".sh")]
         for script in scripts:
             if soc:
                 _replace_setting(script, "noncolin=", "noncolin=.true.")
                 _replace_setting(script, "lspinorb=", "lspinorb=.true.")
-                _replace_setting(script, "spinors=", "spinors=true")
             else:
                 _replace_setting(script, "noncolin=", "noncolin=.false.")
                 _replace_setting(script, "lspinorb=", "lspinorb=.false.")
-                _replace_setting(script, "spinors=", "spinors=false")
-    elif "vasp" in code:
+
+    if "vasp" in code:
+        configured = True
         INCARS = [file for file in editable if file.startswith("INCAR")]
         for INCAR in INCARS:
             if soc:
                 _replace_setting(INCAR, "LSORBIT =", "LSORBIT = TRUE")
             else:
                 _replace_setting(INCAR, "LSORBIT =", "LSORBIT = FALSE")
-    else:
-        warnings.warn("No SOC configuration implemented for {code} code", UserWarning)
+
+    if "wannier90" in code:
+        configured = True
+        scripts = [file for file in editable if file.endswith(".sh")]
+        for script in scripts:
+            _replace_setting(
+                script, "spinors=", f"spinors={'true' if soc else 'false'}"
+            )
+
+    if not configured:
+        warnings.warn(f"No SOC configuration implemented for {code} code", UserWarning)
 
 
 def set_cell_relaxation(
