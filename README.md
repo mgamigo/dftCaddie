@@ -363,6 +363,8 @@ default_cutoff_ratio: 1.5
 These control generated k-grids and cutoffs. A generated cutoff is the
 pseudopotential recommendation multiplied by `default_cutoff_ratio`;
 these defaults do not establish convergence for a particular system.
+For a one-off `caddie set pseudo --configure` invocation, `--ratio FLOAT`
+overrides this configured cutoff factor.
 
 ### Clusters and Job Scripts
 

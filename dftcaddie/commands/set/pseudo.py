@@ -73,6 +73,13 @@ def add_arguments(parser):
         action="store_true",
         help="Configure cutoffs according to the pseudopotentials",
     )
+    parser.add_argument(
+        "--ratio",
+        metavar="FLOAT",
+        type=float,
+        default=None,
+        help="Cutoff safety factor (default: config.yaml).",
+    )
 
 
 def run(args=None):
@@ -111,6 +118,7 @@ def run(args=None):
         kind_pseudo=args.kind,
         relativistic=args.relativistic,
         configure=args.configure,
+        ratio=args.ratio,
     )
 
 
@@ -123,7 +131,7 @@ def apply_pseudos(
     kind_pseudo: str = "paw",
     configure: bool = False,
     system_info_path: str = "SYSTEM.INFO",
-    ratio: float = 1.5,
+    ratio: float | None = None,
     files: Iterable[str] | None = None,
 ) -> int:
     """
@@ -155,7 +163,8 @@ def apply_pseudos(
     system_info_path : str, optional
         Path to the ``SYSTEM.INFO`` file to edit, by default "SYSTEM.INFO".
     ratio : float, optional
-        Safety factor applied to suggested cutoff values, by default 1.5.
+        Safety factor applied to suggested cutoff values. ``None`` uses
+        ``default_cutoff_ratio`` from the active configuration.
     files : iterable of str, optional
         Basenames or paths that may be changed. ``None`` permits all edits,
         as used by ``caddie set pseudo``.
@@ -177,8 +186,8 @@ def apply_pseudos(
 
     editable = None if files is None else {Path(file).name for file in files}
     system_info_name = Path(system_info_path).name
-    if configure:
-        default_cutoff_ratio = load_config()[0]["default_cutoff_ratio"]
+    if configure and ratio is None:
+        ratio = load_config()[0]["default_cutoff_ratio"]
     if "quantum_espresso" in code:
         pseudos = fm.get_qe_pseudo_paths(
             symbols=symbols,
@@ -192,10 +201,12 @@ def apply_pseudos(
 
         if configure and (editable is None or system_info_name in editable):
             fm.configure_qe_cutoffs_from_pseudos(
-                system_info_path, pseudos, ratio=default_cutoff_ratio
+                system_info_path, pseudos, ratio=ratio
             )
     elif "vasp" in code:
-        pseudos = fm.get_potcar_paths(symbols=symbols)
+        pseudos = fm.get_potcar_paths(
+            symbols=symbols, exchange=exchange, kind=kind_pseudo
+        )
         if editable is None or "POTCAR" in editable:
             fm.write_potcar(pseudos)
         fm.set_spin_orbit_coupling(relativistic, code, files=editable)
@@ -205,7 +216,7 @@ def apply_pseudos(
         )
         if configure and (editable is None or "POTCAR" in editable) and editable_incars:
             fm.configure_vasp_cutoffs_from_potcar(
-                "POTCAR", ratio=default_cutoff_ratio, files=editable
+                "POTCAR", ratio=ratio, files=editable
             )
     else:
         warnings.warn(
