@@ -32,7 +32,6 @@ select.validate()
     Convert matching errors into Questionary validation feedback.
 """
 
-import re
 import sys
 
 
@@ -107,8 +106,8 @@ def select(message, options, labels=None, *, hint="Supply explicit CLI options."
         Nonempty list of permitted values. Boolean questions expect both
         True and False; single-option settings are resolved by the caller.
     labels : list of str, optional
-        Display names corresponding one-to-one with options. Legacy bracketed
-        shortcut labels such as [B]ands are displayed as Bands.
+        Display names corresponding one-to-one with options. Labels are shown
+        exactly as supplied.
     hint : str, optional
         Instructions reported when no interactive terminal is available.
 
@@ -138,7 +137,6 @@ def select(message, options, labels=None, *, hint="Supply explicit CLI options."
     if all(type(option) is bool for option in options):
         return confirm(message, default=options[0], hint=hint)
     titles = labels if labels is not None else options
-    titles = [re.sub(r"\[([A-Za-z0-9])\]", r"\1", title) for title in titles]
 
     def resolve(text):
         """

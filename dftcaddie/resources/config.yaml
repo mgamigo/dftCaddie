@@ -97,7 +97,7 @@ mpi_executables:
 
 calculations:
   bands:
-    name: "[B]ands"
+    name: "Bands"
     config:
       - name: code
         prompt: "Select code:"
@@ -125,7 +125,7 @@ calculations:
         - vasp/bands.sh
         - vasp/master.sh
   relax:
-    name: "[R]elax"
+    name: "Relax"
     flavors:
       fixed_cell:
         name: "Fixed_cell"
@@ -184,7 +184,7 @@ calculations:
             - vasp/relax.sh
             - vasp/master.sh
   phonons:
-    name: "[P]honons"
+    name: "Phonons"
     config:
       - name: code
         prompt: "Select code:"

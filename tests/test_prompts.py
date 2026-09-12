@@ -31,17 +31,19 @@ def terminal(monkeypatch):
         yield pipe
 
 
-def test_typed_selection_returns_key_and_cleans_labels(terminal, monkeypatch, capsys):
+def test_typed_selection_returns_key_and_preserves_labels(
+    terminal, monkeypatch, capsys
+):
     factory = Mock(wraps=questionary.autocomplete)
     monkeypatch.setattr(questionary, "autocomplete", factory)
     terminal.send_text("dO\r")
     assert prompts.select("Kind", ["bands", "dos"], ["[B]ands", "[D]OS"]) == "dos"
     assert factory.call_args.kwargs["choices"] == [
-        "Bands",
-        "DOS",
+        "[B]ands",
+        "[D]OS",
     ]
     assert factory.call_args.args[0] == "Selection:"
-    assert capsys.readouterr().out == "Kind:\n  Bands\n  DOS\n"
+    assert capsys.readouterr().out == "Kind:\n  [B]ands\n  [D]OS\n"
 
 
 @pytest.mark.parametrize(
