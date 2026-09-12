@@ -19,6 +19,15 @@ def complete(tmp_path, bundled_config):
     working = tmp_path / "calculation"
     working.mkdir()
 
+    def snapshot():
+        """Capture files and directories below the completion working tree."""
+        return {
+            str(path.relative_to(working)): (
+                path.read_bytes() if path.is_file() else None
+            )
+            for path in working.rglob("*")
+        }
+
     def run(line):
         """Collect completion candidates and verify no preparation occurred."""
         output.write_text("")
@@ -33,7 +42,7 @@ def complete(tmp_path, bundled_config):
             "COMP_POINT": str(len(line)),
             "COMP_TYPE": "63",
         }
-        before = {p.name: p.read_bytes() for p in working.iterdir()}
+        before = snapshot()
         result = subprocess.run(
             [str(Path(sys.executable).parent / "caddie")],
             cwd=working,
@@ -44,7 +53,7 @@ def complete(tmp_path, bundled_config):
         )
         assert result.returncode == 0, result.stderr
         assert not result.stdout
-        assert {p.name: p.read_bytes() for p in working.iterdir()} == before
+        assert snapshot() == before
         return output.read_text().splitlines()
 
     return run, config, working
@@ -88,6 +97,8 @@ def test_prefix_and_paths(complete):
     (working / "Si.cif").write_text("structure fixture")
     assert "Si.cif" in run("caddie set system Si")
     assert "Si.cif" in run("caddie calc --structure Si")
+    (working / "target").mkdir()
+    assert "target/" in run("caddie -C tar")
 
 
 def test_configuration_changes_are_seen_on_next_completion(complete):

@@ -21,14 +21,22 @@ _caddie_heading()
     Heading for the client.
 _show_heading()
     Return whether the welcome heading should be printed.
+_existing_directory()
+    Resolve and validate a calculation directory argument.
+_working_directory()
+    Temporarily run command dispatch from a selected directory.
 _build_parser()
     Build the caddie parser.
 """
 
-import sys
 import argparse
 import logging
+import os
+import sys
+from contextlib import contextmanager
+from pathlib import Path
 
+from argcomplete.completers import DirectoriesCompleter
 from dftcaddie import __version__
 from dftcaddie.commands import calc, config, set as set_command
 from dftcaddie.prompts import InputRequired
@@ -72,6 +80,60 @@ def _show_heading(args) -> bool:
     return args.command in (None, "calc")
 
 
+def _existing_directory(value: str) -> Path:
+    """
+    Resolve an existing calculation directory.
+
+    Parameters
+    ----------
+    value : str
+        Directory supplied on the command line.
+
+    Returns
+    -------
+    pathlib.Path
+        Absolute resolved directory path.
+
+    Raises
+    ------
+    argparse.ArgumentTypeError
+        The path does not exist or is not a directory.
+    """
+    path = Path(value).expanduser()
+    if not path.exists():
+        raise argparse.ArgumentTypeError(f"directory does not exist: {value}")
+    if not path.is_dir():
+        raise argparse.ArgumentTypeError(f"not a directory: {value}")
+    return path.resolve()
+
+
+@contextmanager
+def _working_directory(directory: Path | None):
+    """
+    Temporarily change the process working directory.
+
+    Parameters
+    ----------
+    directory : pathlib.Path or None
+        Directory used during command dispatch. ``None`` preserves the
+        current working directory.
+
+    Yields
+    ------
+    pathlib.Path
+        Directory from which the command is run.
+    """
+    previous = Path.cwd()
+    target = previous if directory is None else directory
+    if directory is not None:
+        os.chdir(directory)
+    try:
+        yield target
+    finally:
+        if directory is not None:
+            os.chdir(previous)
+
+
 def _build_parser() -> argparse.ArgumentParser:
     """
     Build caddie parser
@@ -104,6 +166,14 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Only show errors.",
     )
+    directory_action = parser.add_argument(
+        "-C",
+        "--directory",
+        type=_existing_directory,
+        metavar="DIR",
+        help="Run as if caddie were started in DIR.",
+    )
+    directory_action.completer = DirectoriesCompleter()
     subparsers = parser.add_subparsers(title="Commands", dest="command")
 
     # --- calc subcommand ---
@@ -154,20 +224,25 @@ def main(argv: list[str] | None = None) -> int:
     _configure_logging(args.verbose, quiet=args.quiet)
 
     try:
-        if _show_heading(args):
-            _caddie_heading()
-        # Dispatch
-        if args.command == "calc":
-            calc.run(args)
-        elif args.command == "set":
-            set_command.run(args)
-        elif args.command == "config":
-            status = config.run(args)
-            if status:
-                return status
-        else:
-            parser.print_help()
-            return 0
+        with _working_directory(args.directory) as directory:
+            if args.directory is not None:
+                logging.getLogger(__name__).info(
+                    "Using calculation directory: %s", directory
+                )
+            if _show_heading(args):
+                _caddie_heading()
+            # Dispatch
+            if args.command == "calc":
+                calc.run(args)
+            elif args.command == "set":
+                set_command.run(args)
+            elif args.command == "config":
+                status = config.run(args)
+                if status:
+                    return status
+            else:
+                parser.print_help()
+                return 0
     except InputRequired as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1

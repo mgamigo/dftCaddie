@@ -151,9 +151,18 @@ The first command copies the band-structure templates and inserts the structure.
 The second configures the k-grid and high-symmetry path. Pseudopotentials still
 need to be configured before running the calculation.
 
-**Preparation commands write into the current working directory.** Use a
-separate directory for each calculation. Paths such as `../Si.cif` are also
-accepted when the structure is stored elsewhere.
+**Preparation commands write into the current working directory by default.**
+Use a separate directory for each calculation. To operate elsewhere without
+changing directory, put the global `-C/--directory` option before the command:
+
+```bash
+mkdir -p ~/calculations/Si-bands
+caddie -C ~/calculations/Si-bands calc \
+    --kind bands --code quantum_espresso --structure /path/to/Si.cif
+```
+
+The selected directory must already exist. Relative directory paths are
+resolved from the invocation directory.
 
 ### Use Interactive Choices
 
@@ -204,6 +213,7 @@ subcommand:
 
 ```bash
 caddie --version
+caddie -C calculation-directory calc --help
 caddie calc --help
 caddie set --help
 caddie set system --help
@@ -414,6 +424,7 @@ source ~/.local/share/bash-completion/completions/caddie
 | Type, then press Tab | Suggestions |
 | --- | --- |
 | `caddie ` | Subcommands |
+| `caddie -C ` | Filesystem directories |
 | `caddie calc -` | Short and long flags |
 | `caddie calc --kind ` | Configured calculation kinds |
 | `caddie calc --kind relax --flavor ` | Relaxation flavors |
@@ -432,10 +443,16 @@ New options with custom dynamic values need a completion callback.
 
 ## Scripts and Agents
 
-Supply full calculation keys and use configured defaults for unattended work:
+Supply the calculation directory, full calculation keys, and configured
+defaults for unattended work. Absolute structure paths avoid dependence on
+the agent's invocation directory:
 
 ```bash
-caddie calc --kind bands --code quantum_espresso --structure ../Si.cif --auto
+caddie -C /work/calculations/Si-bands calc \
+    --kind bands \
+    --code quantum_espresso \
+    --structure /work/structures/Si.cif \
+    --auto
 ```
 
 An empty destination directory avoids overwrite questions. Use `--overwrite`
@@ -443,11 +460,13 @@ only when you intend to replace existing calculation templates.
 
 If a required choice or overwrite confirmation cannot be collected because
 stdin or stdout is not a terminal, caddie exits with status 1 and a hint.
-Cancelling a prompt or declining an overwrite stops preparation with status
-130. All overwrite decisions are collected before copying templates.
+Cancelling a prompt stops preparation with status 130. Declining an overwrite
+keeps that file and continues through the remaining overwrite questions. All
+overwrite decisions are collected before copying templates.
 
 The `set system` and `set pseudo` commands infer the calculation from files in the
-current directory. Keep different calculations in separate directories.
+selected calculation directory. Keep different calculations in separate
+directories.
 Preparation is not transactional: failures during later setting steps can leave
 partially configured files.
 
