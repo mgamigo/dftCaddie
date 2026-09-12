@@ -1000,17 +1000,17 @@ def get_potcar_paths(
     kind: str = "paw",
 ) -> list[str]:
     """
-    Resolve VASP POTCAR file paths for a given set of atomic symbols.
+    Resolve VASP POTCAR paths in POSCAR species-group order.
 
     This function locates the appropriate pseudopotential library directory
     (matching the requested exchange–correlation functional and PAW type),
-    and selects one POTCAR file per atomic species following a priority
+    and selects one POTCAR file per consecutive species group following a priority
     order: bare potential → `_pv` → `_sv`.
 
     Parameters
     ----------
     symbols : Iterable[str]
-        Chemical symbols present in the structure (e.g., ``["Si", "O"]``).
+        Chemical symbols in atom order, matching the structure used for POSCAR.
     exchange : str, optional
         Exchange/correlation label used to locate pseudos (e.g., ``"pbe"``),
         by default "pbe".
@@ -1021,8 +1021,9 @@ def get_potcar_paths(
     Returns
     -------
     list[str]
-        List of absolute paths to the selected POTCAR files, one per
-        unique atomic symbol.
+        Paths to the selected POTCAR files, one per consecutive species group.
+        A species appearing in separate groups has its potential repeated,
+        matching ASE's unsorted POSCAR output.
 
     Raises
     ------
@@ -1035,6 +1036,7 @@ def get_potcar_paths(
     """
     from dftcaddie.config import resolve_potcar_library
     from pathlib import Path
+    from itertools import groupby
 
     potcar_library = resolve_potcar_library()
 
@@ -1056,9 +1058,8 @@ def get_potcar_paths(
             f"Not subfolder fund in {potcar_library} that contains {kind} and {exchange}"
         )
 
-    symbols = set(symbols)
     pseudos = []
-    for sym in symbols:
+    for sym, _ in groupby(symbols):
         candidates = [sym, f"{sym}_pv", f"{sym}_sv"]
 
         for name in candidates:

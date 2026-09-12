@@ -442,3 +442,47 @@ def test_get_qe_pseudo_paths_uses_resolve_pslibrary_and_glob(
     )
 
     assert paths == [str(match)]
+
+
+@pytest.mark.parametrize(
+    "symbols,groups,counts",
+    [
+        (["Si", "O", "O"], ["Si", "O"], [1, 2]),
+        (["O", "O", "Si"], ["O", "Si"], [2, 1]),
+        (["Si", "O", "Si"], ["Si", "O", "Si"], [1, 1, 1]),
+        (["Si", "Si"], ["Si"], [2]),
+    ],
+)
+def test_potcar_matches_generated_poscar_groups(
+    tmp_path, monkeypatch, symbols, groups, counts
+):
+    from ase import Atoms
+    from ase.io import read
+
+    library = tmp_path / "potentials"
+    for symbol, variant in [("Si", "Si_pv"), ("O", "O")]:
+        folder = library / "paw_pbe" / variant
+        folder.mkdir(parents=True)
+        (folder / "POTCAR").write_text(f"Potential for {symbol}\n")
+    monkeypatch.setattr(fm.config, "resolve_potcar_library", lambda: library)
+    monkeypatch.chdir(tmp_path)
+
+    atoms = Atoms(
+        symbols,
+        positions=[[i, 0, 0] for i in range(len(symbols))],
+        cell=[10, 10, 10],
+        pbc=True,
+    )
+    fm.set_crystal_structure(SimpleNamespace(atoms=atoms), "vasp")
+    paths = fm.get_potcar_paths(iter(atoms.get_chemical_symbols()))
+    fm.write_potcar(paths)
+
+    poscar = (tmp_path / "POSCAR").read_text().splitlines()
+    assert poscar[5].split() == groups
+    assert list(map(int, poscar[6].split())) == counts
+    assert (tmp_path / "POTCAR").read_text() == "".join(
+        f"Potential for {symbol}\n" for symbol in groups
+    )
+    restored = read("POSCAR", format="vasp")
+    assert restored.get_chemical_symbols() == symbols
+    assert restored.positions == pytest.approx(atoms.positions)
