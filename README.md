@@ -84,21 +84,48 @@ freeze those resources.
 
 ## Installation
 
-Python **3.10 or newer** is required. An isolated environment keeps the Python
-dependencies separate from other tools on your workstation or cluster.
+Python **3.10 or newer** is required. Clone the repository before installing
+with either uv or pip:
+
+```bash
+git clone https://github.com/mgamigo/dftCaddie.git
+cd dftCaddie
+```
+
+### uv
+
+Install `caddie` as an isolated command without manually managing a virtual
+environment:
+
+```bash
+uv tool install .
+caddie --help
+```
+
+For development, use an editable installation instead so source changes take
+effect immediately:
+
+```bash
+uv tool install --editable .
+```
+
+### pip
+
+Create and activate a virtual environment, then install the package:
 
 ```bash
 python -m venv ~/.venvs/dftcaddie
 source ~/.venvs/dftcaddie/bin/activate
-
-git clone https://github.com/mgamigo/dftCaddie.git
-cd dftCaddie
 python -m pip install .
 caddie --help
 ```
 
-For development, `uv sync` installs caddie as an editable package together
-with the `dev` dependency group. Run development commands with `uv run`.
+With pip 25.1 or newer, an editable development installation including the
+`dev` dependency group can be installed with:
+
+```bash
+python -m pip install --editable . --group dev
+```
 
 The Python installation includes YAIV, Questionary, and argcomplete.
 DFT executables, MPI, Slurm, and pseudopotential libraries are configured
@@ -354,14 +381,33 @@ setting alone does not implement its effect.
 
 ## Shell Completion
 
-Enable completion in Bash, with the caddie environment active:
+Package installation does not modify shell configuration. Register completion
+once by generating a file in Bash's standard per-user completion directory.
+
+For a uv tool installation:
 
 ```bash
-eval "$(register-python-argcomplete caddie)"
+mkdir -p ~/.local/share/bash-completion/completions
+uvx --from argcomplete register-python-argcomplete caddie \
+    > ~/.local/share/bash-completion/completions/caddie
 ```
 
-Add that line to your Bash startup configuration after the environment's
-commands become available on `PATH` to enable it in subsequent sessions.
+For a pip installation, run the generator while the caddie environment is
+active:
+
+```bash
+mkdir -p ~/.local/share/bash-completion/completions
+register-python-argcomplete caddie \
+    > ~/.local/share/bash-completion/completions/caddie
+```
+
+Open a new terminal after generating the file. To enable it immediately, or on
+a cluster that does not automatically load per-user completions, source it from
+the current shell or `~/.bashrc`:
+
+```bash
+source ~/.local/share/bash-completion/completions/caddie
+```
 
 | Type, then press Tab | Suggestions |
 | --- | --- |
