@@ -461,8 +461,10 @@ only when you intend to replace existing calculation templates.
 If a required choice or overwrite confirmation cannot be collected because
 stdin or stdout is not a terminal, caddie exits with status 1 and a hint.
 Cancelling a prompt stops preparation with status 130. Declining an overwrite
-keeps that file and continues through the remaining overwrite questions. All
-overwrite decisions are collected before copying templates.
+keeps that file unchanged for the entire `calc` invocation, while preparation
+continues through the remaining overwrite questions. All overwrite decisions
+are collected before copying templates. Use the explicit `set` commands when
+you intentionally want to edit files already present in a calculation folder.
 
 The `set system` and `set pseudo` commands infer the calculation from files in the
 selected calculation directory. Keep different calculations in separate

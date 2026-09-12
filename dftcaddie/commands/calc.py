@@ -22,6 +22,7 @@ run.prompt()
 """
 
 import logging
+from pathlib import Path
 
 log = logging.getLogger(__name__)
 
@@ -168,28 +169,46 @@ def run(args=None):
         print(f"{key.title()}: {value}")
     print(f"-------")
     files = fm.resolve_files(calculation)
-    fm.copy_input_files(files, calculation.overwrite)
+    copied_files = fm.copy_input_files(files, calculation.overwrite)
+    copied_names = {Path(file).name for file in copied_files}
 
-    log.info("Editing master.sh ...")
-    scripts = fm.populate_master_script("master.sh", files)
-    fm.set_master_preamble("master.sh", calculation.cluster)
+    if "master.sh" in copied_names:
+        log.info("Editing master.sh ...")
+        fm.populate_master_script("master.sh", files)
+        fm.set_master_preamble("master.sh", calculation.cluster)
 
-    fm.change_mpi_command(scripts, calculation.cluster)
-    fm.configure_input_files(calculation)
+    copied_scripts = [
+        Path(file).name
+        for file in copied_files
+        if file.endswith(".sh") and Path(file).name != "master.sh"
+    ]
+    fm.change_mpi_command(copied_scripts, calculation.cluster)
+    fm.configure_input_files(calculation, files=copied_names)
     if calculation.structure is not None:
         structure = ut.get_structure(spec.structure)
+        editable_files = set(copied_names)
+        if calculation.code == "vasp" and not Path("POSCAR").exists():
+            editable_files.add("POSCAR")
+        if calculation.auto and calculation.code == "vasp" and not Path(
+            "KPOINTS.BS"
+        ).exists():
+            editable_files.add("KPOINTS.BS")
         apply_system(
             kind=calculation.kind,
             code=calculation.code,
             structure=structure,
             autokgrid=calculation.auto,
             kpath=calculation.auto,
+            files=editable_files,
         )
         if calculation.pseudo:
+            if calculation.code == "vasp" and not Path("POTCAR").exists():
+                editable_files.add("POTCAR")
             apply_pseudos(
                 kind_calc=calculation.kind,
                 code=calculation.code,
                 symbols=structure.symbols,
                 relativistic=spec.soc,
                 configure=True,
+                files=editable_files,
             )

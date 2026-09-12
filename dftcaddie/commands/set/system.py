@@ -21,7 +21,9 @@ apply_system()
 """
 
 import logging
+from pathlib import Path
 from types import SimpleNamespace
+from typing import Iterable
 
 log = logging.getLogger(__name__)
 
@@ -128,6 +130,7 @@ def apply_system(
     autokgrid: bool = False,
     kppra: int | None = None,
     kpath: bool = False,
+    files: Iterable[str] | None = None,
 ) -> int:
     """
     Adapt a calculation to a crystal structure.
@@ -155,6 +158,9 @@ def apply_system(
     kpath : bool, optional
         If True, insert a high-symmetry k-path based on the structure space
         group, by default False.
+    files : iterable of str, optional
+        Basenames or paths that may be changed. ``None`` permits all edits,
+        as used by ``caddie set system``.
 
     Returns
     -------
@@ -167,9 +173,18 @@ def apply_system(
         from dftcaddie.config import load_config
 
         kppra = load_config()[0]["default_kppra"]
-    fm.set_crystal_structure(structure, code)
+    editable = None if files is None else {Path(file).name for file in files}
+    if editable is None:
+        fm.set_crystal_structure(structure, code)
+        if autokgrid:
+            fm.set_auto_kgrid(structure, code, kppra)
+        if kpath:
+            fm.set_high_symmetry_path(structure, code)
+        return 0
+
+    fm.set_crystal_structure(structure, code, files=editable)
     if autokgrid:
-        fm.set_auto_kgrid(structure, code, kppra)
+        fm.set_auto_kgrid(structure, code, kppra, files=editable)
     if kpath:
-        fm.set_high_symmetry_path(structure, code)
+        fm.set_high_symmetry_path(structure, code, files=editable)
     return 0

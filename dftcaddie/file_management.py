@@ -409,14 +409,21 @@ def populate_master_script(
 
     log.debug("Sub-scripts to add: %s", sub_scripts)
 
-    # Prepare lines to append
+    # Add only missing calls so repeated preparation remains idempotent.
     if len(sub_scripts) > 0:
+        with open(master_script_path, "r") as file:
+            existing_lines = set(file.readlines())
+        script_lines = [
+            f"bash {script}\n"
+            for script in sub_scripts
+            if f"bash {script}\n" not in existing_lines
+        ]
+        if not script_lines:
+            return sub_scripts
         log.info(
-            "Adding %d sub-scripts to '%s' ...",
-            len(sub_scripts),
+            "Adding %d sub-scripts to '%s' ...", len(script_lines),
             master_script_path,
         )
-        script_lines = [f"bash {script}\n" for script in sub_scripts]
         _insert_lines(master_script_path, script_lines, "#Actual JOBS")
     else:
         log.info("No sub-scripts to add to '%s'", master_script_path)
@@ -553,7 +560,9 @@ def change_mpi_command(file_path: str | list, cluster: str) -> None:
         )
 
 
-def set_spin_orbit_coupling(soc: bool, code: str) -> None:
+def set_spin_orbit_coupling(
+    soc: bool, code: str, files: Iterable[str] | None = None
+) -> None:
     """
     Enable or disable spin-orbit coupling settings in input scripts.
 
@@ -570,12 +579,19 @@ def set_spin_orbit_coupling(soc: bool, code: str) -> None:
         Whether spin-orbit coupling is taken into account or not.
     code: str
         Code that is being used in the calculations.
+    files : iterable of str, optional
+        Basenames or paths that may be changed. ``None`` considers every
+        suitable file in the current directory.
     """
     log.info("Configuring for SOC : %s", soc)
-    files = [f for f in os.listdir(".") if os.path.isfile(f)]
+    editable = (
+        [f for f in os.listdir(".") if os.path.isfile(f)]
+        if files is None
+        else [os.path.basename(file) for file in files]
+    )
 
     if "quantum_espresso" in code:
-        scripts = [file for file in files if file.endswith(".sh")]
+        scripts = [file for file in editable if file.endswith(".sh")]
         for script in scripts:
             if soc:
                 _replace_setting(script, "noncolin=", "noncolin=.true.")
@@ -586,7 +602,7 @@ def set_spin_orbit_coupling(soc: bool, code: str) -> None:
                 _replace_setting(script, "lspinorb=", "lspinorb=.false.")
                 _replace_setting(script, "spinors=", "spinors=false")
     elif "vasp" in code:
-        INCARS = [file for file in files if file.startswith("INCAR")]
+        INCARS = [file for file in editable if file.startswith("INCAR")]
         for INCAR in INCARS:
             if soc:
                 _replace_setting(INCAR, "LSORBIT =", "LSORBIT = TRUE")
@@ -596,7 +612,9 @@ def set_spin_orbit_coupling(soc: bool, code: str) -> None:
         warnings.warn("No SOC configuration implemented for {code} code", UserWarning)
 
 
-def set_cell_relaxation(cell_relaxation: bool, code: str) -> None:
+def set_cell_relaxation(
+    cell_relaxation: bool, code: str, files: Iterable[str] | None = None
+) -> None:
     """
     Configure ionic vs variable-cell relaxation for Quantum ESPRESSO.
 
@@ -611,15 +629,19 @@ def set_cell_relaxation(cell_relaxation: bool, code: str) -> None:
         Whether is a variable cell relaxation.
     code: str
         Code that is being used in the calculations.
+    files : iterable of str, optional
+        Basenames or paths that may be changed. ``None`` permits the usual
+        calculation-specific target.
     """
     log.info("Configuring for cell_relaxation : %s", cell_relaxation)
 
-    if code == "quantum_espresso":
+    editable = None if files is None else {os.path.basename(file) for file in files}
+    if code == "quantum_espresso" and (editable is None or "relax.sh" in editable):
         if cell_relaxation:
             _replace_setting("relax.sh", "calculation=", "calculation='vc-relax'")
         else:
             _replace_setting("relax.sh", "calculation=", "calculation='relax'")
-    elif code == "vasp":
+    elif code == "vasp" and (editable is None or "INCAR.RELAX" in editable):
         if cell_relaxation:
             _replace_setting("INCAR.RELAX", "ISIF =", "ISIF = 3")
         else:
@@ -630,7 +652,9 @@ def set_cell_relaxation(cell_relaxation: bool, code: str) -> None:
         )
 
 
-def configure_input_files(calculation: SimpleNamespace) -> None:
+def configure_input_files(
+    calculation: SimpleNamespace, files: Iterable[str] | None = None
+) -> None:
     """
     Apply calculation-dependent configuration edits to input files.
 
@@ -638,21 +662,31 @@ def configure_input_files(calculation: SimpleNamespace) -> None:
     ----------
     calculation : SimpleNamespace
         Calculation options container.
+    files : iterable of str, optional
+        Basenames or paths that may be changed. ``None`` preserves the
+        historical behavior of scanning the current directory.
     """
     options = set(calculation.__dict__.keys())
 
     # Spin-orbit coupling
     if "soc" in options:
-        set_spin_orbit_coupling(calculation.soc, calculation.code)
+        set_spin_orbit_coupling(calculation.soc, calculation.code, files=files)
 
     # Cell relaxation
     if calculation.kind == "relax":
-        set_cell_relaxation(calculation.cell_relaxation, calculation.code)
+        set_cell_relaxation(calculation.cell_relaxation, calculation.code, files=files)
 
     log.debug("File configuration completed.")
 
 
-def set_crystal_structure(structure: SimpleNamespace, code: str) -> None:
+def _target_is_editable(files: Iterable[str] | None, target: str) -> bool:
+    """Return whether ``target`` may be modified under an optional file limit."""
+    return files is None or target in {os.path.basename(str(file)) for file in files}
+
+
+def set_crystal_structure(
+    structure: SimpleNamespace, code: str, files: Iterable[str] | None = None
+) -> None:
     """
     Write structure-dependent quantities into input templates.
 
@@ -669,8 +703,13 @@ def set_crystal_structure(structure: SimpleNamespace, code: str) -> None:
         ``lattice`` (3x3), ``positions`` (Nx3 fractional), and ``symbols`` (N).
     code : str
         DFT code identifier.
+    files : iterable of str, optional
+        Basenames or paths that may be changed. ``None`` permits edits to the
+        code-specific structure file.
     """
     if "quantum_espresso" in code:
+        if not _target_is_editable(files, "SYSTEM.INFO"):
+            return
         formula = structure.formula
         lattice = structure.lattice
         positions = structure.positions
@@ -705,6 +744,8 @@ def set_crystal_structure(structure: SimpleNamespace, code: str) -> None:
         lat_lines = [f"{x:14.9f} {y:14.9f} {z:14.9f}\n" for x, y, z in lattice]
         _insert_lines("SYSTEM.INFO", lat_lines, "LATTICE=")
     elif "vasp" in code:
+        if not _target_is_editable(files, "POSCAR"):
+            return
         from ase.io import write
 
         write("POSCAR", structure.atoms, format="vasp", direct=True)
@@ -712,7 +753,9 @@ def set_crystal_structure(structure: SimpleNamespace, code: str) -> None:
         warnings.warn("set_crystal_structure skipped (code={code})", UserWarning)
 
 
-def set_high_symmetry_path(structure: SimpleNamespace, code: str) -> None:
+def set_high_symmetry_path(
+    structure: SimpleNamespace, code: str, files: Iterable[str] | None = None
+) -> None:
     """
     Set the high-symmetry k-path in ``SYSTEM.INFO`` based on space group.
 
@@ -727,6 +770,9 @@ def set_high_symmetry_path(structure: SimpleNamespace, code: str) -> None:
         Structure container. Must define ``space_group`` (int).
     code : str
         DFT code identifier. Currently only ``"quantum_espresso"`` is supported.
+    files : iterable of str, optional
+        Basenames or paths that may be changed. ``None`` permits edits to the
+        code-specific k-path file.
 
     Raises
     ------
@@ -743,6 +789,8 @@ def set_high_symmetry_path(structure: SimpleNamespace, code: str) -> None:
     kpaths_dir = os.path.join(source, "kpaths")
 
     if "quantum_espresso" in code:
+        if not _target_is_editable(files, "SYSTEM.INFO"):
+            return
         source_dir = os.path.join(kpaths_dir, "quantum_espresso")
         path_file = os.path.join(source_dir, f"SG{structure.space_group}")
 
@@ -753,6 +801,8 @@ def set_high_symmetry_path(structure: SimpleNamespace, code: str) -> None:
         _insert_lines("SYSTEM.INFO", lines, "QE_CRYST_PATH=")
         FOUND = True
     if "vasp" in code:
+        if not _target_is_editable(files, "KPOINTS.BS"):
+            return
         import shutil
 
         source_dir = os.path.join(kpaths_dir, "vasp")
@@ -761,6 +811,8 @@ def set_high_symmetry_path(structure: SimpleNamespace, code: str) -> None:
         FOUND = True
 
     if "wannier" in code:
+        if not _target_is_editable(files, "wannier90_in.sh"):
+            return
         source_dir = os.path.join(kpaths_dir, "wannier90")
         path_file = os.path.join(source_dir, f"SG{structure.space_group}")
 
@@ -950,7 +1002,12 @@ def configure_qe_cutoffs_from_pseudos(
     return cutoff, ecutrho
 
 
-def set_auto_kgrid(structure: SimpleNamespace, code: str, kppra: int = 9000) -> None:
+def set_auto_kgrid(
+    structure: SimpleNamespace,
+    code: str,
+    kppra: int = 9000,
+    files: Iterable[str] | None = None,
+) -> None:
     """
     Set an automatic k-point grid in ``SYSTEM.INFO``.
 
@@ -968,7 +1025,15 @@ def set_auto_kgrid(structure: SimpleNamespace, code: str, kppra: int = 9000) -> 
         DFT code identifier. Currently only ``"quantum_espresso"`` is supported.
     kppra : int, optional
         Target number of k-points per reciprocal atom, by default 9000.
+    files : iterable of str, optional
+        Basenames or paths that may be changed. ``None`` permits edits to the
+        code-specific k-grid file.
     """
+    if "quantum_espresso" in code and not _target_is_editable(files, "SYSTEM.INFO"):
+        return
+    if "vasp" in code and not _target_is_editable(files, "KPOINTS.SCC"):
+        return
+
     from yaiv.utils import auto_kgrid
 
     lattice = structure.lattice
@@ -1103,6 +1168,7 @@ def write_potcar(pseudos: list[str], output: str = "POTCAR") -> None:
 def configure_vasp_cutoffs_from_potcar(
     potcar: str,
     ratio: float = 1.5,
+    files: Iterable[str] | None = None,
 ) -> int:
     """
     Read suggested cutoffs from vasp ``POTCAR`` headers and update ``ENCUT`` in ``INCAR`` files.
@@ -1113,6 +1179,9 @@ def configure_vasp_cutoffs_from_potcar(
         POTCAR file path to read.
     ratio : float, optional
         Safety factor applied to the maximum suggested values, by default 1.5.
+    files : iterable of str, optional
+        Basenames or paths of INCAR files that may be changed. ``None``
+        considers every ``INCAR*`` file in the current directory.
 
     Returns
     -------
@@ -1137,6 +1206,9 @@ def configure_vasp_cutoffs_from_potcar(
                 enmax_vals.append(float(line.split()[2].strip(";")))
     encut = int(np.max(enmax_vals) * ratio)
     incar_files = glob.glob("INCAR*")
+    if files is not None:
+        editable = {os.path.basename(file) for file in files}
+        incar_files = [file for file in incar_files if os.path.basename(file) in editable]
     if len(incar_files) == 0:
         raise FileNotFoundError("No `INCAR` files found.")
     log.info("Setting ENCUT=%d in %s", encut, incar_files)

@@ -105,6 +105,7 @@ def test_calc_structure_without_pseudo(parse_args, monkeypatch):
         structure=structure,
         autokgrid=False,
         kpath=False,
+        files={"scf.sh", "bands.sh", "project_bands.sh", "SYSTEM.INFO", "master.sh"},
     )
     pseudo_step.assert_not_called()
 
@@ -136,6 +137,7 @@ def test_calc_auto_runs_full_setup(parse_args, monkeypatch, flag):
         structure=structure,
         autokgrid=True,
         kpath=True,
+        files={"scf.sh", "bands.sh", "project_bands.sh", "SYSTEM.INFO", "master.sh"},
     )
     pseudo_step.assert_called_once_with(
         kind_calc="bands",
@@ -143,4 +145,5 @@ def test_calc_auto_runs_full_setup(parse_args, monkeypatch, flag):
         symbols=structure.symbols,
         relativistic=True,
         configure=True,
+        files={"scf.sh", "bands.sh", "project_bands.sh", "SYSTEM.INFO", "master.sh"},
     )

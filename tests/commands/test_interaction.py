@@ -43,6 +43,16 @@ def test_declined_overwrite_keeps_file_and_completes(monkeypatch, capsys):
     assert "May your jobs converge" in capsys.readouterr().out
 
 
+def test_declined_overwrites_leave_existing_calculation_unchanged(monkeypatch):
+    assert cli.main(["calc", "--kind", "bands", "--code", "quantum_espresso"]) == 0
+    before = {path.name: path.read_bytes() for path in Path.cwd().iterdir()}
+    monkeypatch.setattr(prompts, "confirm", lambda *args, **kwargs: False)
+
+    assert cli.main(["calc", "--kind", "bands", "--code", "quantum_espresso"]) == 0
+
+    assert {path.name: path.read_bytes() for path in Path.cwd().iterdir()} == before
+
+
 @pytest.mark.parametrize("decision", ["cancel", "noninteractive"])
 def test_overwrite_stops_before_any_edits(decision, monkeypatch, capsys):
     Path("bands.sh").write_text("Keep my script.\n")

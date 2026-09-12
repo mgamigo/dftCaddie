@@ -21,6 +21,8 @@ apply_pseudos()
 """
 
 import logging
+from pathlib import Path
+from typing import Iterable
 
 log = logging.getLogger(__name__)
 
@@ -122,6 +124,7 @@ def apply_pseudos(
     configure: bool = False,
     system_info_path: str = "SYSTEM.INFO",
     ratio: float = 1.5,
+    files: Iterable[str] | None = None,
 ) -> int:
     """
     Resolve and apply pseudopotentials for a structure and update input templates.
@@ -153,6 +156,9 @@ def apply_pseudos(
         Path to the ``SYSTEM.INFO`` file to edit, by default "SYSTEM.INFO".
     ratio : float, optional
         Safety factor applied to suggested cutoff values, by default 1.5.
+    files : iterable of str, optional
+        Basenames or paths that may be changed. ``None`` permits all edits,
+        as used by ``caddie set pseudo``.
 
     Returns
     -------
@@ -169,6 +175,8 @@ def apply_pseudos(
     from dftcaddie.config import load_config
     import warnings
 
+    editable = None if files is None else {Path(file).name for file in files}
+    system_info_name = Path(system_info_path).name
     if configure:
         default_cutoff_ratio = load_config()[0]["default_cutoff_ratio"]
     if "quantum_espresso" in code:
@@ -178,20 +186,27 @@ def apply_pseudos(
             kind=kind_pseudo,
             relativistic=relativistic,
         )
-        fm.write_pseudos_to_system_info(system_info_path, pseudos)
-        fm.set_spin_orbit_coupling(relativistic, code)
+        if editable is None or system_info_name in editable:
+            fm.write_pseudos_to_system_info(system_info_path, pseudos)
+        fm.set_spin_orbit_coupling(relativistic, code, files=editable)
 
-        if configure:
+        if configure and (editable is None or system_info_name in editable):
             fm.configure_qe_cutoffs_from_pseudos(
                 system_info_path, pseudos, ratio=default_cutoff_ratio
             )
     elif "vasp" in code:
         pseudos = fm.get_potcar_paths(symbols=symbols)
-        fm.write_potcar(pseudos)
-        fm.set_spin_orbit_coupling(relativistic, code)
+        if editable is None or "POTCAR" in editable:
+            fm.write_potcar(pseudos)
+        fm.set_spin_orbit_coupling(relativistic, code, files=editable)
 
-        if configure:
-            fm.configure_vasp_cutoffs_from_potcar("POTCAR", ratio=default_cutoff_ratio)
+        editable_incars = (
+            editable is None or any(name.startswith("INCAR") for name in editable)
+        )
+        if configure and (editable is None or "POTCAR" in editable) and editable_incars:
+            fm.configure_vasp_cutoffs_from_potcar(
+                "POTCAR", ratio=default_cutoff_ratio, files=editable
+            )
     else:
         warnings.warn(
             f"Pseudo client skipped (not implemented for code={code})", UserWarning

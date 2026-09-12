@@ -125,6 +125,18 @@ def test_populate_master_script_adds_only_sh_and_not_self(tmp_path: Path):
     assert "notes.txt" not in text
 
 
+def test_populate_master_script_is_idempotent(tmp_path: Path):
+    master = tmp_path / "master.sh"
+    master.write_text("#!/bin/bash\n#Actual JOBS\n", encoding="utf-8")
+
+    fm.populate_master_script(str(master), ["scf.sh", "bands.sh"])
+    fm.populate_master_script(str(master), ["scf.sh", "bands.sh"])
+
+    text = master.read_text(encoding="utf-8")
+    assert text.count("bash scf.sh\n") == 1
+    assert text.count("bash bands.sh\n") == 1
+
+
 # -------------------------
 # set_master_preamble
 # -------------------------
