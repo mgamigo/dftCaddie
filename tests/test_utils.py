@@ -79,28 +79,21 @@ def calculations(monkeypatch):
     ("filename", "expected"),
     [("bands.in", ("bands", None, "qe")), ("relax.in", ("relax", None, "qe"))],
 )
-def test_resolve_calc_current_dir(
-    calculations, tmp_path, monkeypatch, filename, expected
-):
+def test_resolve_calculation_directory(calculations, tmp_path, filename, expected):
     (tmp_path / filename).touch()
-    monkeypatch.chdir(tmp_path)
-    assert ut.resolve_calc_current_dir() == expected
+    assert ut.resolve_calculation_directory(tmp_path) == expected
 
 
-def test_resolve_calc_current_dir_raises_if_empty(calculations, tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
+def test_resolve_calculation_directory_raises_if_empty(calculations, tmp_path):
     with pytest.raises(RuntimeError, match="Could not infer calculation kind/code"):
-        ut.resolve_calc_current_dir()
+        ut.resolve_calculation_directory(tmp_path)
 
 
-def test_resolve_calc_current_dir_raises_if_ambiguous(
-    calculations, tmp_path, monkeypatch
-):
+def test_resolve_calculation_directory_raises_if_ambiguous(calculations, tmp_path):
     calculations["other"] = {"files": {"qe": ["bands.in"]}}
     (tmp_path / "bands.in").touch()
-    monkeypatch.chdir(tmp_path)
     with pytest.raises(RuntimeError, match="Ambiguous calculation definition"):
-        ut.resolve_calc_current_dir()
+        ut.resolve_calculation_directory(tmp_path)
 
 
 def test_get_config(calculations):

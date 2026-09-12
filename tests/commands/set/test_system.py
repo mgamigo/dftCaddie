@@ -36,7 +36,9 @@ def test_apply_system_optional_steps(monkeypatch, autokgrid, kpath):
 def test_system_pseudo_uses_flavor_default(parse_args, monkeypatch):
     structure = SimpleNamespace(symbols=["Si"])
     monkeypatch.setattr(
-        utils, "resolve_calc_current_dir", lambda: ("relax", "variable_cell", "vasp")
+        utils,
+        "resolve_calculation_directory",
+        lambda directory: ("relax", "variable_cell", "vasp"),
     )
     monkeypatch.setattr(utils, "get_structure", Mock(return_value=structure))
     operation, pseudos = Mock(), Mock()

@@ -10,7 +10,9 @@ from dftcaddie.commands.set import pseudo
 
 def test_pseudo_run_forwards_options(parse_args, monkeypatch):
     monkeypatch.setattr(
-        utils, "resolve_calc_current_dir", lambda: ("bands", None, "quantum_espresso")
+        utils,
+        "resolve_calculation_directory",
+        lambda directory: ("bands", None, "quantum_espresso"),
     )
     reader = Mock(return_value=SimpleNamespace(symbols=["Si"]))
     operation = Mock()

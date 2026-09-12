@@ -38,9 +38,7 @@ def test_suggested_pseudos_cover_known_elements(bundled_config):
     assert len(bundled_config["suggested_qe_pseudos"]) == 94
 
 
-def test_resolve_calc_current_dir(
-    calculation_case, bundled_config, tmp_path, monkeypatch
-):
+def test_resolve_calculation_directory(calculation_case, bundled_config, tmp_path):
     kind, flavor, code = calculation_case
     calculations = bundled_config["calculations"]
     definition = calculations[kind]
@@ -49,8 +47,7 @@ def test_resolve_calc_current_dir(
     files = definition["files"][code]
     for filename in files:
         (tmp_path / Path(filename).name).touch()
-    monkeypatch.chdir(tmp_path)
-    res_kind, res_flavor, res_code = ut.resolve_calc_current_dir()
+    res_kind, res_flavor, res_code = ut.resolve_calculation_directory(tmp_path)
     assert (res_kind, res_code) == (kind, code)
     # Flavors may intentionally share the same complete file signature.
     signatures = [

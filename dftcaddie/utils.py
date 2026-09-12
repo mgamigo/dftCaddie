@@ -9,7 +9,7 @@ management routines, including:
 
 - resolving the target cluster from the hostname,
 - validating explicit option selections,
-- inferring the current calculation kind/code from a working directory,
+- inferring calculation kind/code from a directory,
 - reading basic structure data from a structure file,
 - retrieving calculation configuration entries.
 
@@ -19,8 +19,8 @@ resolve_cluster()
     Identify the cluster key based on the machine hostname.
 check_option_exists()
     Validate that a value is contained in a list of allowed options.
-resolve_calc_current_dir()
-    Infer calculation kind and code from files in the current directory.
+resolve_calculation_directory()
+    Infer calculation kind and code from files in a directory.
 get_structure()
     Read a structure file and return basic structural information.
 get_config()
@@ -29,7 +29,7 @@ get_config()
 
 import logging
 import sys
-import os
+from pathlib import Path
 from types import SimpleNamespace
 
 from dftcaddie import config
@@ -39,7 +39,7 @@ log = logging.getLogger(__name__)
 __all__ = [
     "resolve_cluster",
     "check_option_exists",
-    "resolve_calc_current_dir",
+    "resolve_calculation_directory",
     "get_structure",
     "get_config",
 ]
@@ -106,9 +106,14 @@ def check_option_exists(
     return 0
 
 
-def resolve_calc_current_dir() -> tuple[str, str, str]:
+def resolve_calculation_directory(directory: str | Path) -> tuple[str, str, str]:
     """
-    Infer calculation kind, flavor and code from files in the current directory.
+    Infer calculation kind, flavor and code from files in a directory.
+
+    Parameters
+    ----------
+    directory : str or pathlib.Path
+        Calculation directory whose regular files are used for detection.
 
     Returns
     -------
@@ -120,14 +125,15 @@ def resolve_calc_current_dir() -> tuple[str, str, str]:
     RuntimeError
         If no matching calculation definition is found or if the match is ambiguous.
     """
-    present_files = set(f for f in os.listdir(".") if os.path.isfile(f))
+    directory = Path(directory)
+    present_files = {path.name for path in directory.iterdir() if path.is_file()}
     calculations = config.load_config()[0]["calculations"]
 
     matches = []
 
     def append_matches(matches, files):
         for code, expected_files in files.items():
-            expected = set([os.path.basename(f) for f in expected_files])
+            expected = {Path(file).name for file in expected_files}
             overlap = expected & present_files
 
             if overlap:

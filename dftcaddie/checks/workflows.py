@@ -655,7 +655,7 @@ def _check_calc_output(definition, kind, code):
             Path(Path(filename).name).is_file(),
             f"Missing generated template: {filename}",
         )
-    resolved_kind, _, resolved_code = utils.resolve_calc_current_dir()
+    resolved_kind, _, resolved_code = utils.resolve_calculation_directory(Path.cwd())
     _require(
         (resolved_kind, resolved_code) == (kind, code),
         "Generated files resolve to a different calculation.",
