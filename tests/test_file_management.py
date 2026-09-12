@@ -238,6 +238,30 @@ def test_change_mpi_command_no_matching_executable_no_change(
     assert script.read_text(encoding="utf-8") == "echo hello\n"
 
 
+def test_change_mpi_command_continues_after_non_mpi_script(
+    tmp_path: Path, monkeypatch, config_data
+):
+    helper = tmp_path / "helper.sh"
+    helper.write_text("echo helper\n", encoding="utf-8")
+    calculation = tmp_path / "calculation.sh"
+    calculation.write_text("mpirun pw.x -in scf.pwi\n", encoding="utf-8")
+
+    monkeypatch.setitem(config_data, "mpi_executables", ["pw.x"])
+    monkeypatch.setitem(
+        config_data,
+        "clusters",
+        {
+            "source": {"mpi_command": "mpirun"},
+            "target": {"mpi_command": "srun -n 8"},
+        },
+    )
+
+    fm.change_mpi_command([str(helper), str(calculation)], "target")
+
+    assert helper.read_text(encoding="utf-8") == "echo helper\n"
+    assert calculation.read_text(encoding="utf-8").startswith("srun -n 8 ")
+
+
 # -------------------------
 # set_cell_relaxation
 # -------------------------

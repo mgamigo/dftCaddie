@@ -541,7 +541,7 @@ def change_mpi_command(file_path: str | list, cluster: str) -> None:
 
         if not changes:
             log.debug("No MPI commands found in '%s'", file)
-            return
+            continue
 
         with open(file, "w") as f:
             f.writelines(lines)
