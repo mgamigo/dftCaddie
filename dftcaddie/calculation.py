@@ -53,9 +53,9 @@ class CalculationSpec:
     structure : str or None, optional
         Structure filename, without reading or validating its contents.
     auto : bool, optional
-        Whether to request automatic structure, k-grid, k-path, and pseudo setup.
+        Whether to request automatic system, k-grid, k-path, and pseudo configuration.
     pseudo : bool, optional
-        Whether to configure pseudopotentials after structure setup.
+        Whether to configure pseudopotentials after applying the system.
     overwrite : bool, optional
         Whether existing templates may be replaced without confirmation.
     settings : dict of str to str or bool, optional
@@ -151,7 +151,7 @@ def resolve_calculation(
     ------
     ValueError
         A required choice is missing, a selection is invalid, or automatic or
-        pseudo setup is requested without a structure argument.
+        pseudo configuration is requested without a structure argument.
 
     Notes
     -----

@@ -10,7 +10,10 @@ from dftcaddie import cli, prompts
 
 @pytest.mark.parametrize(
     "args,hint",
-    [(["calc"], "--kind"), (["sbatch", "--cluster", "cluster2"], "--header")],
+    [
+        (["calc"], "--kind"),
+        (["set", "header", "--cluster", "cluster2"], "--header"),
+    ],
 )
 def test_missing_input_without_terminal(args, hint, monkeypatch, capsys):
     monkeypatch.setattr(prompts.sys, "stdin", Mock(isatty=lambda: False))

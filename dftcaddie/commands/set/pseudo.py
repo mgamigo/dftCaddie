@@ -1,8 +1,8 @@
 """
-dftCaddie | dftcaddie.commands.pseudo
-=====================================
+dftCaddie | dftcaddie.commands.set.pseudo
+=========================================
 
-CLI handler for the ``caddie pseudo`` command.
+CLI handler for the ``caddie set pseudo`` command.
 
 This module implements the workflow used to select and apply
 pseudopotentials for a calculation. It resolves the current calculation
@@ -13,7 +13,7 @@ energy cutoffs based on pseudopotential recommendations.
 Functions
 ---------
 add_arguments()
-    Register command-line arguments for the ``pseudo`` subcommand.
+    Register arguments for the ``caddie set pseudo`` subcommand.
 run()
     Dispatch the ``pseudo`` workflow using parsed CLI arguments.
 apply_pseudos()
@@ -33,7 +33,7 @@ __all__ = [
 
 def add_arguments(parser):
     """
-    Add command-line arguments for the ``pseudo`` subcommand.
+    Add command-line arguments for the ``set pseudo`` subcommand.
 
     Parameters
     ----------
@@ -75,7 +75,7 @@ def add_arguments(parser):
 
 def run(args=None):
     """
-    Dispatch the ``caddie pseudo`` workflow.
+    Dispatch the ``caddie set pseudo`` workflow.
 
     This function resolves the current calculation kind and code from the
     working directory, reads the provided structure file, and applies
@@ -86,7 +86,7 @@ def run(args=None):
     Parameters
     ----------
     args : argparse.Namespace
-        Parsed command-line arguments for the ``pseudo`` subcommand.
+        Parsed command-line arguments for the ``set pseudo`` subcommand.
     """
 
     from dftcaddie import utils as ut

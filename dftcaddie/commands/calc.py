@@ -71,7 +71,7 @@ def add_arguments(parser):
         "-a",
         "--auto",
         action="store_true",
-        help="Run the full automatic setup from scratch (structure must be provided).",
+        help="Run full automatic preparation (requires --structure FILE).",
     )
     parser.add_argument(
         "--kind",
@@ -109,8 +109,8 @@ def run(args=None):
     """
     from dftcaddie.calculation import resolve_calculation
     from dftcaddie.config import load_config
-    from dftcaddie.commands.setup import apply_setup
-    from dftcaddie.commands.pseudo import apply_pseudos
+    from dftcaddie.commands.set.system import apply_system
+    from dftcaddie.commands.set.pseudo import apply_pseudos
     from dftcaddie import utils as ut
     from dftcaddie import file_management as fm
     from dftcaddie import prompts
@@ -178,7 +178,7 @@ def run(args=None):
     fm.configure_input_files(calculation)
     if calculation.structure is not None:
         structure = ut.get_structure(spec.structure)
-        apply_setup(
+        apply_system(
             kind=calculation.kind,
             code=calculation.code,
             structure=structure,

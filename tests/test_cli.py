@@ -82,10 +82,15 @@ def test_non_calc_command_omits_heading(monkeypatch, capsys):
 
 @pytest.mark.parametrize("subcommand", _get_subcommands())
 def test_dispatch(monkeypatch, subcommand):
+    modules = {
+        "calc": cli.calc,
+        "set": cli.set_command,
+        "config": cli.config,
+    }
     handlers = {}
     for name in _get_subcommands():
         handlers[name] = Mock(return_value=0)
-        monkeypatch.setattr(getattr(cli, name), "run", handlers[name])
+        monkeypatch.setattr(modules[name], "run", handlers[name])
 
     # Isolate dispatch from command-specific required arguments.
     args = Namespace(command=subcommand, verbose=0, quiet=False)

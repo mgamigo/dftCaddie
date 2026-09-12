@@ -99,7 +99,7 @@ def test_resolve_calc_current_dir_raises_if_ambiguous(
     calculations["other"] = {"files": {"qe": ["bands.in"]}}
     (tmp_path / "bands.in").touch()
     monkeypatch.chdir(tmp_path)
-    with pytest.raises(RuntimeError, match="Ambiguous calculation setup"):
+    with pytest.raises(RuntimeError, match="Ambiguous calculation definition"):
         ut.resolve_calc_current_dir()
 
 

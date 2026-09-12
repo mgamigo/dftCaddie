@@ -83,7 +83,7 @@ __all__ = [
     "set_spin_orbit_coupling",
     "set_cell_relaxation",
     "configure_input_files",
-    # Structure & setup
+    # Structure and system configuration
     "set_crystal_structure",
     "set_auto_kgrid",
     "set_high_symmetry_path",
@@ -440,7 +440,7 @@ def set_master_preamble(master_script_path: str, cluster: str, header: int = 0) 
 
     This function reads a cluster-specific header from a file and inserts
     it at the beginning of a master script, updating the script to reflect
-    the target cluster’s setup requirements.
+    the target cluster's execution requirements.
 
     Parameters
     ----------

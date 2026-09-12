@@ -46,7 +46,7 @@ calculations from scripts and agents.
 - Resolves Quantum ESPRESSO pseudopotentials and assembles VASP POTCAR files.
 - Sets energy cutoffs from pseudopotential recommendations when requested.
 - Applies spin-orbit and cell-relaxation choices.
-- Configures MPI launch commands and the SBATCH header in `master.sh`.
+- Configures MPI launch commands and the scheduler header in `master.sh`.
 - Checks configuration, referenced resources, and preparation workflows.
 - Completes commands, flags, paths, and configured choices in the shell.
 
@@ -117,7 +117,7 @@ cp tests/data/Si.cif ~/caddie-example/Si.cif
 cd ~/caddie-example
 
 caddie calc --kind bands --code quantum_espresso --structure Si.cif
-caddie setup Si.cif --autokgrid --kpath
+caddie set system Si.cif --autokgrid --kpath
 ```
 
 The first command copies the band-structure templates and inserts the structure.
@@ -152,22 +152,22 @@ Once the required pseudopotential library is configured:
 caddie calc --kind bands --code quantum_espresso --structure Si.cif --auto
 ```
 
-`--auto` requests structure setup, an automatic k-grid, a high-symmetry path,
+`--auto` requests system configuration, an automatic k-grid, a high-symmetry path,
 and pseudopotential configuration with cutoffs. It still asks for unresolved
 calculation choices when necessary.
 
 Both `calc --auto` and `calc --pseudo` require `--structure FILE`.
 The latter adds pseudopotentials without automatically requesting k-grid and
-k-path setup.
+k-path configuration.
 
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
 | `caddie calc` | Create and configure a calculation from templates. |
-| `caddie setup FILE` | Apply a structure and optional k-point setup to an existing calculation. |
-| `caddie pseudo FILE` | Select pseudopotentials and optionally configure cutoffs. |
-| `caddie sbatch` | Replace the SBATCH header in `master.sh`. |
+| `caddie set system FILE` | Adapt an existing calculation to a structure and optionally set its k-points. |
+| `caddie set pseudo FILE` | Select pseudopotentials and optionally configure cutoffs. |
+| `caddie set header` | Replace the scheduler header in `master.sh`. |
 | `caddie config init` | Copy editable default configuration and resources into your home directory. |
 | `caddie config check` | Validate configuration and resources. |
 
@@ -176,7 +176,10 @@ verbosity flag before the subcommand:
 
 ```bash
 caddie calc --help
-caddie setup --help
+caddie set --help
+caddie set system --help
+caddie set pseudo --help
+caddie set header --help
 caddie -v calc --kind bands --code vasp
 caddie -vv config check
 ```
@@ -204,8 +207,8 @@ adjusted as needed.
 
 ```bash
 caddie calc --kind relax --flavor fixed_cell --code quantum_espresso
-caddie setup ../Si.cif --autokgrid
-caddie pseudo ../Si.cif --configure
+caddie set system ../Si.cif --autokgrid
+caddie set pseudo ../Si.cif --configure
 ```
 
 ### Variable-Cell Relaxation with VASP
@@ -214,8 +217,8 @@ This requires a configured VASP pseudopotential library:
 
 ```bash
 caddie calc --kind relax --flavor variable_cell --code vasp --structure ../Si.cif
-caddie setup ../Si.cif --autokgrid --kppra 12000
-caddie pseudo ../Si.cif --configure
+caddie set system ../Si.cif --autokgrid --kppra 12000
+caddie set pseudo ../Si.cif --configure
 ```
 
 ### Change the K-Point Density
@@ -223,7 +226,7 @@ caddie pseudo ../Si.cif --configure
 Inside an existing calculation folder:
 
 ```bash
-caddie setup ../Si.cif --autokgrid --kppra 16000
+caddie set system ../Si.cif --autokgrid --kppra 16000
 ```
 
 `--kppra` sets the target k-point density used by `--autokgrid`. It does not
@@ -232,7 +235,7 @@ request grid generation on its own.
 ### Select Quantum ESPRESSO Pseudopotentials
 
 ```bash
-caddie pseudo ../Si.cif --exchange pbe --kind paw --relativistic --configure
+caddie set pseudo ../Si.cif --exchange pbe --kind paw --relativistic --configure
 ```
 
 Here `--kind` means the pseudopotential type, not the calculation kind.
@@ -243,10 +246,10 @@ omitting it disables SOC when applying pseudopotentials.
 The exchange and pseudopotential-kind selectors currently apply to QE.
 The VASP command path uses the library's PBE PAW selection.
 
-### Change an SBATCH Header
+### Change a Scheduler Header
 
 ```bash
-caddie sbatch --cluster local --header default
+caddie set header --cluster local --header default
 ```
 
 For a configured cluster, use its key and header name. Omit `--header` for
@@ -308,7 +311,7 @@ VASP expects a library root containing a PBE PAW directory, with files such as
 
 Edit the templates to change the input parameters and scripts you normally
 use. Selected settings are subsequently overwritten by the corresponding
-setup operations.
+`set` operations.
 
 The bundled numerical configuration includes:
 
@@ -325,12 +328,13 @@ these defaults do not establish convergence for a particular system.
 ### Clusters and Job Scripts
 
 Each cluster entry defines a hostname substring, an MPI launch command, and
-named SBATCH headers. Adapt the bundled placeholder clusters to your machines.
+named scheduler headers. The bundled files contain Slurm SBATCH directives.
+Adapt the placeholder clusters to your machines.
 
 During `calc`, caddie detects the cluster, applies its first header preset,
 and configures MPI calls in the generated scripts. The `mpi_executables`
 list identifies executables that receive that launch command.
-Use `caddie sbatch` afterwards to select a different header preset.
+Use `caddie set header` afterwards to select a different header preset.
 
 ### Add Calculations or Flavors
 
@@ -366,9 +370,10 @@ commands become available on `PATH` to enable it in subsequent sessions.
 | `caddie calc --kind ` | Configured calculation kinds |
 | `caddie calc --kind relax --flavor ` | Relaxation flavors |
 | `caddie calc --kind bands --code ` | Codes available for bands |
-| `caddie sbatch --cluster ` | Configured clusters |
-| `caddie sbatch --cluster local --header ` | Headers for that cluster |
-| `caddie setup ` | Filesystem paths |
+| `caddie set ` | `system`, `pseudo`, and `header` |
+| `caddie set header --cluster ` | Configured clusters |
+| `caddie set header --cluster local --header ` | Headers for that cluster |
+| `caddie set system ` | Filesystem paths |
 
 Flags appear only after typing `-`. Press Tab twice to list multiple matches,
 according to your shell's completion settings.
@@ -393,9 +398,9 @@ stdin or stdout is not a terminal, caddie exits with status 1 and a hint.
 Cancelling a prompt or declining an overwrite stops preparation with status
 130. All overwrite decisions are collected before copying templates.
 
-The `setup` and `pseudo` commands infer the calculation from files in the
+The `set system` and `set pseudo` commands infer the calculation from files in the
 current directory. Keep different calculations in separate directories.
-Preparation is not transactional: failures during later setup steps can leave
+Preparation is not transactional: failures during later setting steps can leave
 partially configured files.
 
 ## Validation and Development
@@ -424,7 +429,7 @@ python -m pip install -e .
 python -m pytest -q
 ```
 
-Tests include command workflows, staged versus automatic setup, repeated
+Tests include command workflows, staged versus automatic preparation, repeated
 configuration, interactive input, and shell completion. Workflow cases run in
 fresh directories within a shared subprocess, with timeout handling.
 
@@ -432,7 +437,10 @@ fresh directories within a shared subprocess, with timeout handling.
 
 | Module | Responsibility |
 | --- | --- |
-| `cli.py`, `commands/` | Argument parsing and command workflows |
+| `cli.py`, `commands/set/__init__.py` | Top-level parsing and `set` command dispatch |
+| `commands/set/system.py` | Structure, automatic k-grid, and k-path workflow |
+| `commands/set/pseudo.py` | Pseudopotential selection and cutoff workflow |
+| `commands/set/header.py` | Scheduler-header selection and replacement |
 | `calculation.py` | Resolve preparation choices into a `CalculationSpec` |
 | `prompts.py` | Typed selections, confirmations, and terminal checks |
 | `completion.py` | Configuration-dependent shell completion |

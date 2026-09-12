@@ -53,15 +53,19 @@ def complete(tmp_path, bundled_config):
 @pytest.mark.parametrize(
     "line,expected",
     [
-        ("caddie ", {"calc", "setup", "pseudo", "sbatch", "config"}),
+        ("caddie ", {"calc", "set", "config"}),
+        ("caddie set ", {"system", "pseudo", "header"}),
         ("caddie calc -", {"-s", "--kind", "--flavor", "--code"}),
         ("caddie calc --", {"--kind", "--flavor", "--code"}),
         ("caddie config ", {"init", "check"}),
         ("caddie calc --kind ", {"bands", "relax", "phonons"}),
         ("caddie calc --kind relax --flavor ", {"fixed_cell", "variable_cell"}),
         ("caddie calc --kind phonons --code ", {"quantum_espresso"}),
-        ("caddie sbatch --cluster cluster2 --header ", {"default", "long", "small"}),
-        ("caddie sbatch --cluster ", {"local", "cluster1", "cluster2"}),
+        (
+            "caddie set header --cluster cluster2 --header ",
+            {"default", "long", "small"},
+        ),
+        ("caddie set header --cluster ", {"local", "cluster1", "cluster2"}),
     ],
 )
 def test_shell_candidates(complete, line, expected):
@@ -72,7 +76,7 @@ def test_shell_candidates(complete, line, expected):
         assert "vasp" not in candidates
 
 
-@pytest.mark.parametrize("line", ["caddie ", "caddie calc ", "caddie setup "])
+@pytest.mark.parametrize("line", ["caddie ", "caddie calc ", "caddie set system "])
 def test_flags_require_dash_prefix(complete, line):
     run, _, _ = complete
     assert not any(candidate.startswith("-") for candidate in run(line))
@@ -82,7 +86,7 @@ def test_prefix_and_paths(complete):
     run, _, working = complete
     assert run("caddie calc --kind ph") == ["phonons"]
     (working / "Si.cif").write_text("structure fixture")
-    assert "Si.cif" in run("caddie setup Si")
+    assert "Si.cif" in run("caddie set system Si")
     assert "Si.cif" in run("caddie calc --structure Si")
 
 

@@ -118,7 +118,7 @@ def resolve_calc_current_dir() -> tuple[str, str, str]:
     Raises
     ------
     RuntimeError
-        If no matching calculation setup is found or if the match is ambiguous.
+        If no matching calculation definition is found or if the match is ambiguous.
     """
     present_files = set(f for f in os.listdir(".") if os.path.isfile(f))
     calculations = config.load_config()[0]["calculations"]
@@ -175,7 +175,9 @@ def resolve_calc_current_dir() -> tuple[str, str, str]:
             )
             best["flavor"] = None
         else:
-            raise RuntimeError(f"Ambiguous calculation setup detected: {equally_good}")
+            raise RuntimeError(
+                f"Ambiguous calculation definition detected: {equally_good}"
+            )
 
     if best["flavor"] is None:
         log.info("Resolved calcualtion kind/code as %s/%s", best["kind"], best["code"])

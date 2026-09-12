@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import pytest
 
 from dftcaddie import config, file_management as fm, utils
-from dftcaddie.commands import pseudo
+from dftcaddie.commands.set import pseudo
 
 
 def test_pseudo_run_forwards_options(parse_args, monkeypatch):
@@ -16,7 +16,9 @@ def test_pseudo_run_forwards_options(parse_args, monkeypatch):
     operation = Mock()
     monkeypatch.setattr(utils, "get_structure", reader)
     monkeypatch.setattr(pseudo, "apply_pseudos", operation)
-    pseudo.run(parse_args("pseudo", "Si.cif", "-e", "pbesol", "-k", "us", "-r", "-c"))
+    pseudo.run(
+        parse_args("set", "pseudo", "Si.cif", "-e", "pbesol", "-k", "us", "-r", "-c")
+    )
     reader.assert_called_once_with("Si.cif")
     operation.assert_called_once_with(
         kind_calc="bands",

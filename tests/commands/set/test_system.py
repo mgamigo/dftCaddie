@@ -4,20 +4,20 @@ from unittest.mock import Mock
 import pytest
 
 from dftcaddie import utils, file_management as fm
-from dftcaddie.commands import setup, pseudo
+from dftcaddie.commands.set import system, pseudo
 
 
 @pytest.mark.parametrize(
     "autokgrid,kpath", [(False, False), (True, False), (False, True)]
 )
-def test_apply_setup_optional_steps(monkeypatch, autokgrid, kpath):
+def test_apply_system_optional_steps(monkeypatch, autokgrid, kpath):
     structure = SimpleNamespace()
     writer, grid, path = Mock(), Mock(), Mock()
     monkeypatch.setattr(fm, "set_crystal_structure", writer)
     monkeypatch.setattr(fm, "set_auto_kgrid", grid)
     monkeypatch.setattr(fm, "set_high_symmetry_path", path)
     assert (
-        setup.apply_setup(
+        system.apply_system(
             "bands", "quantum_espresso", structure, autokgrid, 1234, kpath
         )
         == 0
@@ -33,18 +33,25 @@ def test_apply_setup_optional_steps(monkeypatch, autokgrid, kpath):
         path.assert_not_called()
 
 
-def test_setup_pseudo_uses_flavor_default(parse_args, monkeypatch):
+def test_system_pseudo_uses_flavor_default(parse_args, monkeypatch):
     structure = SimpleNamespace(symbols=["Si"])
     monkeypatch.setattr(
         utils, "resolve_calc_current_dir", lambda: ("relax", "variable_cell", "vasp")
     )
     monkeypatch.setattr(utils, "get_structure", Mock(return_value=structure))
     operation, pseudos = Mock(), Mock()
-    monkeypatch.setattr(setup, "apply_setup", operation)
+    monkeypatch.setattr(system, "apply_system", operation)
     monkeypatch.setattr(pseudo, "apply_pseudos", pseudos)
-    setup.run(
+    system.run(
         parse_args(
-            "setup", "Si.cif", "--autokgrid", "--kpath", "--kppra", "1234", "--pseudo"
+            "set",
+            "system",
+            "Si.cif",
+            "--autokgrid",
+            "--kpath",
+            "--kppra",
+            "1234",
+            "--pseudo",
         )
     )
     operation.assert_called_once_with(
@@ -64,6 +71,6 @@ def test_setup_pseudo_uses_flavor_default(parse_args, monkeypatch):
     )
 
 
-def test_setup_rejects_empty_directory(parse_args):
+def test_system_rejects_empty_directory(parse_args):
     with pytest.raises(RuntimeError, match="Could not infer"):
-        setup.run(parse_args("setup", "Si.cif"))
+        system.run(parse_args("set", "system", "Si.cif"))

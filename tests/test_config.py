@@ -214,7 +214,7 @@ def test_invalid_yaml_does_not_break_imports_or_help(tmp_path, monkeypatch, cont
     assert result.returncode == 0, result.stderr
     for args, expected in [
         (["--help"], 0),
-        (["setup", "--help"], 0),
+        (["set", "system", "--help"], 0),
         (["config", "check"], 1),
     ]:
         result = subprocess.run(

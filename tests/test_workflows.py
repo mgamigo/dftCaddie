@@ -116,7 +116,7 @@ def test_custom_resources_and_defaults_are_used(
     results = checker.check_workflows(data, source)
     qe_result = next(r for r in results if r.case == "bands/default/quantum_espresso")
     assert not qe_result.success
-    assert qe_result.stage == "setup output"
+    assert qe_result.stage == "system output"
     assert "ATM_NUM" in qe_result.message
     assert all(r.success for r in results if r.case.endswith("/vasp"))
     assert data == original

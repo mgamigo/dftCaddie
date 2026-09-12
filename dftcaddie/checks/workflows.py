@@ -30,7 +30,7 @@ _snapshot()
 _has_code_family()
     Return whether a code name includes a backend family.
 _has_managed_workflow()
-    Return whether setup and pseudo checks are implemented for any code family.
+    Return whether system and pseudo checks are implemented for any code family.
 _worker()
     Prepare shared fixtures and stream results from an isolated worker.
 _prepare_fixtures()
@@ -43,11 +43,11 @@ _check_automatic()
     Compare automatic preparation with the equivalent staged commands.
 _check_calc_output()
     Check templates, calculation detection, and master script wiring.
-_check_setup_output()
+_check_system_output()
     Check the structure, k-grid, and high-symmetry k-path.
 _check_pseudo_output()
     Check pseudo selection, cutoffs, and spin-orbit settings.
-_check_sbatch_headers()
+_check_headers()
     Check all configured headers preserve the job body.
 _check_reconfiguration()
     Check changed settings, preserved notes, and repeatability.
@@ -144,7 +144,7 @@ def check_workflows(
     list of WorkflowResult
         Failures include the stage and error message; remaining cases continue.
         Unexpected interactive prompts fail explicitly. Backends without
-        implemented setup/pseudo checks still run generic staged checks and
+        implemented system/pseudo checks still run generic staged checks and
         skip code-specific scenarios successfully.
     """
     if checks is not None:
@@ -418,7 +418,7 @@ def _has_code_family(code, family):
 
 def _has_managed_workflow(code):
     """
-    Return whether setup and pseudo checks are implemented for any code family.
+    Return whether system and pseudo checks are implemented for any code family.
 
     Parameters
     ----------
@@ -551,10 +551,10 @@ def _run_case(payload, root, fixtures):
             _check_automatic(run, flags, structure, root, scenario)
         else:
             # Generic checks: every configured backend should copy templates,
-            # resolve the calculation, wire scripts, and accept SBATCH headers.
+            # resolve the calculation, wire scripts, and accept scheduler headers.
             run("calc", *flags)
             master = _check_calc_output(definition, kind, code)
-            _check_sbatch_headers(run, data, master)
+            _check_headers(run, data, master)
 
             if not _has_managed_workflow(code):
                 return WorkflowResult(
@@ -566,11 +566,25 @@ def _run_case(payload, root, fixtures):
                 )
 
             # Managed backend checks: these commands edit known input formats.
-            run("setup", str(structure), "--autokgrid", "--kppra", "64", "--kpath")
-            run.stage = "setup output"
-            _check_setup_output(code, structure)
+            run(
+                "set",
+                "system",
+                str(structure),
+                "--autokgrid",
+                "--kppra",
+                "64",
+                "--kpath",
+            )
+            run.stage = "system output"
+            _check_system_output(code, structure)
 
-            run("pseudo", str(structure), "--configure", "--relativistic")
+            run(
+                "set",
+                "pseudo",
+                str(structure),
+                "--configure",
+                "--relativistic",
+            )
             run.stage = "pseudo output"
             _check_pseudo_output(code, data, fixtures)
 
@@ -601,7 +615,7 @@ def _check_automatic(run, flags, structure, root, scenario):
     root : pathlib.Path
         Parent for the separate comparison directory.
     scenario : str
-        automatic (pseudo setup) or auto (full automatic setup).
+        automatic (pseudo configuration) or auto (full automatic preparation).
     """
     option = "--auto" if scenario == "auto" else "--pseudo"
     run("calc", *flags, "--structure", str(structure), option)
@@ -610,7 +624,7 @@ def _check_automatic(run, flags, structure, root, scenario):
     os.chdir(root / "staged")
     run("calc", *flags)
     extra = ["--autokgrid", "--kpath"] if scenario == "auto" else []
-    run("setup", str(structure), "--pseudo", *extra)
+    run("set", "system", str(structure), "--pseudo", *extra)
     run.stage = "compare"
     _require(
         _snapshot() == automatic,
@@ -658,7 +672,7 @@ def _check_calc_output(definition, kind, code):
     return master
 
 
-def _check_setup_output(code, structure):
+def _check_system_output(code, structure):
     """
     Check the generated structure, k-grid, and high-symmetry k-path.
 
@@ -737,9 +751,9 @@ def _check_pseudo_output(code, data, fixtures):
             )
 
 
-def _check_sbatch_headers(run, data, master):
+def _check_headers(run, data, master):
     """
-    Check every configured SBATCH header while preserving the job body.
+    Check every configured scheduler header while preserving the job body.
 
     Parameters
     ----------
@@ -753,7 +767,14 @@ def _check_sbatch_headers(run, data, master):
     body = master[master.index("#Actual JOBS") :]
     for cluster, entry in data["clusters"].items():
         for header in entry["headers"]:
-            run("sbatch", "--cluster", cluster, "--header", header["name"])
+            run(
+                "set",
+                "header",
+                "--cluster",
+                cluster,
+                "--header",
+                header["name"],
+            )
             result = Path("master.sh").read_text()
             _require(
                 result.endswith(body),
@@ -793,12 +814,20 @@ def _check_reconfiguration(run, code, data, fixtures):
 
     def reconfigure():
         """
-        Apply the second-pass setup, pseudo, and sbatch commands.
+        Apply the second-pass system, pseudo, and header commands.
         """
-        run("setup", str(structure), "--autokgrid", "--kppra", "4096")
-        run("pseudo", str(structure), "--configure")
         run(
-            "sbatch",
+            "set",
+            "system",
+            str(structure),
+            "--autokgrid",
+            "--kppra",
+            "4096",
+        )
+        run("set", "pseudo", str(structure), "--configure")
+        run(
+            "set",
+            "header",
             "--cluster",
             "local",
             "--header",

@@ -1,8 +1,8 @@
 """
-dftCaddie | dftcaddie.commands.sbatch
-=====================================
+dftCaddie | dftcaddie.commands.set.header
+=========================================
 
-CLI handler for the ``caddie sbatch`` command.
+CLI handler for the ``caddie set header`` command.
 
 This module provides an interactive workflow to select a target cluster and an
 SBATCH header preset, then apply it to the current working directory's
@@ -12,9 +12,9 @@ preserving the current ``#SBATCH --job-name`` value.
 Functions
 ---------
 add_arguments(parser)
-    Register command-line arguments for the ``sbatch`` subcommand.
+    Register arguments for the ``caddie set header`` subcommand.
 run(args=None)
-    Dispatch the ``sbatch`` workflow (resolve cluster/header and apply it).
+    Resolve and apply the selected scheduler header.
 apply_header(cluster, header)
     Replace the SBATCH header in ``master.sh`` with the selected preset.
 """
@@ -32,14 +32,14 @@ __all__ = [
 
 def add_arguments(parser):
     """
-    Add command-line arguments for the ``sbatch`` subcommand.
+    Add command-line arguments for the ``set header`` subcommand.
 
     Parameters
     ----------
     parser : argparse.ArgumentParser
-        Subparser instance to which the ``sbatch`` arguments are added.
+        Subparser instance to which the ``header`` arguments are added.
     """
-    from dftcaddie.completion import complete_sbatch
+    from dftcaddie.completion import complete_header
 
     parser.add_argument(
         "-c",
@@ -47,19 +47,19 @@ def add_arguments(parser):
         metavar="CLUSTER",
         required=False,
         help="Cluster name used to generate an SBATCH header.",
-    ).completer = complete_sbatch
+    ).completer = complete_header
     parser.add_argument(
         "-H",
         "--header",
         metavar="HEADER",
         required=False,
         help="Desired SBATCH header.",
-    ).completer = complete_sbatch
+    ).completer = complete_header
 
 
 def run(args=None):
     """
-    Dispatch the ``caddie sbatch`` workflow.
+    Dispatch the ``caddie set header`` workflow.
 
     This function selects a cluster (from CLI or inferred via hostname) and an
     SBATCH header preset (from CLI or an interactive selection menu), then updates
@@ -68,7 +68,7 @@ def run(args=None):
     Parameters
     ----------
     args : argparse.Namespace
-        Parsed command-line arguments for the ``sbatch`` subcommand.
+        Parsed command-line arguments for the ``set header`` subcommand.
     """
     from dftcaddie import utils as ut
     from dftcaddie.config import load_config
@@ -86,12 +86,12 @@ def run(args=None):
     options = [item["name"] for item in headers]
     if args.header is None:
         args.header = prompts.select(
-            f"Choose a sbatch header for {args.cluster}:",
+            f"Choose a scheduler header for {args.cluster}:",
             options,
             hint=f"Supply --header with one of: {', '.join(options)}.",
         )
     ut.check_option_exists(args.header, options, "Headings")
-    log.info("Sbatch header is: %s", args.header)
+    log.info("Scheduler header is: %s", args.header)
 
     print(f"\nSummary\n-------")
     keys = list(args.__dict__.keys())

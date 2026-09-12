@@ -11,7 +11,7 @@ and prepare the necessary input files.
 Functions
 ---------
 main(...)
-    Command-line client for dftCaddie that facilitates the setup of DFT calculations.
+    Dispatch calculation creation, setting, and configuration commands.
 
 Private Utilities
 -----------------
@@ -29,7 +29,7 @@ import sys
 import argparse
 import logging
 
-from dftcaddie.commands import calc, config, pseudo, sbatch, setup
+from dftcaddie.commands import calc, config, set as set_command
 from dftcaddie.prompts import InputRequired
 
 __all__ = [
@@ -107,29 +107,14 @@ def _build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     calc.add_arguments(calc_parser)
-    # --- setup subcommand ---
-    setup_parser = subparsers.add_parser(
-        "setup",
-        help="Configure the calculation for a given system",
-        description="Configure the calculation for a given system",
+    # --- set subcommand ---
+    set_parser = subparsers.add_parser(
+        "set",
+        help="Adapt an existing calculation",
+        description="Set system, pseudopotential, or scheduler-header details",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    setup.add_arguments(setup_parser)
-    # --- pseudo subcommand ---
-    pseudo_parser = subparsers.add_parser(
-        "pseudo",
-        help="Set the desired pseudopotentials",
-        description="Set the desired pseudopotentials",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    pseudo.add_arguments(pseudo_parser)
-    # --- sbatch subcommand ---
-    sbatch_parser = subparsers.add_parser(
-        "sbatch",
-        help="Set the desired sbatch header",
-        description="Set the desired sbatch header",
-    )
-    sbatch.add_arguments(sbatch_parser)
+    set_command.add_arguments(set_parser)
     # --- config subcommand ---
     config_parser = subparsers.add_parser(
         "config",
@@ -167,12 +152,8 @@ def main(argv: list[str] | None = None) -> int:
         # Dispatch
         if args.command == "calc":
             calc.run(args)
-        elif args.command == "setup":
-            setup.run(args)
-        elif args.command == "pseudo":
-            pseudo.run(args)
-        elif args.command == "sbatch":
-            sbatch.run(args)
+        elif args.command == "set":
+            set_command.run(args)
         elif args.command == "config":
             status = config.run(args)
             if status:

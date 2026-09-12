@@ -10,7 +10,7 @@ Functions
 ---------
 complete_calculation()
     Suggest calculation kinds, flavors, or codes from the active configuration.
-complete_sbatch()
+complete_header()
     Suggest clusters or headers for the selected or detected cluster.
 """
 
@@ -64,7 +64,7 @@ def complete_calculation(prefix, parsed_args, action, **kwargs):
     return [value for value in dict.fromkeys(values) if value.startswith(prefix)]
 
 
-def complete_sbatch(prefix, parsed_args, action, **kwargs):
+def complete_header(prefix, parsed_args, action, **kwargs):
     """
     Complete cluster names or cluster-specific SBATCH headers.
 
@@ -83,7 +83,7 @@ def complete_sbatch(prefix, parsed_args, action, **kwargs):
     -------
     list of str
         Matching cluster or header keys. Headers use hostname detection when
-        no cluster has been supplied, matching the sbatch command behavior.
+        no cluster has been supplied, matching the header command behavior.
     """
     from dftcaddie.config import load_config
     from dftcaddie.utils import resolve_cluster

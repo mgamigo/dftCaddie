@@ -5,7 +5,8 @@ from unittest.mock import Mock
 import pytest
 
 from dftcaddie import utils
-from dftcaddie.commands import calc, setup, pseudo
+from dftcaddie.commands import calc
+from dftcaddie.commands.set import pseudo, system
 
 
 @pytest.mark.parametrize("flag", ["-a", "--auto", "-p", "--pseudo"])
@@ -85,7 +86,7 @@ def test_calc_structure_without_pseudo(parse_args, monkeypatch):
     structure = SimpleNamespace(symbols=["Si"])
     setup_step, pseudo_step = Mock(), Mock()
     monkeypatch.setattr(utils, "get_structure", lambda path: structure)
-    monkeypatch.setattr(setup, "apply_setup", setup_step)
+    monkeypatch.setattr(system, "apply_system", setup_step)
     monkeypatch.setattr(pseudo, "apply_pseudos", pseudo_step)
     calc.run(
         parse_args(
@@ -113,7 +114,7 @@ def test_calc_auto_runs_full_setup(parse_args, monkeypatch, flag):
     structure = SimpleNamespace(symbols=["Si"])
     setup_step, pseudo_step = Mock(), Mock()
     monkeypatch.setattr(utils, "get_structure", lambda path: structure)
-    monkeypatch.setattr(setup, "apply_setup", setup_step)
+    monkeypatch.setattr(system, "apply_system", setup_step)
     monkeypatch.setattr(pseudo, "apply_pseudos", pseudo_step)
 
     calc.run(
