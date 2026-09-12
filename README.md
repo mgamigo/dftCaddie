@@ -97,8 +97,8 @@ python -m pip install .
 caddie --help
 ```
 
-For development, use `python -m pip install -e .` instead. Activate the
-environment in subsequent terminal sessions before using `caddie`.
+For development, `uv sync` installs caddie as an editable package together
+with the `dev` dependency group. Run development commands with `uv run`.
 
 The Python installation includes YAIV, Questionary, and argcomplete.
 DFT executables, MPI, Slurm, and pseudopotential libraries are configured
@@ -425,8 +425,8 @@ are skipped.
 From a development checkout:
 
 ```bash
-python -m pip install -e .
-python -m pytest -q
+uv sync
+uv run pytest -q
 ```
 
 Tests include command workflows, staged versus automatic preparation, repeated
