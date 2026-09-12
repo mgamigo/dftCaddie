@@ -31,7 +31,19 @@ def test_explicit_calc_without_terminal(monkeypatch):
     assert Path("master.sh").is_file()
 
 
-@pytest.mark.parametrize("decision", [False, "cancel", "noninteractive"])
+def test_declined_overwrite_keeps_file_and_completes(monkeypatch, capsys):
+    Path("bands.sh").write_text("Keep my script.\n")
+    monkeypatch.setattr(prompts, "confirm", lambda *args, **kwargs: False)
+
+    status = cli.main(["calc", "--kind", "bands", "--code", "quantum_espresso"])
+
+    assert status == 0
+    assert Path("bands.sh").read_text() == "Keep my script.\n"
+    assert Path("master.sh").is_file()
+    assert "May your jobs converge" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("decision", ["cancel", "noninteractive"])
 def test_overwrite_stops_before_any_edits(decision, monkeypatch, capsys):
     Path("bands.sh").write_text("Keep my script.\n")
     Path("notes.txt").write_text("Keep my notes.\n")

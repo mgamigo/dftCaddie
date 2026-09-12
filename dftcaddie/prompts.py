@@ -3,9 +3,10 @@ dftCaddie | dftcaddie.prompts
 ============================
 
 Questionary input shared by calculation selection and overwrite workflows.
-Typed selections accept exact names and unique prefixes, with vertical option
-lists and Tab completion. Questions require interactive stdin and stdout;
-unattended callers receive an actionable error instead of a prompt.
+Typed selections show the question before a vertical option list and a
+``Selection:`` field. They accept exact names and unique prefixes, with Tab
+completion. Questions require interactive stdin and stdout; unattended callers
+receive an actionable error instead of a prompt.
 
 Classes
 -------
@@ -202,10 +203,14 @@ def select(message, options, labels=None, *, hint="Supply explicit CLI options."
             return str(exc)
         return True
 
+    heading = message.rstrip()
+    if not heading.endswith((":", "?")):
+        heading += ":"
+    print(heading)
     print("\n".join(f"  {title}" for title in titles))
     answer = _ask(
         questionary.autocomplete(
-            message,
+            "Selection:",
             choices=titles,
             ignore_case=True,
             match_middle=False,

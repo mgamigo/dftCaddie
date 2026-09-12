@@ -320,7 +320,7 @@ def resolve_files(calculation: SimpleNamespace) -> list[str]:
 
 def copy_input_files(files: list[str], overwrite: bool = False):
     """
-    Validate templates and collect overwrite decisions before copying files.
+    Validate templates, collect overwrite decisions, and copy selected files.
 
     Parameters
     ----------
@@ -332,14 +332,15 @@ def copy_input_files(files: list[str], overwrite: bool = False):
     Returns
     -------
     list of str
-        Copied template paths.
+        Template paths that were copied. Existing destinations declined by
+        the user are omitted.
 
     Raises
     ------
     FileNotFoundError
         A required template is missing.
     KeyboardInterrupt
-        An overwrite was declined or the user cancelled.
+        The user cancels an overwrite question.
     """
     import shutil
     from pathlib import Path
@@ -351,17 +352,24 @@ def copy_input_files(files: list[str], overwrite: bool = False):
     for path in sources:
         if not path.is_file():
             raise FileNotFoundError(f"Required template not found: {path}")
-    if not overwrite:
-        for destination in destinations:
-            if destination.exists() and not prompts.confirm(
+    selected = []
+    for file, source_path, destination in zip(files, sources, destinations):
+        if (
+            not overwrite
+            and destination.exists()
+            and not prompts.confirm(
                 f"Overwrite '{destination.name}'?",
                 hint="Use --overwrite to replace existing files, or choose an empty directory.",
-            ):
-                raise KeyboardInterrupt
-    for source_path, destination in zip(sources, destinations):
+            )
+        ):
+            log.info("Keeping existing '%s'", destination.name)
+            continue
+        selected.append((file, source_path, destination))
+
+    for _, source_path, destination in selected:
         shutil.copy(source_path, destination)
         log.debug("Copied '%s'", source_path)
-    return files
+    return [file for file, _, _ in selected]
 
 
 def populate_master_script(

@@ -100,7 +100,7 @@ calculations:
     name: "[B]ands"
     config:
       - name: code
-        prompt: "Available codes:"
+        prompt: "Select code:"
         options:
           - quantum_espresso
           - vasp
@@ -131,7 +131,7 @@ calculations:
         name: "Fixed_cell"
         config:
           - name: code
-            prompt: "Available codes:"
+            prompt: "Select code:"
             options:
               - quantum_espresso
               - vasp
@@ -159,7 +159,7 @@ calculations:
         name: "Variable_cell"
         config:
           - name: code
-            prompt: "Available codes:"
+            prompt: "Select code:"
             options:
               - quantum_espresso
               - vasp
@@ -187,7 +187,7 @@ calculations:
     name: "[P]honons"
     config:
       - name: code
-        prompt: "Available codes:"
+        prompt: "Select code:"
         options:
           - quantum_espresso
       - name: soc

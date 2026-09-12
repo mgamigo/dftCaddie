@@ -212,7 +212,7 @@ def resolve_calculation(
     kind = choose(
         "kind",
         list(calculations),
-        "Available Calculation Types:",
+        "Select calculation:",
         [entry["name"] for entry in calculations.values()],
     )
     definition = calculations[kind]
@@ -222,7 +222,7 @@ def resolve_calculation(
         flavor = choose(
             "flavor",
             list(flavors),
-            "Available flavors:",
+            "Select flavor:",
             [entry["name"] for entry in flavors.values()],
         )
         definition = flavors[flavor]

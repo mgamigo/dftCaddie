@@ -1,9 +1,11 @@
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
 import dftcaddie.file_management as fm
+from dftcaddie import prompts
 
 
 @pytest.fixture
@@ -66,6 +68,40 @@ def test_remove_lines_missing_markers_leaves_file_unchanged(tmp_path: Path):
 
     fm._remove_lines(str(f), "START", "END")
     assert f.read_text(encoding="utf-8") == original
+
+
+# -------------------------
+# copy_input_files
+# -------------------------
+
+
+def test_copy_input_files_collects_each_overwrite_decision(tmp_path, monkeypatch):
+    resources = tmp_path / "resources"
+    templates = resources / "templates"
+    templates.mkdir(parents=True)
+    for name in ("keep.in", "replace.in", "new.in"):
+        (templates / name).write_text(f"Template {name}\n", encoding="utf-8")
+
+    working = tmp_path / "working"
+    working.mkdir()
+    (working / "keep.in").write_text("Keep me\n", encoding="utf-8")
+    (working / "replace.in").write_text("Replace me\n", encoding="utf-8")
+    monkeypatch.chdir(working)
+    monkeypatch.setattr(fm.config, "load_config", lambda: ({}, resources))
+
+    decisions = iter([False, True])
+    confirm = Mock(side_effect=lambda *args, **kwargs: next(decisions))
+    monkeypatch.setattr(prompts, "confirm", confirm)
+
+    copied = fm.copy_input_files(["keep.in", "replace.in", "new.in"])
+
+    assert confirm.call_count == 2
+    assert (working / "keep.in").read_text(encoding="utf-8") == "Keep me\n"
+    assert (working / "replace.in").read_text(encoding="utf-8") == (
+        "Template replace.in\n"
+    )
+    assert (working / "new.in").read_text(encoding="utf-8") == "Template new.in\n"
+    assert copied == ["replace.in", "new.in"]
 
 
 # -------------------------

@@ -40,7 +40,8 @@ def test_typed_selection_returns_key_and_cleans_labels(terminal, monkeypatch, ca
         "Bands",
         "DOS",
     ]
-    assert capsys.readouterr().out == "  Bands\n  DOS\n"
+    assert factory.call_args.args[0] == "Selection:"
+    assert capsys.readouterr().out == "Kind:\n  Bands\n  DOS\n"
 
 
 @pytest.mark.parametrize(
