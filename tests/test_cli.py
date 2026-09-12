@@ -5,6 +5,7 @@ from pathlib import Path
 from argparse import Namespace
 import pytest
 
+from dftcaddie import __version__
 from dftcaddie import cli
 from dftcaddie.cli import _build_parser
 from unittest.mock import Mock
@@ -35,6 +36,12 @@ def test_caddie_help_works():
     assert p.returncode == 0, p.stderr
     # argparse typically prints to stdout, but be tolerant
     assert (p.stdout + p.stderr).strip() != ""
+
+
+def test_caddie_version():
+    p = _run(["caddie", "--version"])
+    assert p.returncode == 0, p.stderr
+    assert p.stdout.strip() == f"caddie {__version__}"
 
 
 @pytest.mark.parametrize("subcommand", _get_subcommands())

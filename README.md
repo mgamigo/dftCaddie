@@ -198,10 +198,12 @@ k-path configuration.
 | `caddie config init` | Copy editable default configuration and resources into your home directory. |
 | `caddie config check` | Validate configuration and resources. |
 
-Every command supports `--help`. For additional logging, put the global
-verbosity flag before the subcommand:
+Every command supports `--help`, and `caddie --version` prints the installed
+version. For additional logging, put the global verbosity flag before the
+subcommand:
 
 ```bash
+caddie --version
 caddie calc --help
 caddie set --help
 caddie set system --help

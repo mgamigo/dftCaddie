@@ -29,6 +29,7 @@ import sys
 import argparse
 import logging
 
+from dftcaddie import __version__
 from dftcaddie.commands import calc, config, set as set_command
 from dftcaddie.prompts import InputRequired
 
@@ -83,6 +84,12 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="caddie",
         description="DFT Caddie - Your assistant for DFT calculations",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+        help="Show caddie version and exit.",
     )
     parser.add_argument(
         "-v",
