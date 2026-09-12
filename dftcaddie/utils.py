@@ -127,7 +127,9 @@ def resolve_calculation_directory(directory: str | Path) -> tuple[str, str, str]
     """
     directory = Path(directory)
     present_files = {path.name for path in directory.iterdir() if path.is_file()}
-    calculations = config.load_config()[0]["calculations"]
+    from dftcaddie.calculation import iter_calculation_definitions
+
+    settings = config.load_config()[0]
 
     matches = []
 
@@ -147,14 +149,8 @@ def resolve_calculation_directory(directory: str | Path) -> tuple[str, str, str]
                     }
                 )
 
-    for kind, kind_data in calculations.items():
-        flavors = kind_data.get("flavors", None)
-        if flavors is not None:
-            for flavor, flavor_data in flavors.items():
-                append_matches(matches, flavor_data["files"])
-        else:
-            flavor = None
-            append_matches(matches, kind_data["files"])
+    for kind, flavor, definition in iter_calculation_definitions(settings):
+        append_matches(matches, definition["files"])
     if not matches:
         raise RuntimeError(
             "Could not infer calculation kind/code from directory contents."
@@ -279,35 +275,28 @@ def get_config(kind: str, config_name: str, flavor: str = None) -> dict:
     KeyError
         If the calculation kind or configuration name is not found.
     """
-    calculations = config.load_config()[0]["calculations"]
+    from dftcaddie.calculation import (
+        get_calculation_definition,
+        iter_calculation_definitions,
+    )
+
+    settings = config.load_config()[0]
     if flavor is not None:
         try:
-            configs = calculations[kind]["flavors"][flavor]["config"]
-        except KeyError as exc:
+            configs = get_calculation_definition(settings, kind, flavor)["config"]
+        except (KeyError, ValueError) as exc:
             raise KeyError(
                 f"No config for calculation kind/flavor: '{kind}/{flavor}'"
             ) from exc
     else:
-        try:
-            possible_flavors = calculations[kind].get("flavors", None)
-        except KeyError as exc:
-            raise KeyError(f"No calculation kind: {kind!r}") from exc
-        # No possible flavors
-        if possible_flavors is None:
-            try:
-                configs = calculations[kind]["config"]
-            except KeyError as exc:
-                raise KeyError(f"No config for calculation kind: {kind!r}") from exc
-        # More than one possible flavor (retrieve setting for first flavor)
-        else:
-            for flavor, flavor_data in possible_flavors.items():
-                try:
-                    configs = flavor_data["config"]
-                    break
-                except KeyError as exc:
-                    raise KeyError(
-                        f"No config for calculation kind/flavor: '{kind}/{flavor}'"
-                    ) from exc
+        variants = [
+            definition
+            for variant_kind, _, definition in iter_calculation_definitions(settings)
+            if variant_kind == kind
+        ]
+        if not variants:
+            raise KeyError(f"No calculation kind: {kind!r}")
+        configs = variants[0]["config"]
 
     for cfg in configs:
         if cfg.get("name") == config_name:

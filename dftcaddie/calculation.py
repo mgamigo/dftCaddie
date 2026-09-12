@@ -14,6 +14,10 @@ CalculationSpec
 
 Functions
 ---------
+iter_calculation_definitions()
+    Yield each configured calculation variant with its kind and flavor.
+get_calculation_definition()
+    Retrieve one configured calculation variant.
 resolve_calculation()
     Validate a request and resolve configured defaults or prompted choices.
 
@@ -32,7 +36,87 @@ resolve_calculation.choose()
 
 from dataclasses import dataclass, field
 from types import SimpleNamespace
-from typing import Callable
+from typing import Callable, Iterator
+
+__all__ = [
+    "CalculationSpec",
+    "iter_calculation_definitions",
+    "get_calculation_definition",
+    "resolve_calculation",
+]
+
+
+def iter_calculation_definitions(
+    settings: dict,
+) -> Iterator[tuple[str, str | None, dict]]:
+    """
+    Yield resolved calculation definitions from configuration.
+
+    Parameters
+    ----------
+    settings : dict
+        Configuration containing the ``calculations`` mapping.
+
+    Yields
+    ------
+    kind : str
+        Calculation kind key.
+    flavor : str or None
+        Flavor key, or ``None`` for a calculation without flavors.
+    definition : dict
+        The corresponding calculation definition, containing ``files`` and
+        ``config`` entries.
+    """
+    for kind, definition in settings["calculations"].items():
+        for flavor, variant in definition.get("flavors", {None: definition}).items():
+            yield kind, flavor, variant
+
+
+def get_calculation_definition(
+    settings: dict, kind: str, flavor: str | None = None
+) -> dict:
+    """
+    Retrieve one calculation definition from configuration.
+
+    Parameters
+    ----------
+    settings : dict
+        Configuration containing the ``calculations`` mapping.
+    kind : str
+        Calculation kind key.
+    flavor : str, optional
+        Flavor key. It must be supplied for calculations declaring flavors.
+
+    Returns
+    -------
+    dict
+        Resolved calculation definition containing ``files`` and ``config``.
+
+    Raises
+    ------
+    KeyError
+        If ``kind`` or ``flavor`` is not configured.
+    ValueError
+        If a flavored calculation is requested without a flavor.
+    """
+    try:
+        definition = settings["calculations"][kind]
+    except KeyError as exc:
+        raise KeyError(f"No calculation kind: {kind!r}") from exc
+
+    flavors = definition.get("flavors")
+    if flavors is None:
+        if flavor is not None:
+            raise KeyError(f"Calculation {kind!r} has no flavor {flavor!r}.")
+        return definition
+    if flavor is None:
+        raise ValueError(f"Calculation {kind!r} requires a flavor.")
+    try:
+        return flavors[flavor]
+    except KeyError as exc:
+        raise KeyError(
+            f"No config for calculation kind/flavor: '{kind}/{flavor}'"
+        ) from exc
 
 
 @dataclass(frozen=True)
@@ -225,9 +309,11 @@ def resolve_calculation(
             "Select flavor:",
             [entry["name"] for entry in flavors.values()],
         )
-        definition = flavors[flavor]
+        definition = get_calculation_definition(settings, kind, flavor)
     elif request.get("flavor") is not None:
         raise ValueError(f"Calculation {kind!r} has no flavors.")
+    else:
+        definition = get_calculation_definition(settings, kind)
 
     resolved = {}
     for setting in definition["config"]:

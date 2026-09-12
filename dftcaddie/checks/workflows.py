@@ -97,10 +97,11 @@ def calculation_cases(data):
         ``(kind, flavor, code)`` for each configured template set. ``flavor`` is
         None for calculations without a flavor layer.
     """
-    for kind, definition in data["calculations"].items():
-        for flavor, variant in definition.get("flavors", {None: definition}).items():
-            for code in variant["files"]:
-                yield kind, flavor, code
+    from dftcaddie.calculation import iter_calculation_definitions
+
+    for kind, flavor, definition in iter_calculation_definitions(data):
+        for code in definition["files"]:
+            yield kind, flavor, code
 
 
 def check_workflows(
@@ -525,6 +526,8 @@ def _run_case(payload, root, fixtures):
     run = _CommandRunner()
     scenario = payload["scenario"]
     try:
+        from dftcaddie.calculation import get_calculation_definition
+
         data = payload["data"]
         kind, flavor, code = payload["case"]
         structure, _, _ = fixtures
@@ -533,10 +536,9 @@ def _run_case(payload, root, fixtures):
         os.chdir(working)
 
         flags = ["--kind", kind, "--code", code]
-        definition = data["calculations"][kind]
         if flavor is not None:
             flags += ["--flavor", flavor]
-            definition = definition["flavors"][flavor]
+        definition = get_calculation_definition(data, kind, flavor)
 
         if not _has_managed_workflow(code) and scenario != "staged":
             return WorkflowResult(

@@ -4,7 +4,36 @@ from copy import deepcopy
 
 import pytest
 
-from dftcaddie.calculation import CalculationSpec, resolve_calculation
+from dftcaddie.calculation import (
+    CalculationSpec,
+    get_calculation_definition,
+    iter_calculation_definitions,
+    resolve_calculation,
+)
+
+
+def test_calculation_definition_helpers(bundled_config):
+    bands = get_calculation_definition(bundled_config, "bands")
+    variable_relax = get_calculation_definition(
+        bundled_config, "relax", "variable_cell"
+    )
+
+    assert bands is bundled_config["calculations"]["bands"]
+    assert (
+        variable_relax
+        is bundled_config["calculations"]["relax"]["flavors"]["variable_cell"]
+    )
+    assert ("bands", None, bands) in list(iter_calculation_definitions(bundled_config))
+    assert ("relax", "variable_cell", variable_relax) in list(
+        iter_calculation_definitions(bundled_config)
+    )
+
+
+def test_calculation_definition_helper_rejects_incomplete_selection(bundled_config):
+    with pytest.raises(ValueError, match="requires a flavor"):
+        get_calculation_definition(bundled_config, "relax")
+    with pytest.raises(KeyError, match="no flavor"):
+        get_calculation_definition(bundled_config, "bands", "fixed_cell")
 
 
 def test_defaults_and_explicit_overrides(bundled_config):

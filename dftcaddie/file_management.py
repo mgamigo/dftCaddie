@@ -304,18 +304,13 @@ def resolve_files(calculation: SimpleNamespace) -> list[str]:
     files : list[str]
         List of files that are relevant for the calculation.
     """
-    # Resolve needed files.
-    calculations = config.load_config()[0]["calculations"]
+    from dftcaddie.calculation import get_calculation_definition
+
     log.debug("Resolving needed files ...")
-    if "flavor" in calculation.__dict__.keys():
-        files_to_copy = list(
-            calculations[calculation.kind]["flavors"][calculation.flavor]["files"][
-                calculation.code
-            ]
-        )
-    else:
-        files_to_copy = calculations[calculation.kind]["files"][calculation.code]
-    return files_to_copy
+    definition = get_calculation_definition(
+        config.load_config()[0], calculation.kind, getattr(calculation, "flavor", None)
+    )
+    return list(definition["files"][calculation.code])
 
 
 def copy_input_files(files: list[str], overwrite: bool = False):

@@ -37,30 +37,28 @@ def complete_calculation(prefix, parsed_args, action, **kwargs):
         selection, return the union of available values in configuration order.
     """
     from dftcaddie.config import load_config
+    from dftcaddie.calculation import iter_calculation_definitions
 
-    calculations = load_config()[0]["calculations"]
+    settings = load_config()[0]
+    calculations = settings["calculations"]
     if action.dest == "kind":
         values = list(calculations)
     else:
         kind = getattr(parsed_args, "kind", None)
-        definitions = (
-            ([calculations[kind]] if kind in calculations else [])
-            if kind is not None
-            else list(calculations.values())
-        )
         flavor = getattr(parsed_args, "flavor", None)
         values = []
-        for definition in definitions:
-            flavors = definition.get("flavors", {})
-            if action.dest == "flavor":
-                values.extend(flavors)
+        for variant_kind, variant_flavor, definition in iter_calculation_definitions(
+            settings
+        ):
+            if kind is not None and variant_kind != kind:
                 continue
-            if flavor is not None:
-                variants = [flavors[flavor]] if flavor in flavors else []
-            else:
-                variants = list(flavors.values()) if flavors else [definition]
-            for variant in variants:
-                values.extend(variant["files"])
+            if action.dest == "flavor":
+                if variant_flavor is not None:
+                    values.append(variant_flavor)
+                continue
+            if flavor is not None and variant_flavor != flavor:
+                continue
+            values.extend(definition["files"])
     return [value for value in dict.fromkeys(values) if value.startswith(prefix)]
 
 
