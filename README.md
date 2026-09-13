@@ -12,5 +12,8 @@ uv run --with pexpect --with pyte --with pillow \
 
 The recorder drives the real CLI through a pseudo-terminal, uses bundled
 configuration in a temporary folder, and checks that structure insertion
-succeeded. It requires the DejaVu Sans Mono font. No DFT calculation is run.
+succeeded. It requires DejaVu Sans Mono and Noto Color Emoji fonts. The terminal
+viewport is 88 columns by 15 rows, rendered at 928 by 383 pixels. The closing
+golf emoji uses the color font while terminal text uses the monospace font.
+No DFT calculation is run.
 The output replaces the GIF beside the recorder in this branch.

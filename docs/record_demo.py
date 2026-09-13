@@ -28,21 +28,38 @@ def main():
     output = Path(__file__).resolve().parent / "assets/interactive.gif"
     output.parent.mkdir(parents=True, exist_ok=True)
     font = ImageFont.truetype("DejaVuSansMono.ttf", 16)
-    screen = pyte.Screen(88, 32)
+    # Noto's bitmap emoji font has a fixed strike size; scale its rendered glyph.
+    emoji_font = ImageFont.truetype("NotoColorEmoji.ttf", 109)
+    golf = "\u26f3"
+    bounds = emoji_font.getbbox(golf)
+    emoji = Image.new("RGBA", (bounds[2] - bounds[0], bounds[3] - bounds[1]))
+    ImageDraw.Draw(emoji).text(
+        (-bounds[0], -bounds[1]), golf, font=emoji_font, embedded_color=True
+    )
+    emoji.thumbnail((20, 20), Image.Resampling.LANCZOS)
+    columns, rows = 88, 15
+    cell_width = font.getlength("M")
+    screen = pyte.Screen(columns, rows)
     stream = pyte.Stream(screen)
     frames = []
     durations = []
 
     def frame(duration=160):
         """Render the current terminal screen and retain its display duration."""
-        image = Image.new("RGB", (928, 766), "#171b20")
+        image = Image.new("RGB", (928, 383), "#171b20")
         draw = ImageDraw.Draw(image)
         draw.rectangle((0, 0, 928, 42), fill="#293138")
         draw.text(
             (24, 10), "dftCaddie  /  interactive preparation", font=font, fill="#78d9b0"
         )
-        for row, line in enumerate(screen.display):
-            draw.text((24, 52 + row * 22), line, font=font, fill="#e8edf0")
+        for row in range(rows):
+            for column in range(columns):
+                char = screen.buffer[row][column].data
+                x, y = 24 + column * cell_width, 52 + row * 21
+                if char == golf:
+                    image.paste(emoji, (round(x), y), emoji)
+                elif char.strip():
+                    draw.text((x, y), char, font=font, fill="#e8edf0")
         frames.append(image)
         durations.append(duration)
 
@@ -64,7 +81,7 @@ def main():
             cwd=work,
             env={**os.environ, "TERM": "xterm-256color", "PROMPT_TOOLKIT_NO_CPR": "1"},
             encoding="utf-8",
-            dimensions=(32, 88),
+            dimensions=(rows, columns),
         )
         transcript = ""
 
