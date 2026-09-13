@@ -9,6 +9,44 @@ from dftcaddie.commands import calc
 from dftcaddie.commands.set import pseudo, system
 
 
+@pytest.mark.parametrize("flag", ["--pseudo", "--auto"])
+def test_supplied_structure_controls_generated_vasp_inputs(parse_args, monkeypatch, flag):
+    from ase.build import bulk
+    from ase.io import write
+    from dftcaddie import file_management as fm
+
+    write("POSCAR", bulk("Si"), format="vasp")
+    write("Ge.cif", bulk("Ge"))
+    original = Path("POSCAR").read_bytes()
+    potential = Path("Ge.POTCAR")
+    potential.write_text("Germanium potential\n ENMAX = 200;\n")
+    finder = Mock(return_value=[str(potential)])
+    grid = Mock(wraps=fm.set_auto_kgrid)
+    monkeypatch.setattr(fm, "get_potcar_paths", finder)
+    monkeypatch.setattr(fm, "set_auto_kgrid", grid)
+
+    calc.run(
+        parse_args(
+            "calc",
+            "--kind",
+            "bands",
+            "--code",
+            "vasp",
+            "--structure",
+            "Ge.cif",
+            flag,
+        )
+    )
+
+    assert Path("POSCAR").read_bytes() == original
+    finder.assert_called_once_with(symbols=["Ge", "Ge"], exchange="pbe", kind="paw")
+    assert Path("POTCAR").read_bytes() == potential.read_bytes()
+    if flag == "--auto":
+        assert grid.call_args.args[0].symbols == ["Ge", "Ge"]
+    else:
+        grid.assert_not_called()
+
+
 @pytest.mark.parametrize("flag", ["-a", "--auto", "-p", "--pseudo"])
 def test_calc_requires_structure_before_prompting_or_writing(
     parse_args, monkeypatch, flag, caplog

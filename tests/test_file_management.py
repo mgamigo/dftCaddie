@@ -408,6 +408,36 @@ def test_set_high_symmetry_path_uses_active_resource_root(
 # -------------------------
 
 
+@pytest.mark.parametrize("editable", ["SYSTEM.INFO", "wannier90_in.sh"])
+def test_combined_kpath_edits_only_allowed_target(
+    tmp_path, monkeypatch, config_data, editable
+):
+    monkeypatch.chdir(tmp_path)
+    contents = {
+        "SYSTEM.INFO": "QE_CRYST_PATH=\nold QE path\nEOL\n",
+        "wannier90_in.sh": "BEGIN KPOINT_PATH\nold Wannier path\nEND KPOINT_PATH\n",
+    }
+    for name, text in contents.items():
+        Path(name).write_text(text)
+    for backend in ("quantum_espresso", "wannier90"):
+        path = tmp_path / "kpaths" / backend / "SG1"
+        path.parent.mkdir(parents=True)
+        path.write_text("NEW_PATH\n")
+
+    fm.set_high_symmetry_path(
+        SimpleNamespace(space_group=1), "quantum_espresso/wannier90", files={editable}
+    )
+
+    for name, original in contents.items():
+        if name == editable:
+            assert Path(name).read_text() == original.replace(
+                "old QE path" if name == "SYSTEM.INFO" else "old Wannier path",
+                "NEW_PATH",
+            )
+        else:
+            assert Path(name).read_text() == original
+
+
 def test_configure_qe_cutoffs_from_pseudos_reads_headers_and_sets_values(
     tmp_path: Path, monkeypatch
 ):

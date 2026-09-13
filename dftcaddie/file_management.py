@@ -773,6 +773,9 @@ def set_high_symmetry_path(
 
     For VASP coppies the KPATH into a file called KPOINTS.BS.
 
+    Combined code identifiers configure each editable backend target
+    independently. A protected target does not prevent edits to other targets.
+
     Parameters
     ----------
     structure : SimpleNamespace
@@ -797,9 +800,7 @@ def set_high_symmetry_path(
     _, source = config.load_config()
     kpaths_dir = os.path.join(source, "kpaths")
 
-    if "quantum_espresso" in code:
-        if not _target_is_editable(files, "SYSTEM.INFO"):
-            return
+    if "quantum_espresso" in code and _target_is_editable(files, "SYSTEM.INFO"):
         source_dir = os.path.join(kpaths_dir, "quantum_espresso")
         path_file = os.path.join(source_dir, f"SG{structure.space_group}")
 
@@ -809,9 +810,7 @@ def set_high_symmetry_path(
         _remove_lines("SYSTEM.INFO", "QE_CRYST_PATH=", "EOL")
         _insert_lines("SYSTEM.INFO", lines, "QE_CRYST_PATH=")
         FOUND = True
-    if "vasp" in code:
-        if not _target_is_editable(files, "KPOINTS.BS"):
-            return
+    if "vasp" in code and _target_is_editable(files, "KPOINTS.BS"):
         import shutil
 
         source_dir = os.path.join(kpaths_dir, "vasp")
@@ -819,9 +818,7 @@ def set_high_symmetry_path(
         shutil.copy(path_file, "KPOINTS.BS")
         FOUND = True
 
-    if "wannier" in code:
-        if not _target_is_editable(files, "wannier90_in.sh"):
-            return
+    if "wannier" in code and _target_is_editable(files, "wannier90_in.sh"):
         source_dir = os.path.join(kpaths_dir, "wannier90")
         path_file = os.path.join(source_dir, f"SG{structure.space_group}")
 
@@ -831,7 +828,9 @@ def set_high_symmetry_path(
         _remove_lines("wannier90_in.sh", "BEGIN KPOINT_PATH", "END KPOINT_PATH")
         _insert_lines("wannier90_in.sh", lines, "BEGIN KPOINT_PATH")
         FOUND = True
-    if not FOUND:
+    if not FOUND and not any(
+        backend in code for backend in ("quantum_espresso", "vasp", "wannier")
+    ):
         warnings.warn("set_high_symmetry_path skipped (code={code})", UserWarning)
 
 

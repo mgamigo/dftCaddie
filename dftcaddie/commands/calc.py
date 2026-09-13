@@ -103,6 +103,9 @@ def run(args=None):
     copies template input files, and applies code- and cluster-specific
     configuration edits.
 
+    Structure-dependent edits use the explicitly supplied structure, even
+    when other calculation files are preserved.
+
     Parameters
     ----------
     args : argparse.Namespace
