@@ -35,19 +35,29 @@ cd new_calc
 caddie calc
 ```
 
-| Command | What it does |
-| --- | --- |
-| `caddie calc` | Creates a calculation folder from a configured workflow and its templates. |
-| `caddie set system FILE` | Inserts a structure and can generate k-grids and high-symmetry k-paths. |
-| `caddie set pseudo FILE` | Selects pseudopotentials, writes QE species information or VASP POTCAR, and can set recommended cutoffs. |
-| `caddie set header` | Replaces the scheduler header in `master.sh` while keeping the job body. |
-| `caddie config init` | Installs an editable copy of the bundled configuration and resources. |
-| `caddie config check` | Validates the active configuration. |
+The most useful command forms are:
 
-During preparation, caddie can apply calculation settings such as spin-orbit
-coupling and cell relaxation, adapt MPI commands to the selected cluster, and
-assemble `master.sh` from the calculation scripts. It prepares files only: it
-does not submit jobs or run DFT calculations.
+- `caddie calc`: Fully interactive calculation setup.
+  - `caddie calc --structure Si.cif`: Also writes the supplied structure.
+  - `caddie calc --details --structure Si.cif`: Also asks about every setting.
+  - `caddie calc --kind bands --code quantum_espresso`: Sets known choices.
+  - `caddie calc --structure Si.cif --auto`: Also sets structure, k-points,
+    pseudopotentials, and cutoffs.
+  - `caddie -C /work/Si-bands calc ...`: Runs in another calculation directory.
+- `caddie set`: Modifies an existing calculation.
+  - `caddie set system Si.cif --autokgrid --kpath`: Sets the structure, k-grid,
+    and k-path.
+  - `caddie set pseudo Si.cif --configure`: Sets pseudopotentials and cutoffs.
+  - `caddie set header`: Sets the scheduler header in `master.sh`.
+- `caddie config`: Manages configuration and resources.
+  - `caddie config init`: Creates an editable user configuration.
+  - `caddie config check --workflows`: Checks configuration and workflows.
+
+Caddie organizes the calculation workflow into `master.sh`, the top-level job
+script intended for submission. It adds the selected scheduler header and calls
+the calculation scripts in their configured order, for example an SCF step
+followed by a bands or phonon step. Submit `master.sh` through your usual
+cluster workflow; caddie prepares the job but does not submit or run it.
 
 ## Installation
 
@@ -82,7 +92,7 @@ be edited and extended to represent your own calculation conventions.
 
 You can add a code that caddie does not yet edit directly. In that case,
 `caddie calc` can still copy and orchestrate its configured templates,
-but actions behind `caddie set` wourld require editing rules in Python.
+but actions behind `caddie set` require editing rules in Python.
 
 To initialize your user configuration, run:
 
