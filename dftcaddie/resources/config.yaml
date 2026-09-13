@@ -2,15 +2,15 @@
 # dftCaddie — User Configuration File
 # ============================================================
 #
-# This file allows you to customize:
-#   • Pseudopotential locations
-#   • Available clusters and SBATCH headers
-#   • MPI launch commands
-#   • Calculation kinds and templates
+# This file defines your calculation recipes and execution environment:
+#   • Calculation kinds, flavors, settings, and templates
+#   • Shared numerical defaults
+#   • Clusters, MPI launch commands, and SBATCH headers
+#   • Pseudopotential library locations
 #
-# You can safely edit this file.
-# New calculation kinds, clusters, or headers can be added
-# following the same structure shown below.
+# Start by adapting a calculation definition, then configure the execution
+# environment and pseudopotential sources. Run ``caddie config check
+# --workflows`` after edits.
 #
 # User configuration directory:
 #   ~/.config/dftcaddie/
@@ -18,82 +18,24 @@
 
 
 # ------------------------------------------------------------
-# Pseudopotential locations
-# ------------------------------------------------------------
-# Absolute paths to your pseudopotential libraries.
-# These folders must contain the raw QE / VASP pseudo files.
-
-#qe_pslibrary: ~/Software/pslibrary
-#vasp_pseudopotentials: ~/Software/vasp/pseudos
-
-
-# ------------------------------------------------------------
-# Cluster definitions
-# ------------------------------------------------------------
-# Each cluster entry defines:
-#   hostname      → substring used to auto-detect the cluster
-#   mpi_command   → MPI launcher prepended to mpi executables
-#   headers       → Available SBATCH header presets
-#
-# Header files must exist in:
-#   ~/.config/dftcaddie/sbatch_headers/
-#
-# "local" is used as fallback when no hostname matches.
-
-clusters:
-  local:
-    hostname: ""
-    mpi_command: "mpiexec -np 2"
-    headers:
-      - name: default
-        file: local.default
-  cluster1:
-    hostname: "cluster1_hostname"
-    mpi_command: "mpiexec -np $NPROCS"
-    headers:
-      - name: default
-        file: cluster1.default
-  cluster2:
-    hostname: "cluster2_hostname"
-    mpi_command: "srun --mpi=pmi2"
-    headers:
-      - name: default
-        file: cluster2.default
-      - name: long
-        file: cluster2.long
-      - name: small
-        file: cluster2.small
-
-
-# ------------------------------------------------------------
-# MPI-aware executables
-# ------------------------------------------------------------
-# These executables will automatically receive the cluster's
-# mpi_command prefix when generating scripts.
-
-mpi_executables:
-  - pw.x
-  - projwfc.x
-  - ph.x
-  - fs.x
-  - pw2wannier90.x
-  - wannier90.x
-  - vasp_ncl
-
-
-# ------------------------------------------------------------
 # Calculation definitions
 # ------------------------------------------------------------
 # Each calculation kind defines:
-#   name    → Display label in CLI
-#   config  → Interactive configuration options
-#   files   → Required template files
+#   name      → label displayed in the interactive client
+#   config    → selectable settings; ``code`` is required
+#   flavors   → complete workflow variants, when needed
+#   files     → templates grouped by code
 #
-# Template files must be located in:
-#   ~/.config/dftcaddie/templates/<code>/
+# ``code.options`` must match the keys under ``files`` exactly. Settings with a
+# ``default`` are not prompted for unless ``caddie calc --details`` is used.
 #
-# Advanced users may extend this section.
-# Incorrect edits may break CLI behavior.
+# Template paths are relative to ``templates/``. Include one ``master.sh`` in
+# every code mapping. It is the submit-ready top-level script: caddie adds the
+# selected SBATCH header and calls every other listed ``.sh`` file in order.
+# ``master.sh`` never calls itself.
+#
+# A flavor has its own configuration and template mapping. For example, the
+# two ``relax`` flavors below use different cell-relaxation settings.
 
 calculations:
   bands:
@@ -128,7 +70,7 @@ calculations:
     name: "Relax"
     flavors:
       fixed_cell:
-        name: "Fixed_cell"
+        name: "Fixed cell"
         config:
           - name: code
             prompt: "Select code:"
@@ -156,7 +98,7 @@ calculations:
             - vasp/relax.sh
             - vasp/master.sh
       variable_cell:
-        name: "Variable_cell"
+        name: "Variable cell"
         config:
           - name: code
             prompt: "Select code:"
@@ -208,35 +150,100 @@ calculations:
 # ------------------------------------------------------------
 # Global numerical defaults
 # ------------------------------------------------------------
-# Default parameters used when generating input files.
-# These values are applied unless explicitly overwritten
-# via CLI options.
+# These numerical defaults are used by the system and pseudopotential helpers.
+# They complement parameters stored in templates; they do not establish
+# scientific convergence for a particular material.
 
-# Target k-point density in kppra units.
-# kppra = (number of k-points) × (number of atoms).
-# Used when automatically generating Monkhorst–Pack grids.
+# Target k-point density: kppra = number of k-points × number of atoms.
+# Used by ``caddie set system --autokgrid`` and ``caddie calc --auto``.
 default_kppra: 12000
-# kppra ratio for non-self-consistent grids (x times more dense).
+# Multiplier for non-self-consistent grids relative to the self-consistent grid.
 nscf_kppra_ratio: 4
 
-# Safety factor applied to suggested plane-wave cutoffs
-# read from pseudopotential headers.
-# Final cutoff = suggested_cutoff × default_cutoff_ratio.
+# Safety factor for cutoffs read from pseudopotential headers.
+# Final cutoff = suggested cutoff × default_cutoff_ratio.
 default_cutoff_ratio: 1.5
+
+
+# ------------------------------------------------------------
+# Cluster definitions
+# ------------------------------------------------------------
+# Each cluster entry defines:
+#   hostname      → substring used to detect the cluster
+#   mpi_command   → launcher prepended to configured MPI executables
+#   headers       → available SBATCH header presets
+#
+# Header files are resolved from:
+#   ~/.config/dftcaddie/sbatch_headers/
+#
+# ``local`` is the fallback when no hostname matches. During ``caddie calc``,
+# the first header listed for the detected cluster is added to ``master.sh``.
+
+clusters:
+  local:
+    hostname: ""
+    mpi_command: "mpiexec -np 2"
+    headers:
+      - name: default
+        file: local.default
+  cluster1:
+    hostname: "cluster1_hostname"
+    mpi_command: "mpiexec -np $NPROCS"
+    headers:
+      - name: default
+        file: cluster1.default
+  cluster2:
+    hostname: "cluster2_hostname"
+    mpi_command: "srun --mpi=pmi2"
+    headers:
+      - name: default
+        file: cluster2.default
+      - name: long
+        file: cluster2.long
+      - name: small
+        file: cluster2.small
+
+
+# ------------------------------------------------------------
+# MPI-aware executables
+# ------------------------------------------------------------
+# When one of these executables occurs in a generated shell script, caddie
+# prepends the selected cluster's ``mpi_command``. Add executables used in your
+# own templates here.
+
+mpi_executables:
+  - pw.x
+  - projwfc.x
+  - ph.x
+  - fs.x
+  - pw2wannier90.x
+  - wannier90.x
+  - vasp_ncl
+
+
+# ------------------------------------------------------------
+# Pseudopotential locations
+# ------------------------------------------------------------
+# Uncomment and set either entry when you use automatic pseudopotential setup.
+# ``~`` is expanded. QE checks $PSLIBRARY first; it overrides qe_pslibrary.
+# VASP expects the root directory containing its exchange/kind subdirectories.
+
+#qe_pslibrary: ~/Software/pslibrary
+#vasp_pseudopotentials: ~/Software/vasp/pseudos
 
 
 
 # ------------------------------------------------------------
 # Suggested Quantum ESPRESSO pseudopotentials
 # ------------------------------------------------------------
-# Wildcard patterns used to select default pseudos from PSLibrary.
+# Wildcard patterns used to select default QE pseudopotentials from PSLibrary.
 #
 # Special placeholders:
 #   $fct → exchange functional (pbe, pbesol, pz, ...)
 #   *    → pseudo kind (kjpaw, us, ...)
 #
-# These patterns are used to automatically resolve
-# preferred pseudopotentials for each element.
+# Caddie uses the element's pattern to choose one preferred pseudo. Customize
+# an entry when your PSLibrary version or preferred potential differs.
 
 suggested_qe_pseudos:
   H: "H.$fct-*_psl.1.0.0"
