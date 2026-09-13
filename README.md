@@ -11,7 +11,7 @@
 ^^^^^^^`^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 </pre>
 
-<p><strong>Prepare DFT calculation workflows from the terminal using your templates, defaults, and job scripts.</strong></p>
+<p><strong>Prepare DFT calculation workflows from the terminal using your templates, defaults, and scripts.</strong></p>
 
 <p>
   <a href="#features">Features</a> ·
