@@ -1,3 +1,5 @@
+<a name="readme-top"></a>
+
 # dftCaddie
 
 <div align="center">
@@ -69,6 +71,8 @@ header and calls the calculation scripts in their configured order. Submit
 it through your usual cluster workflow; caddie prepares the files but does
 not submit or execute the calculation.
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 ## Installation
 
 Requires **Python 3.10 or newer**. The package is `dftcaddie`; the terminal
@@ -122,6 +126,8 @@ completion immediately:
 ```bash
 source ~/.local/share/bash-completion/completions/caddie
 ```
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Make It Yours
 
@@ -232,6 +238,7 @@ Cluster entries define a hostname match, MPI launch command, and named header
 presets. During `calc`, caddie applies the detected cluster's MPI command and
 first header preset. Edit the bundled placeholder entries for your machines.
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Examples
 
@@ -299,3 +306,5 @@ caddie -C /work/calculations/Si-bands calc \
 Use a fresh directory to avoid overwrite questions. `--overwrite` allows
 replacement of existing templates. Without an interactive terminal, supply
 all required choices and omit `--details` to use configured defaults.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
