@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="440" viewBox="0 0 1040 440" role="img" aria-labelledby="title description">
+  <title id="title">From templates to a calculation folder</title>
+  <desc id="description">Templates, configuration and cluster settings, and an optional structure feed caddie calc. The output folder contains input files and master.sh. When submitted, master.sh calls the configured workflow scripts in order.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M1 1 L6 4 L1 7" fill="none" stroke="#6e7781" stroke-width="1.5"/>
+    </marker>
+  </defs>
+  <rect width="1040" height="440" rx="8" fill="#ffffff"/>
+  <g font-family="DejaVu Sans, sans-serif" font-size="18" fill="#24292f">
+    <text x="32" y="38" fill="#57606a" font-size="14">YOUR CONVENTIONS</text>
+    <g fill="#f6f8fa" stroke="#d0d7de">
+      <rect x="32" y="60" width="288" height="76" rx="6"/>
+      <rect x="376" y="60" width="288" height="76" rx="6"/>
+      <rect x="720" y="60" width="288" height="76" rx="6" stroke-dasharray="5 5"/>
+    </g>
+    <text x="52" y="90" fill="#16704a">Templates</text>
+    <text x="52" y="116" font-size="15">Input defaults and scripts</text>
+    <text x="396" y="90" fill="#8a5700">Configuration</text>
+    <text x="396" y="116" font-size="15">Recipes and cluster settings</text>
+    <text x="740" y="90" fill="#0969da">Structure</text>
+    <text x="740" y="116" font-size="15">Optional CIF, POSCAR, ...</text>
+    <g fill="none" stroke="#6e7781" stroke-width="1.5">
+      <path d="M176 136 V166 H864 V136 M520 136 V166"/>
+      <path d="M520 166 V194" marker-end="url(#arrow)"/>
+    </g>
+    <rect x="384" y="198" width="272" height="54" rx="6" fill="#daf3e5" stroke="#218653"/>
+    <text x="520" y="232" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="22" fill="#116038">caddie calc</text>
+    <path d="M520 252 V294" fill="none" stroke="#6e7781" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <rect x="32" y="300" width="976" height="112" rx="6" fill="#f6f8fa" stroke="#d0d7de"/>
+    <text x="52" y="328" fill="#57606a" font-size="14">PREPARED CALCULATION FOLDER</text>
+    <text x="52" y="370">Input files</text>
+    <path d="M237 346 V390" stroke="#d0d7de"/>
+    <text x="272" y="370" font-family="DejaVu Sans Mono, monospace" fill="#16704a">master.sh</text>
+    <path d="M405 364 H455" fill="none" stroke="#6e7781" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <text x="479" y="370">Workflow scripts, in order</text>
+    <text x="479" y="394" font-size="14" fill="#57606a">Run through your usual submission workflow</text>
+  </g>
+</svg>
