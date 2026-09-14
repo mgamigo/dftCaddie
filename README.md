@@ -11,55 +11,68 @@
 ^^^^^^^`^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 </pre>
 
-<p><strong>Prepare DFT calculation workflows from the terminal using your templates, defaults, and scripts.</strong></p>
+<p><strong>Prepare DFT workflows your way, with your templates, defaults and cluster settings.</strong></p>
 
 <p>
   <a href="#features">Features</a> ·
   <a href="#installation">Installation</a> ·
-  <a href="#make-it-yours">Configuration</a> ·
   <a href="#shell-completion">Shell Completion</a> ·
+  <a href="#make-it-yours">Configuration</a> ·
   <a href="#examples">Examples</a>
 </p>
 
-<img src="/../assets/docs/assets/interactive.gif?raw=true" alt="Interactive dftCaddie preparation" width="928" />
+<img src="/../assets/docs/assets/interactive.gif?raw=true" alt="Live terminal demo: choose Bands, Quantum ESPRESSO, and SOC, then prepare inputs from a silicon structure." width="928" />
+
+<p><em>Choose a workflow. Supply a structure. Prepare your calculation.</em></p>
 
 </div>
 
 ## Features
 
-For a full interactive run in a new folder:
+Start with an empty calculation folder and let caddie ask for the missing choices:
 
 ```bash
-mkdir new_calc
-cd new_calc
+mkdir Si-bands
+cd Si-bands
 caddie calc
 ```
 
-The most useful command forms are:
+Choose a calculation, code, and any required workflow variant by typing a name
+or a matching part of it. Settings with defaults are applied automatically;
+add `--details` to choose them interactively too.
 
-- `caddie calc`: Fully interactive calculation setup.
-  - `caddie calc --structure Si.cif`: Also writes the supplied structure.
-  - `caddie calc --details --structure Si.cif`: Also asks about every setting.
-  - `caddie calc --kind bands --code quantum_espresso`: Sets known choices.
-  - `caddie calc --structure Si.cif --auto`: Also sets structure, k-points,
-    pseudopotentials, and cutoffs.
-  - `caddie -C /work/Si-bands calc ...`: Runs in another calculation directory.
-- `caddie set`: Modifies an existing calculation.
-  - `caddie set system Si.cif --autokgrid --kpath`: Sets the structure, k-grid,
-    and k-path.
-  - `caddie set pseudo Si.cif --configure`: Sets pseudopotentials and cutoffs.
-  - `caddie set header`: Sets the scheduler header in `master.sh`.
-- `caddie config`: Manages configuration and resources.
-  - `caddie config init`: Creates an editable user configuration.
-  - `caddie config check --workflows`: Checks configuration and workflows.
+- `caddie calc`: Choose interactively.
+- `caddie calc --structure Si.cif`: Include your structure.
+- `caddie calc --details --structure Si.cif`: Choose every setting.
+- `caddie calc --kind bands --code quantum_espresso`: Supply known choices.
+- `caddie calc --structure Si.cif --auto`: Also set k-points, pseudopotentials, and cutoffs.
+- `caddie -C /work/Si-bands calc`: Work in another directory.
 
-Caddie organizes the calculation workflow into `master.sh`, the top-level job
-script intended for submission. It adds the selected scheduler header and calls
-the calculation scripts in their configured order, for example an SCF step
-followed by a bands or phonon step. Submit `master.sh` through your usual
-cluster workflow; caddie prepares the job but does not submit or run it.
+**Update an existing calculation**
+
+- `caddie set system Si.cif --autokgrid --kpath`: Set the structure, k-grid, and k-path.
+- `caddie set pseudo Si.cif --configure`: Set pseudopotentials and cutoffs.
+- `caddie set header`: Choose a scheduler header.
+
+The bundled recipes cover **bands, relaxation, and phonons**, using Quantum
+ESPRESSO or VASP where configured. All interaction stays in the terminal,
+including on a cluster without a graphical session.
+
+### From Templates to a Job
+
+<p align="center">
+  <img src="/../assets/docs/assets/workflow.svg?raw=true" alt="Templates, configuration and cluster settings, and an optional structure feed caddie calc. It prepares a calculation folder with input files and master.sh, which calls the workflow scripts in order." width="928" />
+</p>
+
+**`master.sh` orchestrates the workflow.** Caddie adds the selected scheduler
+header and calls the calculation scripts in their configured order. Submit
+it through your usual cluster workflow; caddie prepares the files but does
+not submit or execute the calculation.
 
 ## Installation
+
+Requires **Python 3.10 or newer**. The package is `dftcaddie`; the terminal
+command is `caddie`.
 
 ```bash
 git clone https://github.com/mgamigo/dftCaddie.git
@@ -81,20 +94,57 @@ caddie --version
 python -m venv ~/.venvs/dftcaddie
 source ~/.venvs/dftcaddie/bin/activate
 python -m pip install .
-caddie --help
+caddie --version
+```
+
+## Shell Completion
+
+For **uv**, generate the Bash completion file once:
+
+```bash
+mkdir -p ~/.local/share/bash-completion/completions
+uvx --from argcomplete register-python-argcomplete caddie \
+    > ~/.local/share/bash-completion/completions/caddie
+```
+
+For **pip**, activate the installation environment and use:
+
+```bash
+mkdir -p ~/.local/share/bash-completion/completions
+register-python-argcomplete caddie \
+    > ~/.local/share/bash-completion/completions/caddie
+```
+
+Open a new terminal. If your shell does not load per-user Bash completions,
+add the following to `~/.bashrc`. Run it in the current shell to enable
+completion immediately:
+
+```bash
+source ~/.local/share/bash-completion/completions/caddie
 ```
 
 ## Make It Yours
 
-`caddie` comes with a bundled `config.yaml` and a set of resources: templates,
-k-paths, and scheduler headers. The important part is that these are meant to
-be edited and extended to represent your own calculation conventions.
+**Your templates hold your input defaults.** `config.yaml` defines the available
+workflows, connects them to templates, and describes your execution environment.
+The bundled resources are a starting point for your own conventions.
 
-You can add a code that caddie does not yet edit directly. In that case,
-`caddie calc` can still copy and orchestrate its configured templates,
-but actions behind `caddie set` require editing rules in Python.
+<p align="center">
+  <img src="/../assets/docs/assets/recipe.gif?raw=true" alt="Recipe walkthrough: Bands settings in config.yaml, the QE template mapping, and the generated master.sh loading SYSTEM.INFO before calling SCF, bands, and projection scripts in order." width="928" />
+</p>
 
-To initialize your user configuration, run:
+<p align="center"><em>From a configured recipe to an ordered workflow. Shown with bundled resources and a generated master.sh.</em></p>
+
+<details>
+<summary>View the recipe without animation</summary>
+
+![Bands settings and defaults](/../assets/docs/assets/recipe-defaults.png?raw=true)
+![Quantum ESPRESSO template mapping](/../assets/docs/assets/recipe-files.png?raw=true)
+![Generated master script](/../assets/docs/assets/recipe-result.png?raw=true)
+
+</details>
+
+Create your editable copy:
 
 ```bash
 caddie config init
@@ -104,53 +154,52 @@ This creates your editable resource tree:
 
 ```text
 ~/.config/dftcaddie/
-    config.yaml
-    templates/
-    sbatch_headers/
-    kpaths/
+    config.yaml         Recipes, choices, and shared settings
+    templates/          Input files and calculation scripts
+    sbatch_headers/     Scheduler header presets
+    kpaths/             Stored high-symmetry paths
 ```
 
-**Templates hold your input defaults.** `config.yaml` maps calculation kinds,
-flavors, and codes to those templates and defines the choices exposed by the
-client. A kind is a workflow such as `relax`; a flavor is a variation such as
-`fixed_cell`; a code selects its backend.
-
-When a user `config.yaml` exists, caddie uses that resource tree instead of the
-bundled one. Template paths are relative to `templates/`; header paths are
-relative to `sbatch_headers/`.
-
-Check that the configuration and its resources are installed correctly:
+When your user `config.yaml` exists, caddie uses this resource tree instead of
+the bundled one. Check your changes with:
 
 ```bash
 caddie config check --workflows
 ```
 
-### Add a Recipe
+### Define a Recipe
 
-1. Start from a similar entry in the [bundled config](dftcaddie/resources/config.yaml).
-2. Add your input files under your user `templates/` directory.
-3. Define the calculation's name, settings, flavors if needed, and template mapping.
-4. Check the result with `caddie config check --workflows`.
+A **kind** identifies a workflow, such as `bands` or `relax`. A **flavor** is
+a variant with its own configuration and files, such as `fixed_cell` or
+`variable_cell`. The **code** selects the template set.
 
-Each calculation definition has a display name, a list of configurable
-settings, and a mapping from code to template files. For example, a calculation
-may be displayed as `Relax`, while its configuration key is `relax`.
+For example, this entry under `calculations` defines a minimal QE SCF recipe:
 
-The `code` setting is mandatory because it selects a backend and its template
-set. The `files` mapping lists the templates copied into the calculation folder.
-One of them is normally `master.sh`, the top-level script that caddie uses to
-orchestrate the calculation scripts in order. It receives the scheduler header and
-contains the calls to each individual script. `master.sh` itself is not added as a
-sub-script, so it never invokes itself.
+```yaml
+calculations:
+  scf:
+    name: "Self-consistent"
+    config:
+      - name: code
+        prompt: "Select code:"
+        options:
+          - quantum_espresso
+    files:
+      quantum_espresso:
+        - quantum_espresso/scf.sh
+        - quantum_espresso/SYSTEM.INFO
+        - quantum_espresso/master.sh
+```
 
-A calculation may also have **flavors**. A flavor is a named variation of a
-workflow with its own defaults, configuration, and template mapping; it is not
-just one more input setting. For example, `relax` has `fixed_cell` and
-`variable_cell` flavors. Both are relaxation calculations, but the first uses
-ionic relaxation while the second permits cell relaxation, so they can carry
-different scripts and VASP/QE settings.
+Template paths are relative to `templates/`. Include `master.sh` and list the
+other shell scripts in execution order. Start from the
+[bundled configuration](dftcaddie/resources/config.yaml) for examples of
+defaults, settings, and flavors.
 
-New recipes will reuse QE, VASP, and supported Wannier editing operations.
+New recipes can reuse the existing QE, VASP, and supported Wannier editing
+operations. You can also configure templates for another code: caddie can
+copy them and assemble the workflow, while code-specific edits require
+Python support.
 
 ### Pseudopotential Libraries
 
@@ -184,38 +233,13 @@ presets. During `calc`, caddie applies the detected cluster's MPI command and
 first header preset. Edit the bundled placeholder entries for your machines.
 
 
-## Shell Completion
-
-For a uv installation:
-
-```bash
-mkdir -p ~/.local/share/bash-completion/completions
-uvx --from argcomplete register-python-argcomplete caddie \
-    > ~/.local/share/bash-completion/completions/caddie
-```
-
-For pip, generate the same file with the environment activated:
-
-```bash
-mkdir -p ~/.local/share/bash-completion/completions
-register-python-argcomplete caddie \
-    > ~/.local/share/bash-completion/completions/caddie
-```
-
-Open a new terminal. If your shell does not automatically load per-user Bash
-completions, add this to `~/.bashrc`; it also enables completion immediately
-when run in the current shell:
-
-```bash
-source ~/.local/share/bash-completion/completions/caddie
-```
-
 ## Examples
 
 ### Prepare a Complete Folder
 
-With a pseudopotential library configured, you can keep choosing interactively
-while caddie applies the structure, k-grid, k-path, and pseudopotentials:
+With your pseudopotential library configured, keep choosing interactively
+while caddie prepares the structure, k-grid, k-path, pseudopotentials, and
+cutoffs:
 
 ```bash
 caddie calc --structure Si.cif --auto
@@ -228,7 +252,7 @@ Both `--auto` and `--pseudo` require `--structure FILE`.
 
 ### Adjust an Existing Calculation
 
-The `set` commands infer the calculation from the files in its folder:
+The `set` commands infer the calculation from the files in the target folder.
 
 ```bash
 # Apply a structure and choose a denser k-grid.
@@ -254,14 +278,8 @@ are passed to both QE and VASP library lookup. `--relativistic` enables SOC and
 selects relativistic QE potentials; omitting it disables SOC when applying
 pseudopotentials.
 
-`set header` preserves the job body and current job name. It selects the
-cluster by hostname, falling back to `local`; you can supply both choices:
-
-```bash
-caddie set header --cluster local --header default
-```
-
-Changing a header does not update MPI commands in the sub-scripts.
+Changing a header preserves the job body and current job name. It does not
+change MPI launch commands in the calculation scripts.
 
 ### Scripts and Agents
 
@@ -278,11 +296,6 @@ caddie -C /work/calculations/Si-bands calc \
     --auto
 ```
 
-Use a fresh directory for each calculation. If a template already exists,
-caddie asks before replacing it; `--overwrite` accepts replacement for all
-templates. When no interactive terminal is available, provide all required
-choices explicitly. `--auto` and `--pseudo` always require `--structure FILE`.
-
-The same command remains reproducible only while its templates, configuration,
-structure file, and pseudopotential library remain the same. Caddie prepares
-the input folder but does not establish scientific convergence or execute it.
+Use a fresh directory to avoid overwrite questions. `--overwrite` allows
+replacement of existing templates. Without an interactive terminal, supply
+all required choices and omit `--details` to use configured defaults.

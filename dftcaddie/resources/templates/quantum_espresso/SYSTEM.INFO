@@ -1,23 +1,50 @@
 #!/bin/bash
 
+# Shared QE settings: master.sh sources this Bash file and exports its values
+# to the calculation scripts. Keep comments outside the multiline data blocks.
+# The atom counts, hydrogen data, unit cell, and k-path below are placeholders.
+# Prepare them with caddie or edit them before running a calculation; numerical
+# defaults still need convergence checks for your system.
+# QE input conventions: https://www.quantum-espresso.org/Doc/INPUT_PW.html
+
 #SYSTEM******************************+
+# Calculation prefix and file name stem; caddie uses the supplied formula.
 NAME='NoName'
+# Number of atoms in the cell (nat) and distinct atomic species (ntyp).
 ATM_NUM=Num
 ATM_TYPES=Num
+
+# Wavefunction and charge-density cutoffs (ecutwfc and ecutrho), both in Ry.
+# By default, the density cutoff is computed as 10 times the wavefunction
+# cutoff when sourced (requires python3). Pseudopotential cutoff configuration
+# replaces this expression with a numerical value.
 CUTOFF=60
 ECUTRHO=`python3 -c "print(int(10*float('$CUTOFF')))"`
+# Smearing width (degauss), in Ry; the smearing method lives in the templates.
 SMEAR=0.012
+
+# Automatic grid dimensions: self-consistent, then non-self-consistent.
+# Each value contains three integers. The consuming script sets grid shifts;
+# the bundled SCF/relax scripts use 0 0 0. The second grid is available for
+# templates that use it; the bundled bands script uses the k-path instead.
 KGRID='10 10 10'
 NKGRID='10 10 10'
+
+# PSLibrary subfolder, e.g. pbe or rel-pbe, beneath the library root.
+# This selects the potential directory, not a QE input_dft override.
 EXCHANGE='pbe'
+
+# One row per species: label, atomic mass in amu, pseudopotential filename.
 ATOMIC_SPECIES=$(cat <<-EOL
 H  1.0   H.UPF
 EOL
 )
+# One row per atom: species label and three fractional lattice coordinates.
 ATOMIC_CRYST_POSITIONS=$(cat <<-EOL
 H            0.0000000000       0.0000000000        0.0000000000
 EOL
 )
+# Three cell vectors, one per row, with Cartesian components in angstrom.
 LATTICE=$(cat <<-EOL
      1.0    0.0    0.0
      0.0    1.0    0.0
@@ -25,6 +52,9 @@ LATTICE=$(cat <<-EOL
 EOL
 )
 
+# Band path for K_POINTS {crystal_b}: number of vertices, then one row per
+# vertex with three reciprocal-lattice coordinates and the number of points
+# for the segment to the next vertex. The last row's segment count is unused.
 QE_CRYST_PATH=$(cat <<-EOL
 4
 0.0000000000     0.0000000000     0.0000000000     100

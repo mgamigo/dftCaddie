@@ -228,10 +228,8 @@ mpi_executables:
 # ``~`` is expanded. QE checks $PSLIBRARY first; it overrides qe_pslibrary.
 # VASP expects the root directory containing its exchange/kind subdirectories.
 
-#qe_pslibrary: ~/Software/pslibrary
-#vasp_pseudopotentials: ~/Software/vasp/pseudos
-
-
+#qe_pslibrary: /path/to/pslibrary
+#vasp_pseudopotentials: /path/to/vasp/potentials
 
 # ------------------------------------------------------------
 # Suggested Quantum ESPRESSO pseudopotentials
