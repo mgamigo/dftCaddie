@@ -10,8 +10,8 @@ done
 rm -r results_ph/*
 cd $PREFIX/results_ph
 
+read -r PH_NQ1 PH_NQ2 PH_NQ3 <<<"$PHGRID"
 cat >$NAME.ph.pwi <<EOF
-
 &INPUTPH
   prefix='$NAME',
   recover=.true.
@@ -21,11 +21,11 @@ cat >$NAME.ph.pwi <<EOF
   tr2_ph=1e-17
   alpha_mix=0.5,
   verbosity='high'
-  nq1=3, nq2=3, nq3=2,
+  nq1=$PH_NQ1, nq2=$PH_NQ2, nq3=$PH_NQ3,
  /
 EOF
 
 echo "running the phonons calculation"
-$QE_PATH/ph.x -npool $NPOOLS <$NAME.ph.pwi >$NAME.ph.pwo
+$QE_PATH/ph.x -npool $NPOOLS -in $NAME.ph.pwi >$NAME.ph.pwo
 rm input_tmp.in
 echo "done"

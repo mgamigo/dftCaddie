@@ -1,14 +1,6 @@
 #!/bin/bash
 # === DFTCADDIE SBATCH HEADER END ===
 
-node=$(hostname)
-echo "******************"
-echo "job run at node " $node
-echo "NPROCS = " $NPROCS
-echo "NPOOLS = " $NPOOLS
-echo "******************"
-echo ""
-
 ##########################################################################
 # Load your required modules once, then save them with: module save QE_modules
 module purge

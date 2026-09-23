@@ -1,0 +1,8 @@
+export NPROCS=4
+export NPOOLS=1
+
+echo "******************"
+echo "NPROCS = " $NPROCS
+echo "NPOOLS = " $NPOOLS
+echo "******************"
+echo ""
