@@ -56,7 +56,7 @@ calculations:
       quantum_espresso:
         - quantum_espresso/scf.sh
         - quantum_espresso/bands.sh
-        - quantum_espresso/project_bands.sh
+        - quantum_espresso/project_kresolved.sh
         - quantum_espresso/SYSTEM.INFO
         - quantum_espresso/master.sh
       vasp:
@@ -184,7 +184,7 @@ default_cutoff_ratio: 1.5
 clusters:
   local:
     hostname: ""
-    mpi_command: "mpiexec -np 2"
+    mpi_command: "mpiexec -np $NPROCS"
     headers:
       - name: default
         file: local.default

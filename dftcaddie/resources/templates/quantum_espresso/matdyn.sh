@@ -19,7 +19,7 @@ cat >q2r.in <<EOF
 EOF
 
 echo "running q2r"
-mpiexec -np $NPROCS q2r.x <q2r.in >q2r.out
+$QE_PATH/q2r.x -in q2r.in >q2r.out
 rm input_tmp.in
 echo "done"
 
@@ -35,6 +35,6 @@ cat >matdyn.in <<EOF
 EOF
 
 echo "running matdyn"
-$QE_PATH/matdyn.x <matdyn.in >matdyn.out
-rm input_tmp.in
+$QE_PATH/matdyn.x -in matdyn.in >matdyn.out
+rm input_tmp.in $NAME.freq.gp matdyn.modes
 echo "done"

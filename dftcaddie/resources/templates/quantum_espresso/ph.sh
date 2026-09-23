@@ -17,10 +17,10 @@ cat >$NAME.ph.pwi <<EOF
   recover=.true.
   outdir='$TMP_DIR/',
   fildyn='$NAME.dyn',
-  ldisp=.true.,
   tr2_ph=1e-17
   alpha_mix=0.5,
-  verbosity='high'
+  verbosity='low'
+  ldisp=.true.,
   nq1=$PH_NQ1, nq2=$PH_NQ2, nq3=$PH_NQ3,
  /
 EOF

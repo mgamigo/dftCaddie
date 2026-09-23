@@ -18,7 +18,7 @@ cat >$NAME.bands.pwi <<EOF
   prefix='$NAME',
   pseudo_dir = '$PSEUDO_DIR',
   outdir='$TMP_DIR',
-  verbosity='high'
+  verbosity='low'
  /
 &SYSTEM
   noncolin=.true.
@@ -47,7 +47,7 @@ $LATTICE
 EOF
 
 echo "running the bands calculation"
-$QE_PATH/pw.x -npool $NPOOLS <$NAME.bands.pwi >$NAME.bands.pwo
+$QE_PATH/pw.x -npool $NPOOLS -in $NAME.bands.pwi >$NAME.bands.pwo
 cp ../tmp/$NAME.save/data-file-schema.xml ./bands.xml
 rm input_tmp.in
 echo "done"

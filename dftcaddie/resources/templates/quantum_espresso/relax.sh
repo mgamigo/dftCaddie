@@ -20,7 +20,7 @@ cat >$NAME.relax.pwi <<EOF
   outdir='$TMP_DIR',
   tstress = .true.
   tprnfor = .true.
-  verbosity='high'
+  verbosity='low'
   forc_conv_thr = 1d-5
  /
 &SYSTEM
@@ -60,6 +60,6 @@ $LATTICE
 EOF
 
 echo "running the relax calculation"
-$QE_PATH/pw.x -npool $NPOOLS <$NAME.relax.pwi >$NAME.relax.pwo
+$QE_PATH/pw.x -npool $NPOOLS -in $NAME.relax.pwi >$NAME.relax.pwo
 rm input_tmp.in
 echo "done"

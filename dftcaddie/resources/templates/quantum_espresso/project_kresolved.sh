@@ -15,14 +15,14 @@ cat >$NAME.proj.pwi <<EOF
 &PROJWFC
   prefix='$NAME',
   outdir='$TMP_DIR',
-  ngauss=0, degauss=0.001
-  kresolveddos=.true.
+  ngauss=0,
+  degauss=0.001,
   filpdos='pdos.dat'
+  kresolveddos=.true.
   filproj='proj.dat'
 /
 EOF
 
 echo "running the projection calculation"
-$QE_PATH/projwfc.x <$NAME.proj.pwi >$NAME.proj.pwo
-rm input_tmp.in
+$QE_PATH/projwfc.x -npool $NPOOLS -in $NAME.proj.pwi >$NAME.proj.pwo
 echo "done"
