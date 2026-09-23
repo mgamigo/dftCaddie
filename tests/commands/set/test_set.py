@@ -8,10 +8,10 @@ import pytest
 from dftcaddie.commands import set as set_command
 
 
-@pytest.mark.parametrize("name", ["system", "pseudo", "header"])
+@pytest.mark.parametrize("name", ["system", "pseudo", "cluster"])
 def test_set_dispatch(monkeypatch, name):
     """Dispatch each public setting name to the matching command module."""
-    handlers = {key: Mock(return_value=key) for key in ("system", "pseudo", "header")}
+    handlers = {key: Mock(return_value=key) for key in ("system", "pseudo", "cluster")}
     for key, handler in handlers.items():
         monkeypatch.setattr(getattr(set_command, key), "run", handler)
 

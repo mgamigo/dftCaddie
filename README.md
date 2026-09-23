@@ -54,7 +54,7 @@ add `--details` to choose them interactively too.
 
 - `caddie set system Si.cif --autokgrid --kpath`: Set the structure, k-grid, and k-path.
 - `caddie set pseudo Si.cif --configure`: Set pseudopotentials and cutoffs.
-- `caddie set header`: Choose a scheduler header.
+- `caddie set cluster`: Configure the cluster header and MPI commands.
 
 The bundled recipes cover **bands, relaxation, and phonons**, using Quantum
 ESPRESSO or VASP where configured. All interaction stays in the terminal,
@@ -272,8 +272,8 @@ caddie set system Si.cif --kpath
 caddie set pseudo Si.cif --exchange pbe --kind paw \
     --relativistic --configure --ratio 2.0
 
-# Choose a scheduler header interactively.
-caddie set header
+# Configure the cluster and choose a scheduler header interactively.
+caddie set cluster
 ```
 
 `--kppra` takes effect with `--autokgrid`; `--ratio` takes effect with
@@ -285,8 +285,10 @@ are passed to both QE and VASP library lookup. `--relativistic` enables SOC and
 selects relativistic QE potentials; omitting it disables SOC when applying
 pseudopotentials.
 
-Changing a header preserves the job body and current job name. It does not
-change MPI launch commands in the calculation scripts.
+`set cluster` updates the scheduler header and MPI launch commands by default,
+inferring the calculation kind and code to select its scripts. Header replacement
+preserves the job body and current job name. Use `--no-header` to update only MPI
+commands, or `--no-mpi` to update only the header. `--header` selects a named preset.
 
 ### Scripts and Agents
 

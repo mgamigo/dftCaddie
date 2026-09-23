@@ -188,7 +188,7 @@ def _build_parser() -> argparse.ArgumentParser:
     set_parser = subparsers.add_parser(
         "set",
         help="Adapt an existing calculation",
-        description="Set system, pseudopotential, or scheduler-header details",
+        description="Set system, pseudopotential, or cluster details",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     set_command.add_arguments(set_parser)

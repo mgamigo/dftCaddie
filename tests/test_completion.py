@@ -63,7 +63,7 @@ def complete(tmp_path, bundled_config):
     "line,expected",
     [
         ("caddie ", {"calc", "set", "config"}),
-        ("caddie set ", {"system", "pseudo", "header"}),
+        ("caddie set ", {"system", "pseudo", "cluster"}),
         ("caddie calc -", {"-s", "--kind", "--flavor", "--code"}),
         ("caddie calc --", {"--kind", "--flavor", "--code"}),
         ("caddie config ", {"init", "check"}),
@@ -71,10 +71,10 @@ def complete(tmp_path, bundled_config):
         ("caddie calc --kind relax --flavor ", {"fixed_cell", "variable_cell"}),
         ("caddie calc --kind phonons --code ", {"quantum_espresso"}),
         (
-            "caddie set header --cluster cluster2 --header ",
+            "caddie set cluster --cluster cluster2 --header ",
             {"default", "long", "small"},
         ),
-        ("caddie set header --cluster ", {"local", "cluster1", "cluster2"}),
+        ("caddie set cluster --cluster ", {"local", "cluster1", "cluster2"}),
     ],
 )
 def test_shell_candidates(complete, line, expected):

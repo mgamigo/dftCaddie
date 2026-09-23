@@ -297,7 +297,8 @@ def resolve_files(calculation: SimpleNamespace) -> list[str]:
     Parameters
     ----------
     calculation : SimpleNamespace
-        A Namespace with all the relevant details.
+        A Namespace with kind, code, and optional flavor. If flavor is
+        omitted or None, use the first configured flavor when applicable.
 
     Returns
     -------
@@ -307,8 +308,13 @@ def resolve_files(calculation: SimpleNamespace) -> list[str]:
     from dftcaddie.calculation import get_calculation_definition
 
     log.debug("Resolving needed files ...")
+    settings = config.load_config()[0]
+    flavor = getattr(calculation, "flavor", None)
+    flavors = settings["calculations"][calculation.kind].get("flavors")
+    if flavor is None and flavors:
+        flavor = next(iter(flavors))
     definition = get_calculation_definition(
-        config.load_config()[0], calculation.kind, getattr(calculation, "flavor", None)
+        settings, calculation.kind, flavor
     )
     return list(definition["files"][calculation.code])
 
@@ -539,7 +545,10 @@ def change_mpi_command(file_path: str | list, cluster: str) -> None:
                             line = line.replace(c, "")
                             log.debug("Removed existing MPI command '%s'", c)
 
-                    lines[i] = f"{mpi_command} {line}"
+                    lines[i] = (
+                        f"{mpi_command} {line.lstrip()}"
+                        if mpi_command else line.lstrip()
+                    )
 
         if not changes:
             log.debug("No MPI commands found in '%s'", file)

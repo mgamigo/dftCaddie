@@ -8,12 +8,12 @@ system, pseudopotential, and scheduler-header workflows under ``caddie set``.
 Functions
 ---------
 add_arguments()
-    Register the ``system``, ``pseudo``, and ``header`` subcommands.
+    Register the ``system``, ``pseudo``, and ``cluster`` subcommands.
 run()
     Dispatch a parsed ``caddie set`` request to its command module.
 """
 
-from dftcaddie.commands.set import header, pseudo, system
+from dftcaddie.commands.set import cluster, pseudo, system
 
 __all__ = ["add_arguments", "run"]
 
@@ -43,12 +43,12 @@ def add_arguments(parser):
     )
     pseudo.add_arguments(pseudo_parser)
 
-    header_parser = commands.add_parser(
-        "header",
-        help="Set the scheduler header",
-        description="Set the scheduler header in master.sh",
+    cluster_parser = commands.add_parser(
+        "cluster",
+        help="Configure the cluster",
+        description="Set the scheduler header and MPI launch commands",
     )
-    header.add_arguments(header_parser)
+    cluster.add_arguments(cluster_parser)
 
 
 def run(args=None):
@@ -73,7 +73,7 @@ def run(args=None):
     commands = {
         "system": system.run,
         "pseudo": pseudo.run,
-        "header": header.run,
+        "cluster": cluster.run,
     }
     try:
         command = commands[args.set_action]

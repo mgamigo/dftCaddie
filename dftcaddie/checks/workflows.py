@@ -771,7 +771,7 @@ def _check_headers(run, data, master):
         for header in entry["headers"]:
             run(
                 "set",
-                "header",
+                "cluster",
                 "--cluster",
                 cluster,
                 "--header",
@@ -829,7 +829,7 @@ def _check_reconfiguration(run, code, data, fixtures):
         run("set", "pseudo", str(structure), "--configure")
         run(
             "set",
-            "header",
+            "cluster",
             "--cluster",
             "local",
             "--header",

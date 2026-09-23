@@ -12,7 +12,7 @@ from dftcaddie import cli, prompts
     "args,hint",
     [
         (["calc"], "--kind"),
-        (["set", "header", "--cluster", "cluster2"], "--header"),
+        (["set", "cluster", "--cluster", "cluster2"], "--header"),
     ],
 )
 def test_missing_input_without_terminal(args, hint, monkeypatch, capsys):
