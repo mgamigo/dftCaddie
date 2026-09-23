@@ -1020,7 +1020,7 @@ def set_auto_kgrid(
     Set an automatic k-point grid in ``SYSTEM.INFO``.
 
     This computes a Monkhorst-Pack-like k-grid from the structure and writes it
-    to the ``KGRID=`` and ``NKGRID=`` entries in ``SYSTEM.INFO``.
+    to the ``KGRID=``, ``NKGRID=`` and ``PHGRID=`` entries in ``SYSTEM.INFO``.
 
     In VASP, it rewrites KPOINTS.SCC.
 
@@ -1049,16 +1049,23 @@ def set_auto_kgrid(
 
     log.info("Computing automatic k-grid (kppra=%d, n_atoms=%d)", kppra, n_atoms)
     kgrid = auto_kgrid(lattice, n_atoms=n_atoms, kppra=kppra)
+    kgrid_str = " ".join(map(str, kgrid))
+
     nscf_kppra_ratio = config.load_config()[0]["nscf_kppra_ratio"]
     kgrid_nscf = auto_kgrid(lattice, n_atoms=n_atoms, kppra=nscf_kppra_ratio * kppra)
-    kgrid_str = " ".join(map(str, kgrid))
     kgrid_nscf_str = " ".join(map(str, kgrid_nscf))
+
+    ph_kppra_ratio = config.load_config()[0]["ph_kppra_ratio"]
+    kgrid_ph = auto_kgrid(lattice, n_atoms=n_atoms, kppra=ph_kppra_ratio * kppra)
+    kgrid_ph_str = " ".join(map(str, kgrid_ph))
 
     if "quantum_espresso" in code:
         log.info("Setting KGRID='%s' in SYSTEM.INFO", kgrid_str)
         _replace_setting("SYSTEM.INFO", "KGRID=", f"KGRID='{kgrid_str}'")
         log.info("Setting NKGRID='%s' in SYSTEM.INFO", kgrid_nscf_str)
         _replace_setting("SYSTEM.INFO", "NKGRID=", f"NKGRID='{kgrid_nscf_str}'")
+        log.info("Setting PHGRID='%s' in SYSTEM.INFO", kgrid_ph_str)
+        _replace_setting("SYSTEM.INFO", "PHGRID=", f"PHGRID='{kgrid_ph_str}'")
     elif "vasp" in code:
         log.info("Setting KGRID='%s' in KPOINTS.SCC", kgrid_str)
         _remove_lines("KPOINTS.SCC", "Gamma", "0 0 0")

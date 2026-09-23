@@ -28,7 +28,8 @@ SMEAR=0.012
 # the bundled SCF/relax scripts use 0 0 0. The second grid is available for
 # templates that use it; the bundled bands script uses the k-path instead.
 KGRID='10 10 10'
-NKGRID='10 10 10'
+NKGRID='20 20 20'
+PHGRID='2 2 2'
 
 # PSLibrary subfolder, e.g. pbe or rel-pbe, beneath the library root.
 # This selects the potential directory, not a QE input_dft override.
@@ -64,4 +65,4 @@ QE_CRYST_PATH=$(cat <<-EOL
 EOL
 )
 
-export NAME ATM_NUM ATM_TYPES CUTOFF ECUTRHO KGRID NKGRID SMEAR ATOMIC_SPECIES ATOMIC_CRYST_POSITIONS LATTICE QE_CRYST_PATH EXCHANGE
+export NAME ATM_NUM ATM_TYPES CUTOFF ECUTRHO KGRID NKGRID PHGRID SMEAR ATOMIC_SPECIES ATOMIC_CRYST_POSITIONS LATTICE QE_CRYST_PATH EXCHANGE

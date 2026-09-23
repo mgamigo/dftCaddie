@@ -159,6 +159,8 @@ calculations:
 default_kppra: 12000
 # Multiplier for non-self-consistent grids relative to the self-consistent grid.
 nscf_kppra_ratio: 4
+# Multiplier for phonon q-grids relative to the self-consistent grid.
+ph_kppra_ratio: 0.01
 
 # Safety factor for cutoffs read from pseudopotential headers.
 # Final cutoff = suggested cutoff × default_cutoff_ratio.
