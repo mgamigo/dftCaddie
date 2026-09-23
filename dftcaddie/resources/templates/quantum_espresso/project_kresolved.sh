@@ -1,6 +1,5 @@
 PREFIX=$(pwd)
 TMP_DIR=$PREFIX/tmp
-PSEUDO_DIR=$PSLIBRARY/$EXCHANGE/PSEUDOPOTENTIALS
 
 for DIR in "$TMP_DIR" "$PREFIX/results_proj"; do
     if test ! -d $DIR; then

@@ -6,13 +6,12 @@
 module purge
 module restore QE_modules
 
-# Replace these fallback paths in your template, or set the variables in your
-# environment. QE_PATH contains pw.x; PSLIBRARY is the PSLibrary root directory.
-export QE_PATH="${QE_PATH:-/path/to/quantum-espresso/bin}"
-export PSLIBRARY="${PSLIBRARY:-/path/to/pslibrary}"
-
 #Load system
 source SYSTEM.INFO
+## Replace these fallback paths in your template, or set the variables in your
+# environment. QE_PATH contains pw.x; PSLIBRARY is the PSLibrary root directory.
+export QE_PATH="${QE_PATH:-/path/to/quantum-espresso/bin}"
+export PSEUDO_DIR="${PSLIBRARY:-/path/to/pslibrary}"
 
 #Actual JOBS
 
