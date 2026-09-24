@@ -14,11 +14,8 @@ cat >$NAME.proj.pwi <<EOF
 &PROJWFC
   prefix='$NAME',
   outdir='$TMP_DIR',
-  ngauss=0,
-  degauss=0.001,
-  filpdos='pdos.dat'
-  kresolveddos=.true.
   filproj='proj.dat'
+  lsym=.false.
 /
 EOF
 
