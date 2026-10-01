@@ -213,6 +213,15 @@ def select(message, options, labels=None, *, hint="Supply explicit CLI options."
             ignore_case=True,
             match_middle=False,
             complete_style=CompleteStyle.COLUMN,
+            style=questionary.Style(
+                [
+                    ("completion-menu", "bg:#262626 fg:#FF9D00"),
+                    (
+                        "completion-menu.completion.current",
+                        "bg:#444444 fg:#FF9D00 noreverse",
+                    ),
+                ]
+            ),
             validate=validate,
         )
     )
