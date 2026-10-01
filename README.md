@@ -218,7 +218,7 @@ vasp_pseudopotentials: /path/to/vasp/potentials
 
 QE uses `$PSLIBRARY` first, if set, and expects PSLibrary folders such as
 `pbe/PSEUDOPOTENTIALS/` or `rel-pbe/PSEUDOPOTENTIALS/`. The
-`suggested_qe_pseudos` mapping supplies preferred element-specific patterns.
+`suggested_upf_pseudos` mapping supplies preferred element-specific patterns.
 
 VASP expects library subfolders matching the requested exchange and kind,
 for example `potpaw_PBE/Si/POTCAR`. Potentials must already be installed.

@@ -230,7 +230,7 @@ mpi_executables:
 #vasp_pseudopotentials: /path/to/vasp/potentials
 
 # QE names are arbitrary identifiers, not physical metadata.
-qe_pseudopotentials:
+upf_pseudopotentials:
   defaults:
     scalar: pbesol-us-sr
     soc: pbesol-us-fr
@@ -248,7 +248,7 @@ qe_pseudopotentials:
 # version suffix. If no suggested file exists, use the library's normal matches.
 # Explicit library overrides take precedence. Other providers need not match
 # these PSLibrary suggestions; they can use their own patterns and overrides.
-suggested_qe_pseudos:
+suggested_upf_pseudos:
   H: "H.*-*_psl.1.0.0.UPF"
   He: "He.*-*_psl.1.0.0.UPF"
   Li: "Li.*-sl-*_psl.1.0.0.UPF"

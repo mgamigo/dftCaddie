@@ -99,7 +99,7 @@ def resolve_qe_library(name: str) -> dict:
     Parameters
     ----------
     name : str
-        Key in ``qe_pseudopotentials.libraries``.
+        Key in ``upf_pseudopotentials.libraries``.
 
     Returns
     -------
@@ -118,7 +118,7 @@ def resolve_qe_library(name: str) -> dict:
     from copy import deepcopy
 
     data, source = load_config()
-    library = deepcopy(data["qe_pseudopotentials"]["libraries"][name])
+    library = deepcopy(data["upf_pseudopotentials"]["libraries"][name])
     path = Path(library["path"]).expanduser()
     if not path.is_absolute():
         path = source / path

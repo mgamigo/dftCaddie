@@ -25,7 +25,7 @@ Function names for new helpers are proposals.
   silently between multiple matches or fall back to another library.
 - Keep the configuration resolver simple: lookup and path expansion only.
   Schema and directory validation belong to `caddie config check`.
-- Keep optional `suggested_qe_pseudos` as preferences within the selected
+- Keep optional `suggested_upf_pseudos` as preferences within the selected
   library. Missing suggestions do not prevent using that library.
 - Put read-only resolution and parsing in `utils.py`; keep file editing in
   `file_management.py` and configuration resolution in `config.py`.
@@ -36,7 +36,7 @@ Function names for new helpers are proposals.
 Illustrative paths and patterns (verify against actual files before use):
 
 ```yaml
-qe_pseudopotentials:
+upf_pseudopotentials:
   defaults:
     scalar: pbesol-us-sr
     soc: pbesol-us-fr
@@ -71,14 +71,14 @@ whenever SOC is requested, including with an explicit library selection.
 - [x] Completed: Replace `resolve_pslibrary()` with `resolve_qe_library(name)` in
   `config.py`, returning library settings, its name, and an absolute path
   without checking directory existence or validating the schema.
-- [x] Completed: Define `qe_pseudopotentials` with `defaults.scalar`, `defaults.soc`, and
+- [x] Completed: Define `upf_pseudopotentials` with `defaults.scalar`, `defaults.soc`, and
   `libraries` as shown above. Default validation is deferred to step 7.
 - [x] Completed: Require only path and pattern per library; do not parse library names or
   require exchange/kind/relativity fields.
 - [x] Completed: Define path expansion, filename placeholders, element overrides, and
   cutoff-default units and semantics.
 - [x] Completed: Remove `qe_pslibrary` and QE `$PSLIBRARY` resolution. Retain
-  `suggested_qe_pseudos` as optional filename-glob preferences, with library
+  `suggested_upf_pseudos` as optional filename-glob preferences, with library
   overrides for explicit choices.
 - [x] Completed: Update `clear_config_cache()` for the new resolver.
 
@@ -94,7 +94,7 @@ whenever SOC is requested, including with an explicit library selection.
 
 ### 3. Library-based file selection — Completed
 
-- [x] Completed: Move `get_qe_pseudo_paths(library, symbols)` to `utils.py`;
+- [x] Completed: Move `get_upf_pseudo_paths(library, symbols)` to `utils.py`;
   remove the old PSLibrary-specific helper from `file_management.py`.
 - [x] Completed: Accept a resolved library definition and atomic species,
   without exchange/kind/relativistic arguments.

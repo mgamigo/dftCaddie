@@ -189,7 +189,7 @@ def apply_pseudos(
     if configure and ratio is None:
         ratio = load_config()[0]["default_cutoff_ratio"]
     if "quantum_espresso" in code:
-        pseudos = fm.get_qe_pseudo_paths(
+        pseudos = fm.get_upf_pseudo_paths(
             symbols=symbols,
             exchange=exchange,
             kind=kind_pseudo,

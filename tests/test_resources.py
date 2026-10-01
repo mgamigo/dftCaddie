@@ -35,7 +35,7 @@ def test_bundled_config_resources_are_valid(bundled_config, bundled_resources):
 
 
 def test_suggested_pseudos_cover_known_elements(bundled_config):
-    assert len(bundled_config["suggested_qe_pseudos"]) == 94
+    assert len(bundled_config["suggested_upf_pseudos"]) == 94
 
 
 def test_resolve_calculation_directory(calculation_case, bundled_config, tmp_path):

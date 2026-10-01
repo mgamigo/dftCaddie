@@ -62,7 +62,7 @@ def test_vasp_pseudos_honor_exchange_and_kind(monkeypatch):
 def test_pseudo_ratio_overrides_configuration(monkeypatch):
     pseudos = ["/library/pbe/PSEUDOPOTENTIALS/Si.UPF"]
     cutoff = Mock()
-    monkeypatch.setattr(fm, "get_qe_pseudo_paths", lambda **kwargs: pseudos)
+    monkeypatch.setattr(fm, "get_upf_pseudo_paths", lambda **kwargs: pseudos)
     monkeypatch.setattr(fm, "write_pseudos_to_system_info", Mock())
     monkeypatch.setattr(fm, "set_spin_orbit_coupling", Mock())
     monkeypatch.setattr(fm, "configure_qe_cutoffs_from_pseudos", cutoff)
@@ -79,7 +79,7 @@ def test_pseudos_without_configure_preserve_cutoffs(monkeypatch, code):
     if code == "quantum_espresso":
         monkeypatch.setattr(
             fm,
-            "get_qe_pseudo_paths",
+            "get_upf_pseudo_paths",
             lambda **kwargs: ["/library/pbe/PSEUDOPOTENTIALS/Si.UPF"],
         )
         target = Path("SYSTEM.INFO")

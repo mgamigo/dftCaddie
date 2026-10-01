@@ -461,7 +461,7 @@ def _prepare_fixtures(payload, root):
     if any(
         _has_code_family(case[2], "quantum_espresso") for case, _ in payload["checks"]
     ):
-        pattern = data["suggested_qe_pseudos"]["Si"]
+        pattern = data["suggested_upf_pseudos"]["Si"]
         for exchange in ("pbe", "rel-pbe"):
             name = pattern.replace("$fct", exchange).replace("*", "kjpaw") + ".UPF"
             _require(Path(name).name == name, "Si pseudo pattern must be a filename.")

@@ -175,10 +175,10 @@ def validate_config(data, source_dir: Path, *, environ=None) -> list[ConfigIssue
 
     # Global executables and pseudo filename patterns -----------------------
     check_string_list(data.get("mpi_executables"), "mpi_executables")
-    pseudos = data.get("suggested_qe_pseudos")
-    if check_mapping(pseudos, "suggested_qe_pseudos"):
+    pseudos = data.get("suggested_upf_pseudos")
+    if check_mapping(pseudos, "suggested_upf_pseudos"):
         for symbol, pattern in pseudos.items():
-            check_string(pattern, f"suggested_qe_pseudos.{symbol}")
+            check_string(pattern, f"suggested_upf_pseudos.{symbol}")
 
     # Cluster definitions and SBATCH headers --------------------------------
     clusters = data.get("clusters")

@@ -493,11 +493,11 @@ def test_configure_qe_cutoffs_from_pseudos_raises_if_missing_values(
 
 
 # -------------------------
-# get_qe_pseudo_paths (mocked)
+# get_upf_pseudo_paths (mocked)
 # -------------------------
 
 
-def test_get_qe_pseudo_paths_uses_resolve_pslibrary_and_glob(
+def test_get_upf_pseudo_paths_uses_resolve_pslibrary_and_glob(
     tmp_path: Path, monkeypatch, config_data
 ):
     root = tmp_path / "pslib"
@@ -507,7 +507,7 @@ def test_get_qe_pseudo_paths_uses_resolve_pslibrary_and_glob(
     # Make the template realistic (no "XXXXXX" hacks)
     monkeypatch.setitem(
         config_data,
-        "suggested_qe_pseudos",
+        "suggested_upf_pseudos",
         {"Si": "Si.$fct-*.UPF"},
     )
 
@@ -519,7 +519,7 @@ def test_get_qe_pseudo_paths_uses_resolve_pslibrary_and_glob(
     match = pseudo_dir / "Si.pbe-kjpaw.UPF"
     match.write_text("pseudo", encoding="utf-8")
 
-    paths = fm.get_qe_pseudo_paths(
+    paths = fm.get_upf_pseudo_paths(
         symbols=["Si"], exchange="pbe", kind="kjpaw", relativistic=False
     )
 

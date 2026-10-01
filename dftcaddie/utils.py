@@ -27,7 +27,7 @@ get_config()
     Retrieve a config entry by name for a given calculation kind.
 read_upf_pseudo_metadata()
     Read physical metadata and available cutoff recommendations from UPF 2.
-get_qe_pseudo_paths()
+get_upf_pseudo_paths()
     Select QE pseudopotential files from a configured library.
 """
 
@@ -48,162 +48,8 @@ __all__ = [
     "get_structure",
     "get_config",
     "read_upf_pseudo_metadata",
-    "get_qe_pseudo_paths",
+    "get_upf_pseudo_paths",
 ]
-
-
-def read_upf_pseudo_metadata(path: str | Path) -> dict:
-    """
-    Read UPF 2 metadata.
-
-    Parameters
-    ----------
-    path : str or pathlib.Path
-        Pseudopotential file containing an attribute-based PP_HEADER.
-
-    Returns
-    -------
-    dict
-        Element, type (the UPF pseudo_type label), exchange, relativity, has_so,
-        ecutwfc, and ecutrho. Cutoffs are in Ry as declared by the UPF header.
-        Absent fields are None; exchange and relativity are lowercased. A false
-        has_so does not distinguish scalar from nonrelativistic treatment.
-
-    Raises
-    ------
-    ValueError
-        The header is absent, uses the unsupported UPF 1 format, or contains
-        malformed boolean or cutoff data.
-        File access and decoding errors propagate.
-
-    Notes
-    -----
-    Only PP_HEADER is parsed as XML, since other sections may contain non-XML
-    generator text. Read wfc_cutoff/rho_cutoff as declared; zero values mean
-    unavailable recommendations. Fortran D exponents are supported. Free-text
-    recommendations and provider-specific interpretations are not parsed.
-    """
-    import math
-    import re
-    from xml.etree import ElementTree
-
-    path = Path(path)
-    text = path.read_text()
-    header = re.search(r"<PP_HEADER\b[^>]*>", text)
-    if header is None:
-        raise ValueError(f"No PP_HEADER found in {path}.")
-    tag = header.group().rstrip(">").rstrip().rstrip("/") + "/>"
-    try:
-        attrs = ElementTree.fromstring(tag).attrib
-    except ElementTree.ParseError as exc:
-        raise ValueError(f"Malformed PP_HEADER in {path}: {exc}") from exc
-    if not attrs:
-        raise ValueError(f"Expected an attribute-based UPF 2 PP_HEADER in {path}.")
-
-    has_so = attrs.get("has_so")
-    if has_so is not None:
-        boolean = has_so.strip().lower().strip(".")
-        if boolean not in {"t", "true", "f", "false"}:
-            raise ValueError(f"Invalid has_so value {has_so!r} in {path}.")
-        has_so = boolean in {"t", "true"}
-
-    def cutoff(attribute):
-        """Read a cutoff attribute in Ry, with zero meaning unavailable."""
-        raw = attrs.get(attribute)
-        if raw is None:
-            return None
-        try:
-            value = float(raw.replace("D", "E").replace("d", "e"))
-        except ValueError as exc:
-            raise ValueError(f"Invalid {attribute} {raw!r} in {path}.") from exc
-        if not math.isfinite(value) or value < 0:
-            raise ValueError(f"Invalid {attribute} {raw!r} in {path}.")
-        return value or None
-
-    return {
-        "element": attrs.get("element", "").strip().capitalize() or None,
-        "type": attrs.get("pseudo_type", "").strip() or None,
-        "exchange": attrs.get("functional", "").strip().lower() or None,
-        "relativity": attrs.get("relativistic", "").strip().lower() or None,
-        "has_so": has_so,
-        "ecutwfc": cutoff("wfc_cutoff"),
-        "ecutrho": cutoff("rho_cutoff"),
-    }
-
-
-def get_qe_pseudo_paths(library: dict, symbols: Iterable[str]) -> dict[str, Path]:
-    """
-    Select one pseudopotential per species from a resolved QE library.
-
-    Parameters
-    ----------
-    library : dict
-        Settings returned by resolve_qe_library(), including path, pattern,
-        and optional overrides mapping elements to exact filenames.
-    symbols : iterable of str
-        Atomic species in structure order. Repeated elements are selected once.
-
-    Returns
-    -------
-    dict[str, Path]
-        Species-to-path mapping in first-occurrence order. All selected files
-        are direct children of the library directory.
-
-    Raises
-    ------
-    FileNotFoundError
-        The library directory or a species' matching file is missing.
-
-    Warns
-    -----
-    UserWarning
-        Multiple candidates remain; the first filename alphabetically is used.
-
-    Notes
-    -----
-    Exact library overrides take precedence. Otherwise, format the library
-    glob with the element and prefer matches of its optional global
-    suggested_qe_pseudos glob. An absent suggestion leaves the original matches
-    intact. Matching is case-sensitive and preserves version suffixes. This
-    function does not read UPF metadata or validate physical compatibility.
-    """
-    from fnmatch import fnmatchcase
-    import warnings
-
-    directory = Path(library["path"]).absolute()
-    files = sorted(path for path in directory.iterdir() if path.is_file())
-    suggestions = config.load_config()[0].get("suggested_qe_pseudos", {})
-    overrides = library.get("overrides", {})
-    pseudos = {}
-    for symbol in dict.fromkeys(symbols):
-        if symbol in overrides:
-            target = overrides[symbol]
-            matches = [path for path in files if path.name == target]
-        else:
-            target = library["pattern"].format(element=symbol)
-            matches = [path for path in files if fnmatchcase(path.name, target)]
-            suggestion = suggestions.get(symbol)
-            if suggestion:
-                preferred = [
-                    path for path in matches if fnmatchcase(path.name, suggestion)
-                ]
-                matches = preferred or matches
-        if not matches:
-            raise FileNotFoundError(
-                f"No pseudopotential for {symbol} in {directory} "
-                f"matching {target!r}. Check the library pattern or override."
-            )
-        if len(matches) > 1:
-            warnings.warn(
-                f"Multiple pseudopotentials for {symbol} in {directory}: "
-                f"{', '.join(path.name for path in matches)}. "
-                f"Using {matches[0].name} (first alphabetically). "
-                "Set an element override to choose explicitly.",
-                UserWarning,
-                stacklevel=2,
-            )
-        pseudos[symbol] = matches[0]
-    return pseudos
 
 
 def resolve_cluster(clusters: dict) -> str:
@@ -466,3 +312,157 @@ def get_config(kind: str, config_name: str, flavor: str = None) -> dict:
     raise KeyError(
         f"Configuration {config_name!r} not found for calculation kind {kind!r}"
     )
+
+
+def read_upf_pseudo_metadata(path: str | Path) -> dict:
+    """
+    Read UPF 2 metadata.
+
+    Parameters
+    ----------
+    path : str or pathlib.Path
+        Pseudopotential file containing an attribute-based PP_HEADER.
+
+    Returns
+    -------
+    dict
+        Element, type (the UPF pseudo_type label), exchange, relativity, has_so,
+        ecutwfc, and ecutrho. Cutoffs are in Ry as declared by the UPF header.
+        Absent fields are None; exchange and relativity are lowercased. A false
+        has_so does not distinguish scalar from nonrelativistic treatment.
+
+    Raises
+    ------
+    ValueError
+        The header is absent, uses the unsupported UPF 1 format, or contains
+        malformed boolean or cutoff data.
+        File access and decoding errors propagate.
+
+    Notes
+    -----
+    Only PP_HEADER is parsed as XML, since other sections may contain non-XML
+    generator text. Read wfc_cutoff/rho_cutoff as declared; zero values mean
+    unavailable recommendations. Fortran D exponents are supported. Free-text
+    recommendations and provider-specific interpretations are not parsed.
+    """
+    import math
+    import re
+    from xml.etree import ElementTree
+
+    path = Path(path)
+    text = path.read_text()
+    header = re.search(r"<PP_HEADER\b[^>]*>", text)
+    if header is None:
+        raise ValueError(f"No PP_HEADER found in {path}.")
+    tag = header.group().rstrip(">").rstrip().rstrip("/") + "/>"
+    try:
+        attrs = ElementTree.fromstring(tag).attrib
+    except ElementTree.ParseError as exc:
+        raise ValueError(f"Malformed PP_HEADER in {path}: {exc}") from exc
+    if not attrs:
+        raise ValueError(f"Expected an attribute-based UPF 2 PP_HEADER in {path}.")
+
+    has_so = attrs.get("has_so")
+    if has_so is not None:
+        boolean = has_so.strip().lower().strip(".")
+        if boolean not in {"t", "true", "f", "false"}:
+            raise ValueError(f"Invalid has_so value {has_so!r} in {path}.")
+        has_so = boolean in {"t", "true"}
+
+    def cutoff(attribute):
+        """Read a cutoff attribute in Ry, with zero meaning unavailable."""
+        raw = attrs.get(attribute)
+        if raw is None:
+            return None
+        try:
+            value = float(raw.replace("D", "E").replace("d", "e"))
+        except ValueError as exc:
+            raise ValueError(f"Invalid {attribute} {raw!r} in {path}.") from exc
+        if not math.isfinite(value) or value < 0:
+            raise ValueError(f"Invalid {attribute} {raw!r} in {path}.")
+        return value or None
+
+    return {
+        "element": attrs.get("element", "").strip().capitalize() or None,
+        "type": attrs.get("pseudo_type", "").strip() or None,
+        "exchange": attrs.get("functional", "").strip().lower() or None,
+        "relativity": attrs.get("relativistic", "").strip().lower() or None,
+        "has_so": has_so,
+        "ecutwfc": cutoff("wfc_cutoff"),
+        "ecutrho": cutoff("rho_cutoff"),
+    }
+
+
+def get_upf_pseudo_paths(library: dict, symbols: Iterable[str]) -> dict[str, Path]:
+    """
+    Select one pseudopotential per species from a resolved QE library.
+
+    Parameters
+    ----------
+    library : dict
+        Settings returned by resolve_qe_library(), including path, pattern,
+        and optional overrides mapping elements to exact filenames.
+    symbols : iterable of str
+        Atomic species in structure order. Repeated elements are selected once.
+
+    Returns
+    -------
+    dict[str, Path]
+        Species-to-path mapping in first-occurrence order. All selected files
+        are direct children of the library directory.
+
+    Raises
+    ------
+    FileNotFoundError
+        The library directory or a species' matching file is missing.
+
+    Warns
+    -----
+    UserWarning
+        Multiple candidates remain; the first filename alphabetically is used.
+
+    Notes
+    -----
+    Exact library overrides take precedence. Otherwise, format the library
+    glob with the element and prefer matches of its optional global
+    suggested_upf_pseudos glob. An absent suggestion leaves the original matches
+    intact. Matching is case-sensitive and preserves version suffixes. This
+    function does not read UPF metadata or validate physical compatibility.
+    """
+    from fnmatch import fnmatchcase
+    import warnings
+
+    directory = Path(library["path"]).absolute()
+    files = sorted(path for path in directory.iterdir() if path.is_file())
+    suggestions = config.load_config()[0].get("suggested_upf_pseudos", {})
+    overrides = library.get("overrides", {})
+    pseudos = {}
+    for symbol in dict.fromkeys(symbols):
+        if symbol in overrides:
+            target = overrides[symbol]
+            matches = [path for path in files if path.name == target]
+        else:
+            target = library["pattern"].format(element=symbol)
+            matches = [path for path in files if fnmatchcase(path.name, target)]
+            suggestion = suggestions.get(symbol)
+            if suggestion:
+                preferred = [
+                    path for path in matches if fnmatchcase(path.name, suggestion)
+                ]
+                matches = preferred or matches
+        if not matches:
+            raise FileNotFoundError(
+                f"No pseudopotential for {symbol} in {directory} "
+                f"matching {target!r}. Check the library pattern or override."
+            )
+        if len(matches) > 1:
+            warnings.warn(
+                f"Multiple pseudopotentials for {symbol} in {directory}: "
+                f"{', '.join(path.name for path in matches)}. "
+                f"Using {matches[0].name} (first alphabetically). "
+                "Set an element override to choose explicitly.",
+                UserWarning,
+                stacklevel=2,
+            )
+        pseudos[symbol] = matches[0]
+    return pseudos
