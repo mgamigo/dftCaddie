@@ -27,12 +27,15 @@ get_config()
     Retrieve a config entry by name for a given calculation kind.
 read_upf_pseudo_metadata()
     Read physical metadata and available cutoff recommendations from UPF 2.
+get_qe_pseudo_paths()
+    Select QE pseudopotential files from a configured library.
 """
 
 import logging
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Iterable
 
 from dftcaddie import config
 
@@ -45,6 +48,7 @@ __all__ = [
     "get_structure",
     "get_config",
     "read_upf_pseudo_metadata",
+    "get_qe_pseudo_paths",
 ]
 
 
@@ -125,6 +129,81 @@ def read_upf_pseudo_metadata(path: str | Path) -> dict:
         "ecutwfc": cutoff("wfc_cutoff"),
         "ecutrho": cutoff("rho_cutoff"),
     }
+
+
+def get_qe_pseudo_paths(library: dict, symbols: Iterable[str]) -> dict[str, Path]:
+    """
+    Select one pseudopotential per species from a resolved QE library.
+
+    Parameters
+    ----------
+    library : dict
+        Settings returned by resolve_qe_library(), including path, pattern,
+        and optional overrides mapping elements to exact filenames.
+    symbols : iterable of str
+        Atomic species in structure order. Repeated elements are selected once.
+
+    Returns
+    -------
+    dict[str, Path]
+        Species-to-path mapping in first-occurrence order. All selected files
+        are direct children of the library directory.
+
+    Raises
+    ------
+    FileNotFoundError
+        The library directory or a species' matching file is missing.
+
+    Warns
+    -----
+    UserWarning
+        Multiple candidates remain; the first filename alphabetically is used.
+
+    Notes
+    -----
+    Exact library overrides take precedence. Otherwise, format the library
+    glob with the element and prefer matches of its optional global
+    suggested_qe_pseudos glob. An absent suggestion leaves the original matches
+    intact. Matching is case-sensitive and preserves version suffixes. This
+    function does not read UPF metadata or validate physical compatibility.
+    """
+    from fnmatch import fnmatchcase
+    import warnings
+
+    directory = Path(library["path"]).absolute()
+    files = sorted(path for path in directory.iterdir() if path.is_file())
+    suggestions = config.load_config()[0].get("suggested_qe_pseudos", {})
+    overrides = library.get("overrides", {})
+    pseudos = {}
+    for symbol in dict.fromkeys(symbols):
+        if symbol in overrides:
+            target = overrides[symbol]
+            matches = [path for path in files if path.name == target]
+        else:
+            target = library["pattern"].format(element=symbol)
+            matches = [path for path in files if fnmatchcase(path.name, target)]
+            suggestion = suggestions.get(symbol)
+            if suggestion:
+                preferred = [
+                    path for path in matches if fnmatchcase(path.name, suggestion)
+                ]
+                matches = preferred or matches
+        if not matches:
+            raise FileNotFoundError(
+                f"No pseudopotential for {symbol} in {directory} "
+                f"matching {target!r}. Check the library pattern or override."
+            )
+        if len(matches) > 1:
+            warnings.warn(
+                f"Multiple pseudopotentials for {symbol} in {directory}: "
+                f"{', '.join(path.name for path in matches)}. "
+                f"Using {matches[0].name} (first alphabetically). "
+                "Set an element override to choose explicitly.",
+                UserWarning,
+                stacklevel=2,
+            )
+        pseudos[symbol] = matches[0]
+    return pseudos
 
 
 def resolve_cluster(clusters: dict) -> str:

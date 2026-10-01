@@ -237,10 +237,10 @@ qe_pseudopotentials:
   libraries:
     pbesol-us-sr:
       path: ~/Software/PSEUDOS/pslibrary/pbesol/PSEUDOPOTENTIALS
-      pattern: "{element}.pbesol-*_us_psl.*.UPF"
+      pattern: "{element}.pbesol-*rrkjus_psl.*.UPF"
     pbesol-us-fr:
       path: ~/Software/PSEUDOS/pslibrary/rel-pbesol/PSEUDOPOTENTIALS
-      pattern: "{element}.rel-pbesol-*_us_psl.*.UPF"
+      pattern: "{element}.rel-pbesol-*rrkjus_psl.*.UPF"
 
 # Optional element preferences, applied only to files already matching the
 # selected library's pattern. These are filename globs: * covers provider

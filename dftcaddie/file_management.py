@@ -39,8 +39,6 @@ set_auto_kgrid()
     Compute and write an automatic k-point grid.
 set_high_symmetry_path()
     Insert a high-symmetry k-path.
-get_qe_pseudo_paths()
-    Resolve QE pseudopotential paths.
 write_pseudos_to_system_info()
     Write ATOMIC_SPECIES and EXCHANGE into ``SYSTEM.INFO`` (QE).
 configure_qe_cutoffs_from_pseudos()
@@ -88,7 +86,6 @@ __all__ = [
     "set_auto_kgrid",
     "set_high_symmetry_path",
     # Pseudopotentials (QE)
-    "get_qe_pseudo_paths",
     "write_pseudos_to_system_info",
     "configure_qe_cutoffs_from_pseudos",
     # Pseudopotentials (VASP)
@@ -841,86 +838,6 @@ def set_high_symmetry_path(
         backend in code for backend in ("quantum_espresso", "vasp", "wannier")
     ):
         warnings.warn("set_high_symmetry_path skipped (code={code})", UserWarning)
-
-
-def get_qe_pseudo_paths(
-    symbols: Iterable[str],
-    exchange: str = "pbe",
-    kind: str = "paw",
-    relativistic: bool = False,
-) -> list[str]:
-    """
-    Resolve Quantum ESPRESSO pseudopotential file paths from PSLibrary.
-
-    Parameters
-    ----------
-    symbols : Iterable[str]
-        Chemical symbols present in the structure (e.g., ``["Si", "O"]``).
-    exchange : str, optional
-        Exchange/correlation label used to locate pseudos (e.g., ``"pbe"``),
-        by default "pbe".
-    kind : str, optional
-        Pseudopotential kind/wildcard (e.g., ``"paw"``, ``"us"``),
-        by default "paw".
-    relativistic : bool, optional
-        If True, use the relativistic exchange folder (prefix ``"rel-"``),
-        by default False.
-
-    Returns
-    -------
-    pseudos : list[str]
-        Absolute pseudo paths.
-
-    Raises
-    ------
-    FileNotFoundError
-        If no pseudopotential is found for a symbol.
-    RuntimeError
-        If multiple candidates are found for a symbol.
-    """
-    from glob import glob
-    from dftcaddie.config import resolve_pslibrary
-    from pathlib import Path
-
-    ps_library = resolve_pslibrary()
-    suggested_qe_pseudos = config.load_config()[0]["suggested_qe_pseudos"]
-
-    exchange_folder = f"rel-{exchange}" if relativistic else exchange
-    source_path = os.path.join(ps_library, exchange_folder, "PSEUDOPOTENTIALS")
-
-    log.info(
-        "Resolving QE pseudos (exchange=%s, kind=%s, relativistic=%s) from %s ...",
-        exchange,
-        kind,
-        relativistic,
-        source_path,
-    )
-
-    if kind == "paw":
-        kind = "kjpaw"
-
-    symbols = set(symbols)
-    pseudos = []
-    for sym in symbols:
-        target = suggested_qe_pseudos[sym]
-        target = target.replace("$fct", exchange_folder).replace("*", kind)
-        target = ".".join(target.split(".")[:2])
-        matches = glob(f"{source_path}/{target}*")
-
-        if len(matches) == 1:
-            pseudos.append(matches[0])
-            log.debug("Selected pseudo for %s: %s", sym, os.path.basename(matches[0]))
-        elif len(matches) == 0:
-            raise FileNotFoundError(
-                f"No pseudopotential found for {sym!r} under {source_path!r} with pattern {target!r}."
-            )
-        else:
-            raise RuntimeError(
-                f"Multiple pseudopotentials found for {sym!r}: {matches}. "
-                "Please refine your pattern or choose manually."
-            )
-
-    return pseudos
 
 
 def write_pseudos_to_system_info(

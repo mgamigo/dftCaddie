@@ -44,11 +44,11 @@ qe_pseudopotentials:
   libraries:
     pbesol-us-sr:
       path: ~/Software/PSEUDOS/pslibrary/pbesol/PSEUDOPOTENTIALS
-      pattern: "{element}.pbesol-*_us_psl.*.UPF"
+      pattern: "{element}.pbesol-*rrkjus_psl.*.UPF"
 
     pbesol-us-fr:
       path: ~/Software/PSEUDOS/pslibrary/rel-pbesol/PSEUDOPOTENTIALS
-      pattern: "{element}.rel-pbesol-*_us_psl.*.UPF"
+      pattern: "{element}.rel-pbesol-*rrkjus_psl.*.UPF"
 ```
 
 Multiple libraries may share a directory and distinguish their files through
@@ -92,21 +92,21 @@ whenever SOC is requested, including with an explicit library selection.
 - [x] Completed: Distinguish absent metadata from malformed values and normalize supported
   representations and units without guessing unsupported information.
 
-### 3. Library-based file selection
+### 3. Library-based file selection — Completed
 
-- [ ] Move and rework `get_qe_pseudo_paths(library, symbols)` in `utils.py`.
-- [ ] Accept a resolved library definition and atomic species; remove the
-  independent exchange, kind, and relativistic selection arguments.
-- [ ] Return an element-to-`Path` mapping in first-occurrence species order.
-- [ ] Apply explicit element overrides first. Otherwise find library-pattern
-  matches, then prefer those matching the element's `suggested_qe_pseudos` glob
-  if any exist. If none do, keep the original library matches. Preserve version
-  suffixes; suggestions must never select a file outside the library matches.
-- [ ] Require exactly one file per species; report missing files and ambiguous
-  candidates with actionable context.
-- [ ] Validate available UPF metadata against the requested species and check
-  consistency across selected files; never infer metadata from library names.
-- [ ] Initially require selected files within a library to share a directory.
+- [x] Completed: Move `get_qe_pseudo_paths(library, symbols)` to `utils.py`;
+  remove the old PSLibrary-specific helper from `file_management.py`.
+- [x] Completed: Accept a resolved library definition and atomic species,
+  without exchange/kind/relativistic arguments.
+- [x] Completed: Return an element-to-Path mapping in first-occurrence order.
+- [x] Completed: Apply exact element overrides first. Otherwise prefer the
+  optional suggested-pseudo glob within the library-pattern matches, preserving
+  version suffixes. Missing suggestions leave the original matches intact.
+- [x] Completed: Raise FileNotFoundError for missing files. For ambiguity, issue
+  UserWarning and select the first filename alphabetically, as requested.
+- [x] Completed: Omit UPF metadata and physical-compatibility validation, as
+  requested; selection is based on configured filenames only.
+- [x] Completed: Select only files directly in the library directory.
 
 ### 4. Cutoff resolution
 
@@ -213,3 +213,11 @@ whenever SOC is requested, including with an explicit library selection.
   or zero cutoffs remain None; no defaults have been added.
 - Existing utility tests: 11 passed. Full pytest still stops at the pre-existing
   reference to removed resolve_pslibrary. No test files were created or updated.
+
+- Step 3 completed. Real-library checks selected Si/O from scalar and fully
+  relativistic PSLibrary and from ONCVPSP. Smoke checks covered ordering,
+  duplicate species, suggestion preference/fallback, override precedence,
+  missing overrides, and warning plus alphabetical selection for ambiguity.
+- Corrected bundled PSLibrary example patterns to match rrkjus_psl filenames.
+  Existing utility tests: 11 passed; no test files added or changed. Command
+  callers and old tests still need migration in their scheduled steps.
