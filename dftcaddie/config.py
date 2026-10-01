@@ -9,8 +9,8 @@ Functions
 ---------
 load_config()
     Read the active or bundled configuration on first use and cache it.
-resolve_pslibrary()
-    Resolve and validate the Quantum ESPRESSO pseudopotential library.
+resolve_qe_library(name)
+    Look up a named Quantum ESPRESSO library and resolve its path.
 resolve_potcar_library()
     Resolve and validate the VASP POTCAR library.
 clear_config_cache()
@@ -92,67 +92,38 @@ def load_config(default_config: bool = False) -> tuple[dict, Path]:
 
 
 @lru_cache(maxsize=1)
-def resolve_pslibrary() -> Path:
+def resolve_qe_library(name: str) -> dict:
     """
-    Resolve the root path of the Quantum ESPRESSO PSLibrary.
+    Look up a QE library and resolve its configured path.
 
-    The location is resolved in the following priority order:
-
-    1. Environment variable ``$PSLIBRARY``.
-    2. User configuration key ``qe_pslibrary`` in ``config.yaml``.
-
-    The resolved directory must exist.
+    Parameters
+    ----------
+    name : str
+        Key in ``qe_pseudopotentials.libraries``.
 
     Returns
     -------
-    Path
-        Absolute path to the QE PSLibrary.
+    dict
+        Library settings with the name and an absolute Path. The filename
+        pattern is preserved for later species selection. Relative paths use
+        the active configuration directory; ``~`` expands to the user's home.
 
-    Raises
-    ------
-    RuntimeError
-        If no path is defined or if the resolved directory does not exist.
+    Notes
+    -----
+    This only resolves settings. Schema validation and directory checks belong
+    to ``caddie config check``; pseudopotential selection happens separately.
+    The most recent library is cached. Treat returned settings as read-only
+    and call clear_config_cache() after changing configuration.
     """
-    import os
+    from copy import deepcopy
 
-    # ------------------------------------------------------------
-    # 1. Environment variable
-    # ------------------------------------------------------------
-    env_path = os.environ.get("PSLIBRARY")
-    if env_path:
-        path = Path(env_path).expanduser()
-        if path.exists():
-            log.info("Using QE PSLibrary from $PSLIBRARY: %s", path)
-            return path
-        else:
-            raise RuntimeError(
-                f"$PSLIBRARY is set but directory does not exist: '{path}'"
-            )
-
-    # ------------------------------------------------------------
-    # 2. Config file
-    # ------------------------------------------------------------
-    root = load_config()[0].get("qe_pslibrary")
-
-    if root:
-        path = Path(root).expanduser()
-        if path.exists():
-            log.info("Using QE PSLibrary from config.yaml: %s", path)
-            return path
-        else:
-            raise RuntimeError(
-                f"QE PSLibrary not found at '{path}'. "
-                "Check 'qe_pslibrary' in config.yaml."
-            )
-
-    # ------------------------------------------------------------
-    # 3. Hard error
-    # ------------------------------------------------------------
-    raise RuntimeError(
-        "QE PSLibrary not defined. "
-        "Set the $PSLIBRARY environment variable or define "
-        "'qe_pslibrary' in config.yaml."
-    )
+    data, source = load_config()
+    library = deepcopy(data["qe_pseudopotentials"]["libraries"][name])
+    path = Path(library["path"]).expanduser()
+    if not path.is_absolute():
+        path = source / path
+    library.update(name=name, path=path.absolute())
+    return library
 
 
 @lru_cache(maxsize=1)
@@ -198,7 +169,7 @@ def clear_config_cache() -> None:
     Clear cached settings and resolved pseudopotential paths.
 
     This is mainly useful in long-running Python sessions, such as IPython, when
-    ``~/.config/dftcaddie/config.yaml`` or ``$PSLIBRARY`` has changed after the
+    ``~/.config/dftcaddie/config.yaml`` has changed after the
     first configuration lookup.
 
     Returns
@@ -207,5 +178,5 @@ def clear_config_cache() -> None:
         The cache is cleared in-place.
     """
     load_config.cache_clear()
-    resolve_pslibrary.cache_clear()
+    resolve_qe_library.cache_clear()
     resolve_potcar_library.cache_clear()

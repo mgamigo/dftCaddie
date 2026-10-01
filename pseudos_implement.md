@@ -1,7 +1,7 @@
 # QE pseudopotential implementation roadmap
 
 Use this file to track and revise the implementation plan. Mark a step
-`[x] Completed` only after its work is finished. All steps below are pending.
+`[x] Completed` only after its work is finished. Completion status is tracked below.
 Function names for new helpers are proposals.
 
 ## Design decisions
@@ -23,6 +23,10 @@ Function names for new helpers are proposals.
   or rename their pseudopotentials.
 - Resolve files using the selected library and atomic species. Do not choose
   silently between multiple matches or fall back to another library.
+- Keep the configuration resolver simple: lookup and path expansion only.
+  Schema and directory validation belong to `caddie config check`.
+- Keep optional `suggested_qe_pseudos` as preferences within the selected
+  library. Missing suggestions do not prevent using that library.
 - Put read-only resolution and parsing in `utils.py`; keep file editing in
   `file_management.py` and configuration resolution in `config.py`.
 - Defer test creation and updates until the final step.
@@ -62,19 +66,21 @@ whenever SOC is requested, including with an explicit library selection.
 
 ## Implementation steps
 
-### 1. Library configuration and resolution
+### 1. Library configuration and resolution — Completed
 
-- [ ] Replace `resolve_pslibrary()` with `resolve_qe_library(name)` in
-  `config.py`, returning a validated library definition.
-- [ ] Define `qe_pseudopotentials` with `defaults.scalar`, `defaults.soc`, and
-  `libraries` as shown above. Validate that both defaults name configured libraries.
-- [ ] Require only path and pattern per library; do not parse library names or
+- [x] Completed: Replace `resolve_pslibrary()` with `resolve_qe_library(name)` in
+  `config.py`, returning library settings, its name, and an absolute path
+  without checking directory existence or validating the schema.
+- [x] Completed: Define `qe_pseudopotentials` with `defaults.scalar`, `defaults.soc`, and
+  `libraries` as shown above. Default validation is deferred to step 7.
+- [x] Completed: Require only path and pattern per library; do not parse library names or
   require exchange/kind/relativity fields.
-- [ ] Define path expansion, filename placeholders, element overrides, and
+- [x] Completed: Define path expansion, filename placeholders, element overrides, and
   cutoff-default units and semantics.
-- [ ] Remove `qe_pslibrary`, QE `$PSLIBRARY` resolution, and global
-  `suggested_qe_pseudos`; move element preferences into individual libraries.
-- [ ] Update `clear_config_cache()` for the new resolver.
+- [x] Completed: Remove `qe_pslibrary` and QE `$PSLIBRARY` resolution. Retain
+  `suggested_qe_pseudos` as optional filename-glob preferences, with library
+  overrides for explicit choices.
+- [x] Completed: Update `clear_config_cache()` for the new resolver.
 
 ### 2. UPF metadata parsing
 
@@ -92,7 +98,10 @@ whenever SOC is requested, including with an explicit library selection.
 - [ ] Accept a resolved library definition and atomic species; remove the
   independent exchange, kind, and relativistic selection arguments.
 - [ ] Return an element-to-`Path` mapping in first-occurrence species order.
-- [ ] Apply explicit element overrides before the library filename pattern.
+- [ ] Apply explicit element overrides first. Otherwise find library-pattern
+  matches, then prefer those matching the element's `suggested_qe_pseudos` glob
+  if any exist. If none do, keep the original library matches. Preserve version
+  suffixes; suggestions must never select a file outside the library matches.
 - [ ] Require exactly one file per species; report missing files and ambiguous
   candidates with actionable context.
 - [ ] Validate available UPF metadata against the requested species and check
@@ -134,7 +143,10 @@ whenever SOC is requested, including with an explicit library selection.
 - [ ] Add a read-only `inspect_qe_library()` helper for path availability,
   matching files, ambiguities, and metadata problems.
 - [ ] Update production configuration validation for the new schema and remove
-  old QE settings from its checks.
+  removed QE settings from its checks. Validate library mappings, scalar/SOC
+  default references, paths and directory existence, patterns, overrides,
+  suggested-pseudo preferences, and cutoff defaults here rather than in the
+  resolver.
 - [ ] Update the synthetic fixtures and command invocations used by the
   production workflow checker to exercise the new configuration.
 - [ ] Document named library selection, filename patterns, element overrides,
@@ -181,6 +193,15 @@ whenever SOC is requested, including with an explicit library selection.
 
 ## Progress notes
 
-- Roadmap created; implementation steps are pending.
+- Step 1 revised: simple library lookup and path expansion, new bundled schema,
+  optional suggested pseudos restored, and cache handling. Validation is deferred
+  to `caddie config check` in step 7.
+- Resolver smoke checks cover relative paths, preservation of filename patterns,
+  independent returned settings, and resolution of paths that do not exist.
+  No test files were created or updated.
+- Full pytest currently stops during collection because `tests/test_config.py`
+  references removed `resolve_pslibrary`. Existing QE workflow and configuration
+  checker callers still need the later planned migration; step 1 is not an
+  end-to-end working QE workflow.
 - `../PSEUDOS` was not visible in the sandbox when this roadmap was prepared.
   Recheck its availability before implementing provider-specific parsing.
