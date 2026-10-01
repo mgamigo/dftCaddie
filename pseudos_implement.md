@@ -82,14 +82,14 @@ whenever SOC is requested, including with an explicit library selection.
   overrides for explicit choices.
 - [x] Completed: Update `clear_config_cache()` for the new resolver.
 
-### 2. UPF metadata parsing
+### 2. UPF metadata parsing — Completed
 
-- [ ] Add `read_qe_pseudo_metadata(path)` in `utils.py`.
-- [ ] Read element, pseudopotential kind, functional, relativistic information,
+- [x] Completed: Add `read_upf_pseudo_metadata(path)` in `utils.py`.
+- [x] Completed: Read element, pseudopotential kind, functional, relativistic information,
   and recommended wavefunction/charge-density cutoffs when available.
-- [ ] Inspect representative PSLibrary and ONCVPSP files under `../PSEUDOS`
+- [x] Completed: Inspect representative PSLibrary and ONCVPSP files under `devtools/PSEUDOS`
   before settling the supported parsing formats.
-- [ ] Distinguish absent metadata from malformed values and normalize supported
+- [x] Completed: Distinguish absent metadata from malformed values and normalize supported
   representations and units without guessing unsupported information.
 
 ### 3. Library-based file selection
@@ -203,5 +203,13 @@ whenever SOC is requested, including with an explicit library selection.
   references removed `resolve_pslibrary`. Existing QE workflow and configuration
   checker callers still need the later planned migration; step 1 is not an
   end-to-end working QE workflow.
-- `../PSEUDOS` was not visible in the sandbox when this roadmap was prepared.
-  Recheck its availability before implementing provider-specific parsing.
+- Step 2 completed with `read_upf_pseudo_metadata()` for attribute-based UPF 2
+  headers only; provider-specific free text is not parsed. UPF 1 is explicitly unsupported.
+  Missing data returns None; malformed booleans/cutoffs raise ValueError.
+- Provider samples are now available in `devtools/PSEUDOS`. All 1,870 PSLibrary
+  and 144 ONCVPSP files were parsed. The returned `type` preserves the UPF
+  `pseudo_type` label (including USPP). Cutoff attributes are read as declared
+  in Ry, without generator/version exceptions or physical validation. Missing
+  or zero cutoffs remain None; no defaults have been added.
+- Existing utility tests: 11 passed. Full pytest still stops at the pre-existing
+  reference to removed resolve_pslibrary. No test files were created or updated.

@@ -25,6 +25,8 @@ get_structure()
     Read a structure file and return basic structural information.
 get_config()
     Retrieve a config entry by name for a given calculation kind.
+read_upf_pseudo_metadata()
+    Read physical metadata and available cutoff recommendations from UPF 2.
 """
 
 import logging
@@ -42,7 +44,87 @@ __all__ = [
     "resolve_calculation_directory",
     "get_structure",
     "get_config",
+    "read_upf_pseudo_metadata",
 ]
+
+
+def read_upf_pseudo_metadata(path: str | Path) -> dict:
+    """
+    Read UPF 2 metadata.
+
+    Parameters
+    ----------
+    path : str or pathlib.Path
+        Pseudopotential file containing an attribute-based PP_HEADER.
+
+    Returns
+    -------
+    dict
+        Element, type (the UPF pseudo_type label), exchange, relativity, has_so,
+        ecutwfc, and ecutrho. Cutoffs are in Ry as declared by the UPF header.
+        Absent fields are None; exchange and relativity are lowercased. A false
+        has_so does not distinguish scalar from nonrelativistic treatment.
+
+    Raises
+    ------
+    ValueError
+        The header is absent, uses the unsupported UPF 1 format, or contains
+        malformed boolean or cutoff data.
+        File access and decoding errors propagate.
+
+    Notes
+    -----
+    Only PP_HEADER is parsed as XML, since other sections may contain non-XML
+    generator text. Read wfc_cutoff/rho_cutoff as declared; zero values mean
+    unavailable recommendations. Fortran D exponents are supported. Free-text
+    recommendations and provider-specific interpretations are not parsed.
+    """
+    import math
+    import re
+    from xml.etree import ElementTree
+
+    path = Path(path)
+    text = path.read_text()
+    header = re.search(r"<PP_HEADER\b[^>]*>", text)
+    if header is None:
+        raise ValueError(f"No PP_HEADER found in {path}.")
+    tag = header.group().rstrip(">").rstrip().rstrip("/") + "/>"
+    try:
+        attrs = ElementTree.fromstring(tag).attrib
+    except ElementTree.ParseError as exc:
+        raise ValueError(f"Malformed PP_HEADER in {path}: {exc}") from exc
+    if not attrs:
+        raise ValueError(f"Expected an attribute-based UPF 2 PP_HEADER in {path}.")
+
+    has_so = attrs.get("has_so")
+    if has_so is not None:
+        boolean = has_so.strip().lower().strip(".")
+        if boolean not in {"t", "true", "f", "false"}:
+            raise ValueError(f"Invalid has_so value {has_so!r} in {path}.")
+        has_so = boolean in {"t", "true"}
+
+    def cutoff(attribute):
+        """Read a cutoff attribute in Ry, with zero meaning unavailable."""
+        raw = attrs.get(attribute)
+        if raw is None:
+            return None
+        try:
+            value = float(raw.replace("D", "E").replace("d", "e"))
+        except ValueError as exc:
+            raise ValueError(f"Invalid {attribute} {raw!r} in {path}.") from exc
+        if not math.isfinite(value) or value < 0:
+            raise ValueError(f"Invalid {attribute} {raw!r} in {path}.")
+        return value or None
+
+    return {
+        "element": attrs.get("element", "").strip().capitalize() or None,
+        "type": attrs.get("pseudo_type", "").strip() or None,
+        "exchange": attrs.get("functional", "").strip().lower() or None,
+        "relativity": attrs.get("relativistic", "").strip().lower() or None,
+        "has_so": has_so,
+        "ecutwfc": cutoff("wfc_cutoff"),
+        "ecutrho": cutoff("rho_cutoff"),
+    }
 
 
 def resolve_cluster(clusters: dict) -> str:
