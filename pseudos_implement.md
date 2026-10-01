@@ -108,35 +108,37 @@ whenever SOC is requested, including with an explicit library selection.
   requested; selection is based on configured filenames only.
 - [x] Completed: Select only files directly in the library directory.
 
-### 4. Cutoff resolution
+### 4. Cutoff resolution — Completed
 
-- [ ] Add `get_qe_cutoffs(pseudos, *, defaults, ratio)` in `utils.py`.
-- [ ] Resolve each cutoff for each species from a valid recommendation, using
-  an explicitly configured library default when the recommendation is absent.
-- [ ] Report the missing species/value if neither recommendation nor default
-  is available; do not introduce universal hardcoded cutoffs.
-- [ ] Normalize supported units to Ry, take the maximum across species, apply
-  the safety factor, and round upward.
-- [ ] Validate positive cutoff values and safety factors, and report when
-  defaults were used. Document defaults as convergence-test starting points.
+- [x] Completed: Add `get_qe_cutoffs(pseudos, *, defaults=None, ratio=1.5)`
+  in `utils.py`, consuming the species-to-path mapping.
+- [x] Completed: Read UPF cutoff recommendations as declared; optionally use
+  caller-supplied ecutwfc/ecutrho defaults only when recommendations are missing.
+  No cutoff defaults were added to config.yaml.
+- [x] Completed: Report the missing species/value when no recommendation or
+  default is available; do not introduce universal hardcoded cutoffs.
+- [x] Completed: Use `yaiv.defaults.config.ureg` for units. Numeric defaults
+  mean Ry; unit-bearing strings and ureg quantities are accepted. Take the
+  maximum for each cutoff, apply the safety factor, and round upward.
+- [x] Completed: Require positive finite values and safety factors. Warn when
+  defaults are used; document defaults as convergence-test starting points.
 
-### 5. SYSTEM.INFO and QE directory handling
+### 5. SYSTEM.INFO and QE directory handling — Completed
 
-- [ ] Adapt `write_pseudos_to_system_info()` with minimal structural changes to
-  consume the species-to-path mapping and parsed UPF metadata as needed.
-- [ ] Obtain element symbols and masses from mapping keys, and exchange from
-  UPF metadata if still needed, rather than filenames or directory depth.
-  Review whether `EXCHANGE` is still necessary once `PSEUDO_DIR` is explicit;
-  remove it if it only served to construct the old directory path.
-- [ ] Write the selected `PSEUDO_DIR` and ensure generated QE inputs use it.
-- [ ] Update QE `SYSTEM.INFO` and `master.sh` templates to remove their
-  `$PSLIBRARY` directory assumption and preserve the resolved directory.
+- [x] Completed: Adapt `write_pseudos_to_system_info()` to consume the
+  species-to-path mapping; obtain element symbols and masses from mapping keys.
+- [x] Completed: Remove EXCHANGE from the QE template and its exports; exchange
+  metadata is no longer needed for writing SYSTEM.INFO.
+- [x] Completed: Write a shell-quoted absolute PSEUDO_DIR shared by the selected
+  files, and export it through SYSTEM.INFO for the calculation scripts.
+- [x] Completed: Remove the PSLIBRARY-based PSEUDO_DIR assignment in master.sh
+  so it preserves the directory sourced from SYSTEM.INFO.
 
-### 6. Cutoff writing
+### 6. Cutoff writing — Completed
 
-- [ ] Simplify `configure_qe_cutoffs_from_pseudos()` into a wrapper around
-  `get_qe_cutoffs()` that writes `CUTOFF` and `ECUTRHO`.
-- [ ] Finish cutoff resolution and validation before editing the output file.
+- [x] Completed: Make `configure_qe_cutoffs_from_pseudos()` a thin wrapper around
+  `get_qe_cutoffs()`, writing the resolved CUTOFF and ECUTRHO values in Ry.
+- [x] Completed: Resolve and validate both cutoffs before editing SYSTEM.INFO.
 
 ### 7. Library inspection, configuration checks, and documentation
 
@@ -221,3 +223,10 @@ whenever SOC is requested, including with an explicit library selection.
 - Corrected bundled PSLibrary example patterns to match rrkjus_psl filenames.
   Existing utility tests: 11 passed; no test files added or changed. Command
   callers and old tests still need migration in their scheduled steps.
+
+- Steps 4–6 completed. Smoke checks covered real Si/O PSLibrary cutoffs,
+  hartree/Ry fallback conversion, warning behavior, missing-cutoff failure
+  without file modification, arbitrary pseudo filenames, and shell-quoted
+  PSEUDO_DIR paths. Utility/resource tests: 28 passed. Full pytest remains
+  blocked at collection by the old resolve_pslibrary test reference. No test
+  files were added or changed; command integration remains in later steps.

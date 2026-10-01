@@ -40,7 +40,7 @@ set_auto_kgrid()
 set_high_symmetry_path()
     Insert a high-symmetry k-path.
 write_pseudos_to_system_info()
-    Write ATOMIC_SPECIES and EXCHANGE into ``SYSTEM.INFO`` (QE).
+    Write ATOMIC_SPECIES and PSEUDO_DIR into ``SYSTEM.INFO`` (QE).
 configure_qe_cutoffs_from_pseudos()
     Read suggested cutoffs from pseudo headers and update ``SYSTEM.INFO`` (QE).
 get_potcar_paths()
@@ -62,6 +62,7 @@ _remove_lines()
 
 import logging
 import warnings
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Iterable
 import os
@@ -842,97 +843,86 @@ def set_high_symmetry_path(
 
 def write_pseudos_to_system_info(
     system_info_path: str,
-    pseudos: list[str],
+    pseudos: dict[str, Path],
 ) -> None:
     """
-    Update ``SYSTEM.INFO`` with ATOMIC_SPECIES and EXCHANGE for Quantum ESPRESSO.
+    Write ATOMIC_SPECIES and PSEUDO_DIR into SYSTEM.INFO.
 
     Parameters
     ----------
     system_info_path : str
-        Path to the ``SYSTEM.INFO`` file to edit.
-    pseudos : list[str]
-        Pseudopotential paths aligned with ``symbols`` inferred from filenames.
+        Path to the SYSTEM.INFO file to edit.
+    pseudos : dict[str, Path]
+        Species-to-path mapping in the desired species order. Selected files
+        must share a directory; symbols are not inferred from filenames.
+
+    Raises
+    ------
+    ValueError
+        The mapping is empty or the files do not share a directory.
     """
     from ase.data import atomic_numbers, atomic_masses
+    from shlex import quote
 
-    symbols = [os.path.basename(p).split(".")[0] for p in pseudos]
-    masses = [atomic_masses[atomic_numbers[sym]] for sym in symbols]
-    exchange_folder = pseudos[0]
-
+    paths = {symbol: Path(path).absolute() for symbol, path in pseudos.items()}
+    directories = {path.parent for path in paths.values()}
+    if len(directories) != 1:
+        raise ValueError("Pseudopotentials must share one nonempty directory.")
+    directory = directories.pop()
     lines = [
-        f"{s:<2} {m:11.6f}   {os.path.basename(p)}\n"
-        for s, m, p in zip(symbols, masses, pseudos)
+        f"{symbol:<2} {atomic_masses[atomic_numbers[symbol]]:11.6f}   {path.name}\n"
+        for symbol, path in paths.items()
     ]
 
-    log.info("Updating %s: ATOMIC_SPECIES and EXCHANGE ...", system_info_path)
-
+    log.info("Updating %s: ATOMIC_SPECIES and PSEUDO_DIR ...", system_info_path)
     _remove_lines(system_info_path, "ATOMIC_SPECIES=", "EOL")
     _insert_lines(system_info_path, lines, "ATOMIC_SPECIES=")
     _replace_setting(
-        system_info_path, "EXCHANGE=", f"EXCHANGE='{exchange_folder.split('/')[-3]}'"
+        system_info_path,
+        "PSEUDO_DIR=",
+        f"PSEUDO_DIR={quote(str(directory))}",
+        keep_comment=False,
     )
 
 
 def configure_qe_cutoffs_from_pseudos(
     system_info_path: str,
-    pseudos: list[str],
+    pseudos: dict[str, Path],
     ratio: float = 1.5,
+    *,
+    defaults: dict | None = None,
 ) -> tuple[int, int]:
     """
-    Read suggested cutoffs from QE pseudopotential headers and update ``SYSTEM.INFO``.
+    Resolve UPF cutoffs and write CUTOFF/ECUTRHO into SYSTEM.INFO.
 
     Parameters
     ----------
     system_info_path : str
-        Path to the ``SYSTEM.INFO`` file to edit.
-    pseudos : list[str]
-        Pseudopotential file paths to read.
+        File containing CUTOFF and ECUTRHO settings, in Ry.
+    pseudos : dict[str, Path]
+        Species-to-path mapping returned by get_upf_pseudo_paths().
     ratio : float, optional
-        Safety factor applied to the maximum suggested values, by default 1.5.
+        Safety factor applied to the maximum cutoffs, by default 1.5.
+    defaults : dict, optional
+        Optional ecutwfc/ecutrho fallbacks accepted by utils.get_qe_cutoffs().
 
     Returns
     -------
-    cutoff : int
-        Wavefunction cutoff used (after applying ``ratio``).
-    ecutrho : int
-        Charge density cutoff used (after applying ``ratio``).
+    tuple[int, int]
+        Wavefunction and charge-density cutoffs in Ry, rounded upward.
 
-    Raises
-    ------
-    RuntimeError
-        If suggested values cannot be read for all pseudos.
+    Notes
+    -----
+    Both cutoffs are resolved and validated before the file is edited.
     """
-    import numpy as np
+    from dftcaddie.utils import get_qe_cutoffs
 
-    log.info("Configuring cutoffs from pseudo headers (ratio=%s)", ratio)
-
-    cutoff_vals: list[float] = []
-    ecutrho_vals: list[float] = []
-
-    for pseudo in pseudos:
-        with open(pseudo, "r") as f:
-            for line in f:
-                if "Suggested minimum cutoff for wavefunctions" in line:
-                    cutoff_vals.append(float(line.split()[-2]))
-                elif "Suggested minimum cutoff for charge density:" in line:
-                    ecutrho_vals.append(float(line.split()[-2]))
-
-    if len(cutoff_vals) != len(pseudos) or len(ecutrho_vals) != len(pseudos):
-        raise RuntimeError(
-            "Could not read suggested cutoff/ecutrho values for all pseudos."
-        )
-
-    cutoff = int(np.max(cutoff_vals) * ratio)
-    ecutrho = int(np.max(ecutrho_vals) * ratio)
-
+    cutoff, ecutrho = get_qe_cutoffs(pseudos, defaults=defaults, ratio=ratio)
     log.info(
         "Setting CUTOFF=%d and ECUTRHO=%d in %s", cutoff, ecutrho, system_info_path
     )
-
     _replace_setting(system_info_path, "CUTOFF=", f"CUTOFF={cutoff}")
     _replace_setting(system_info_path, "ECUTRHO=", f"ECUTRHO={ecutrho}")
-
     return cutoff, ecutrho
 
 

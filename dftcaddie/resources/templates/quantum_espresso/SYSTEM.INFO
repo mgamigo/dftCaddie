@@ -31,9 +31,8 @@ KGRID='10 10 10'
 NKGRID='20 20 20'
 PHGRID='2 2 2'
 
-# PSLibrary subfolder, e.g. pbe or rel-pbe, beneath the library root.
-# This selects the potential directory, not a QE input_dft override.
-EXCHANGE='pbe'
+# Directory containing the selected pseudopotentials, set by caddie.
+PSEUDO_DIR='/path/to/pseudopotentials'
 
 # One row per species: label, atomic mass in amu, pseudopotential filename.
 ATOMIC_SPECIES=$(cat <<-EOL
@@ -65,4 +64,4 @@ QE_CRYST_PATH=$(cat <<-EOL
 EOL
 )
 
-export NAME ATM_NUM ATM_TYPES CUTOFF ECUTRHO KGRID NKGRID PHGRID SMEAR ATOMIC_SPECIES ATOMIC_CRYST_POSITIONS LATTICE QE_CRYST_PATH EXCHANGE
+export NAME ATM_NUM ATM_TYPES CUTOFF ECUTRHO KGRID NKGRID PHGRID SMEAR ATOMIC_SPECIES ATOMIC_CRYST_POSITIONS LATTICE QE_CRYST_PATH PSEUDO_DIR

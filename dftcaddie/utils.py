@@ -29,6 +29,8 @@ read_upf_pseudo_metadata()
     Read physical metadata and available cutoff recommendations from UPF 2.
 get_upf_pseudo_paths()
     Select QE pseudopotential files from a configured library.
+get_qe_cutoffs()
+    Resolve wavefunction and charge-density cutoffs in Ry.
 """
 
 import logging
@@ -49,6 +51,7 @@ __all__ = [
     "get_config",
     "read_upf_pseudo_metadata",
     "get_upf_pseudo_paths",
+    "get_qe_cutoffs",
 ]
 
 
@@ -466,3 +469,81 @@ def get_upf_pseudo_paths(library: dict, symbols: Iterable[str]) -> dict[str, Pat
             )
         pseudos[symbol] = matches[0]
     return pseudos
+
+
+def get_qe_cutoffs(
+    pseudos: dict[str, Path], *, defaults: dict | None = None, ratio: float = 1.5
+) -> tuple[int, int]:
+    """
+    Resolve QE cutoffs from UPF recommendations and optional defaults.
+
+    Parameters
+    ----------
+    pseudos : dict[str, Path]
+        Species-to-path mapping returned by get_upf_pseudo_paths().
+    defaults : dict, optional
+        Fallback ecutwfc and/or ecutrho for missing recommendations. Numbers
+        mean Ry; unit-bearing strings (e.g. "30 hartree") and quantities from
+        yaiv.defaults.config.ureg are also accepted. Defaults are starting
+        values for convergence tests, before applying the safety factor.
+    ratio : float, optional
+        Positive finite multiplier applied to both maxima, by default 1.5.
+
+    Returns
+    -------
+    tuple[int, int]
+        Wavefunction and charge-density cutoffs in Ry, rounded upward after
+        taking each maximum across species and applying the safety factor.
+
+    Raises
+    ------
+    ValueError
+        No species were supplied, or a cutoff or ratio is not finite/positive.
+    RuntimeError
+        A species has neither a recommendation nor a default for a cutoff.
+        UPF parsing errors and incompatible-unit errors propagate.
+
+    Warns
+    -----
+    UserWarning
+        A default was used in place of a missing UPF recommendation.
+    """
+    import math
+    import warnings
+    from yaiv.defaults.config import ureg
+
+    if not pseudos:
+        raise ValueError("Supply at least one pseudopotential to resolve cutoffs.")
+    if isinstance(ratio, bool) or not math.isfinite(ratio) or ratio <= 0:
+        raise ValueError("Cutoff safety factor must be finite and positive.")
+    defaults = defaults or {}
+    maxima = {"ecutwfc": 0.0, "ecutrho": 0.0}
+    for symbol, path in pseudos.items():
+        metadata = read_upf_pseudo_metadata(path)
+        for key in maxima:
+            value = metadata[key]
+            fallback = value is None
+            if fallback:
+                value = defaults.get(key)
+            if value is None:
+                raise RuntimeError(
+                    f"No {key} recommendation for {symbol} in {path}; "
+                    f"supply a {key} default."
+                )
+            if isinstance(value, (str, ureg.Quantity)):
+                value = ureg.Quantity(value).to("Ry").magnitude
+            else:
+                if isinstance(value, bool):
+                    raise ValueError(f"Invalid {key} for {symbol}: {value!r}.")
+                value = ureg.Quantity(value, "Ry").to("Ry").magnitude
+            if not math.isfinite(value) or value <= 0:
+                raise ValueError(f"{key} for {symbol} must be finite and positive.")
+            if fallback:
+                warnings.warn(
+                    f"No {key} recommendation for {symbol}; using default "
+                    f"{value:g} Ry before the safety factor.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+            maxima[key] = max(maxima[key], value)
+    return tuple(math.ceil(value * ratio) for value in maxima.values())

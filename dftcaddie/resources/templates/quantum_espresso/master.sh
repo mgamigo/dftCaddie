@@ -8,10 +8,9 @@ module restore QE_modules
 
 #Load system
 source SYSTEM.INFO
-## Replace these fallback paths in your template, or set the variables in your
-# environment. QE_PATH contains pw.x; PSLIBRARY is the PSLibrary root directory.
+# Replace this fallback path or set QE_PATH in your environment.
+# PSEUDO_DIR is set and exported by SYSTEM.INFO.
 export QE_PATH="${QE_PATH:-/path/to/quantum-espresso/bin}"
-export PSEUDO_DIR="${PSLIBRARY:-/path/to/pslibrary}"
 
 #Actual JOBS
 
