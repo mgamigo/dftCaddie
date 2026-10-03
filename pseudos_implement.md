@@ -1,4 +1,4 @@
-# QE pseudopotential implementation roadmap
+# Pseudopotential implementation roadmap
 
 Use this file to track and revise the implementation plan. Mark a step
 `[x] Completed` only after its work is finished. Completion status is tracked below.
@@ -68,7 +68,7 @@ whenever SOC is requested, including with an explicit library selection.
 
 ### 1. Library configuration and resolution — Completed
 
-- [x] Completed: Replace `resolve_pslibrary()` with `resolve_qe_library(name)` in
+- [x] Completed: Replace `resolve_pslibrary()` with `resolve_upf_library(name)` in
   `config.py`, returning library settings, its name, and an absolute path
   without checking directory existence or validating the schema.
 - [x] Completed: Define `upf_pseudopotentials` with `defaults.scalar`, `defaults.soc`, and
@@ -140,44 +140,45 @@ whenever SOC is requested, including with an explicit library selection.
   `get_qe_cutoffs()`, writing the resolved CUTOFF and ECUTRHO values in Ry.
 - [x] Completed: Resolve and validate both cutoffs before editing SYSTEM.INFO.
 
-### 7. Library inspection, configuration checks, and documentation
+### 7. Library inspection, configuration checks, and documentation — Completed
 
-- [ ] Add a read-only `inspect_qe_library()` helper for path availability,
+- [x] Completed: Add a read-only `inspect_upf_library()` helper for path availability,
   matching files, ambiguities, and metadata problems.
-- [ ] Update production configuration validation for the new schema and remove
-  removed QE settings from its checks. Validate library mappings, scalar/SOC
+- [x] Completed: Update production configuration validation for the new schema and remove
+  obsolete QE settings from its checks. Validate library mappings, scalar/SOC
   default references, paths and directory existence, patterns, overrides,
   suggested-pseudo preferences, and cutoff defaults here rather than in the
   resolver.
-- [ ] Update the synthetic fixtures and command invocations used by the
+- [x] Completed: Update the synthetic fixtures and command invocations used by the
   production workflow checker to exercise the new configuration.
-- [ ] Document named library selection, filename patterns, element overrides,
+- [x] Completed: Document named library selection, filename patterns, element overrides,
   cutoff defaults, scalar/SOC defaults, and examples for PSLibrary and ONCVPSP.
 
-### 8. Shared workflow and automatic callers
+### 8. Shared workflow and automatic callers — Completed
 
-- [ ] Update `apply_pseudos()` to resolve the library and species, validate
-  selections and requested cutoffs, then perform file edits.
-- [ ] Update `calc.run()` and `set.system.run()` to select `defaults.scalar` or
+- [x] Completed: Update `apply_pseudos()` to resolve the library and species, validate
+  requested SOC support and cutoffs, then perform file edits. General physical
+  compatibility remains the user’s responsibility.
+- [x] Completed: Update `calc.run()` and `set.system.run()` to select `defaults.scalar` or
   `defaults.soc` according to the requested SOC mode for automatic preparation.
-- [ ] Review `set_spin_orbit_coupling()` integration: selecting a fully
+- [x] Completed: Review `set_spin_orbit_coupling()` integration: selecting a fully
   relativistic library and requesting SOC are distinct decisions.
-- [ ] Validate SOC support for every selected species when SOC is requested;
+- [x] Completed: Validate SOC support for every selected species when SOC is requested;
   allow the same fully relativistic library to serve both defaults.
-- [ ] Preserve appropriate VASP behavior while changing shared interfaces.
+- [x] Completed: Preserve appropriate VASP behavior while changing shared interfaces.
 
-### 9. Command interface: caddie set pseudo
+### 9. Command interface: caddie set pseudo — Completed
 
-- [ ] Update `add_arguments()` and `run()` last among the implementation steps.
-- [ ] Add named library selection through `--library`, taking precedence over
+- [x] Completed: Update `add_arguments()` and `run()` last among the implementation steps.
+- [x] Completed: Add named library selection through `--library`, taking precedence over
   the scalar/SOC defaults without implicitly changing the requested SOC mode.
-- [ ] Add `--list` showing configured library names, default roles, and directory
-  availability; show physical metadata when available from UPF inspection.
-- [ ] Expose library inspection through `--check`.
-- [ ] Allow listing/checking without a structure file or calculation directory.
-- [ ] Replace independent QE exchange/kind/relativity selectors with library
-  selection; retain appropriate VASP options and explicit SOC behavior.
-- [ ] Update affected command completion, help text, and usage documentation.
+- [x] Completed: Add `--list` showing configured library names, default roles, and directory
+  availability; physical metadata is shown by `config check --pseudos`.
+- [x] Completed: Expose library inspection through `caddie config check --pseudos`.
+- [x] Completed: Allow listing/checking without a structure file or calculation directory.
+- [x] Completed: Replace independent QE exchange/kind/relativity selectors with library
+  selection for both QE and VASP; keep explicit SOC behavior.
+- [x] Completed: Update affected command completion, help text, and usage documentation.
 
 ### 10. Tests and final verification — deferred until implementation is complete
 
@@ -230,3 +231,43 @@ whenever SOC is requested, including with an explicit library selection.
   PSEUDO_DIR paths. Utility/resource tests: 28 passed. Full pytest remains
   blocked at collection by the old resolve_pslibrary test reference. No test
   files were added or changed; command integration remains in later steps.
+
+- Steps 7–9 completed: `inspect_upf_library`, named-library configuration
+  validation, migrated synthetic production workflows, automatic scalar/SOC
+  defaults, explicit `--library`, `--soc`, `set pseudo --list` and `config check --pseudos`, library
+  completion, CLI status propagation, and README documentation. VASP now uses
+  named POTCAR libraries too; exchange/kind and `--relativistic` are removed.
+- All 28 production workflow combinations passed across runs, including QE,
+  VASP, automatic setup, and reconfiguration. Fixed checker assertions that
+  assumed bands-specific filenames in relaxation calculations. Manual smoke
+  checks confirmed real ONCVPSP inspection, missing-directory exit status,
+  completion, library precedence, SOC support, and no edits on SOC rejection.
+- Step 10 remains pending. No test files were created or modified, and the full
+  pytest suite was not run during steps 7–9.
+
+- Named libraries extended to POTCARs: `potcar_pseudopotentials` uses scalar/SOC
+  defaults, paths, relative patterns such as `{element}/POTCAR`, and exact
+  relative-path overrides. `resolve_potcar_library(name)` mirrors the simple,
+  cached `resolve_upf_library(name)` (renamed from the QE-specific resolver).
+- `get_potcar_paths(library, symbols)` moved to utils.py and preserves POSCAR
+  species-group order, including separated repeats. No automatic bare/pv/sv
+  preference: configure patterns and overrides explicitly. Inspection,
+  configuration validation, completion, synthetic workflows, and documentation
+  cover both formats. `set pseudo --library` replaces VASP exchange/kind flags.
+- Step 10 remains deferred; no test files changed for this extension.
+- POTCAR extension verified against `devtools/VASP_pseudos/PAW_PBE`: exact
+  Ti_pv override, repeated species order, concatenated bytes, SOC settings,
+  cache reuse, CLI inspection, config validation, and completion passed.
+  All 28 production workflows also passed with named POTCAR libraries.
+
+- Library inspection moved to `checks/pseudos.py` and is invoked through
+  `caddie config check --pseudos`. Ordinary config checks stay lightweight;
+  inspection uses the freshly validated YAML, not cached selection settings.
+  `set pseudo --check` was removed; `--list` remains available there.
+
+- Added optional `suggested_potcar_pseudos` (initial preference: Cs_sv/POTCAR).
+  Priority: exact library override, existing suggested relative path/glob,
+  library pattern. Unlike UPF preference filtering, POTCAR suggestions may
+  select variants outside the pattern but remain inside the library root.
+  Missing suggestions fall back; missing overrides fail. Configuration
+  validation and library inspection follow the same preferences.

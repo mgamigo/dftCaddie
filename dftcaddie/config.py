@@ -9,10 +9,10 @@ Functions
 ---------
 load_config()
     Read the active or bundled configuration on first use and cache it.
-resolve_qe_library(name)
-    Look up a named Quantum ESPRESSO library and resolve its path.
-resolve_potcar_library()
-    Resolve and validate the VASP POTCAR library.
+resolve_upf_library(name)
+    Look up a named UPF library and resolve its path.
+resolve_potcar_library(name)
+    Look up a named POTCAR library and resolve its path.
 clear_config_cache()
     Clear cached configuration and pseudopotential library paths.
 
@@ -92,9 +92,9 @@ def load_config(default_config: bool = False) -> tuple[dict, Path]:
 
 
 @lru_cache(maxsize=1)
-def resolve_qe_library(name: str) -> dict:
+def resolve_upf_library(name: str) -> dict:
     """
-    Look up a QE library and resolve its configured path.
+    Look up a UPF library and resolve its configured path.
 
     Parameters
     ----------
@@ -127,41 +127,35 @@ def resolve_qe_library(name: str) -> dict:
 
 
 @lru_cache(maxsize=1)
-def resolve_potcar_library() -> Path:
+def resolve_potcar_library(name: str) -> dict:
     """
-    Resolve the root path of the VASP POTCAR library.
+    Look up a POTCAR library and resolve its configured path.
 
-    The path is read from the user configuration key
-    ``vasp_pseudopotentials``. The directory must exist.
+    Parameters
+    ----------
+    name : str
+        Key in ``potcar_pseudopotentials.libraries``.
 
     Returns
     -------
-    Path
-        Absolute path to the POTCAR library.
+    dict
+        Library settings with the name and an absolute Path. Relative paths
+        use the active configuration directory; ``~`` expands to the home.
 
-    Raises
-    ------
-    RuntimeError
-        If the path is not defined or does not exist.
+    Notes
+    -----
+    The most recent library is cached. Treat returned settings as read-only.
+    Schema and directory validation belong to ``caddie config check``.
     """
-    root = load_config()[0].get("vasp_pseudopotentials")
+    from copy import deepcopy
 
-    if not root:
-        raise RuntimeError(
-            "VASP POTCAR library not defined. "
-            "Set 'vasp_pseudopotentials' in config.yaml."
-        )
-
-    path = Path(root).expanduser()
-
-    if not path.exists():
-        raise RuntimeError(
-            f"VASP POTCAR library not found at '{path}'. "
-            "Check 'vasp_pseudopotentials' in config.yaml."
-        )
-
-    log.info("Using VASP POTCARs from %s", path)
-    return path
+    data, source = load_config()
+    library = deepcopy(data["potcar_pseudopotentials"]["libraries"][name])
+    path = Path(library["path"]).expanduser()
+    if not path.is_absolute():
+        path = source / path
+    library.update(name=name, path=path.absolute())
+    return library
 
 
 def clear_config_cache() -> None:
@@ -178,5 +172,5 @@ def clear_config_cache() -> None:
         The cache is cleared in-place.
     """
     load_config.cache_clear()
-    resolve_qe_library.cache_clear()
+    resolve_upf_library.cache_clear()
     resolve_potcar_library.cache_clear()

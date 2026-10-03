@@ -31,6 +31,13 @@ get_upf_pseudo_paths()
     Select QE pseudopotential files from a configured library.
 get_qe_cutoffs()
     Resolve wavefunction and charge-density cutoffs in Ry.
+get_potcar_paths()
+    Select POTCAR files from a configured library in POSCAR group order.
+
+Private functions
+-----------------
+_potcar_candidates()
+    Find matching POTCAR files using overrides, suggestions, and library patterns.
 """
 
 import logging
@@ -52,6 +59,7 @@ __all__ = [
     "read_upf_pseudo_metadata",
     "get_upf_pseudo_paths",
     "get_qe_cutoffs",
+    "get_potcar_paths",
 ]
 
 
@@ -403,7 +411,7 @@ def get_upf_pseudo_paths(library: dict, symbols: Iterable[str]) -> dict[str, Pat
     Parameters
     ----------
     library : dict
-        Settings returned by resolve_qe_library(), including path, pattern,
+        Settings returned by resolve_upf_library(), including path, pattern,
         and optional overrides mapping elements to exact filenames.
     symbols : iterable of str
         Atomic species in structure order. Repeated elements are selected once.
@@ -547,3 +555,126 @@ def get_qe_cutoffs(
                 )
             maxima[key] = max(maxima[key], value)
     return tuple(math.ceil(value * ratio) for value in maxima.values())
+
+
+def _potcar_candidates(
+    library: dict, symbol: str, *, suggestions: dict | None = None
+) -> list[Path]:
+    """
+    Find POTCAR candidates for one element using configured preferences.
+
+    Parameters
+    ----------
+    library : dict
+        Resolved library path, relative filename pattern, and optional exact
+        relative-path overrides per element.
+    symbol : str
+        Chemical element symbol used to format the library pattern.
+    suggestions : dict, optional
+        Element-to-relative-path globs from suggested_potcar_pseudos.
+
+    Returns
+    -------
+    list[pathlib.Path]
+        Absolute matching file paths in alphabetical order, or an empty list
+        when no file matches. Ambiguity is left for the caller to handle.
+
+    Raises
+    ------
+    ValueError
+        A selection path is absolute or contains a parent-directory component.
+
+    Notes
+    -----
+    An explicit override is mandatory and prevents fallback. Otherwise, an
+    existing suggestion takes precedence over the library pattern. Used by
+    both POTCAR selection and library inspection to keep their rules aligned.
+    """
+    directory = Path(library["path"]).absolute()
+    overrides = library.get("overrides", {})
+    if symbol in overrides:
+        targets = [overrides[symbol]]
+    else:
+        targets = []
+        if suggestions and symbol in suggestions:
+            targets.append(suggestions[symbol])
+        targets.append(library["pattern"].format(element=symbol))
+    for target in targets:
+        relative = Path(target)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError(f"POTCAR selection must stay inside {directory}.")
+        candidates = (
+            [directory / relative] if symbol in overrides else directory.glob(target)
+        )
+        matches = sorted(path for path in candidates if path.is_file())
+        if matches:
+            return matches
+    return []
+
+
+def get_potcar_paths(library: dict, symbols: Iterable[str]) -> list[Path]:
+    """
+    Select POTCARs from a named library in consecutive species-group order.
+
+    Parameters
+    ----------
+    library : dict
+        Resolved path, relative glob pattern such as ``{element}/POTCAR``,
+        and optional exact relative-path overrides per element.
+    symbols : iterable of str
+        Chemical symbols in atom order, matching the unsorted POSCAR.
+
+    Returns
+    -------
+    list[pathlib.Path]
+        One absolute path per consecutive species group. Nonconsecutive
+        repetitions are retained to match ASE's unsorted POSCAR output.
+
+    Raises
+    ------
+    FileNotFoundError
+        The directory or a requested species' POTCAR is missing.
+    ValueError
+        A configured pattern or override leaves the library directory.
+
+    Warns
+    -----
+    UserWarning
+        Multiple files match; the first path alphabetically is selected.
+
+    Notes
+    -----
+    Overrides take precedence over suggested_potcar_pseudos relative-path
+    preferences. If no suggested file exists, use the library pattern.
+    No implicit bare, pv, or sv preference is used.
+    Selection does not inspect the physical metadata in POTCAR files.
+    """
+    from itertools import groupby
+    import warnings
+
+    directory = Path(library["path"]).absolute()
+    if not directory.is_dir():
+        raise FileNotFoundError(f"POTCAR library directory does not exist: {directory}")
+    suggestions = config.load_config()[0].get("suggested_potcar_pseudos", {})
+    selected = {}
+    pseudos = []
+    for symbol, _ in groupby(symbols):
+        if symbol not in selected:
+            matches = _potcar_candidates(library, symbol, suggestions=suggestions)
+            if not matches:
+                raise FileNotFoundError(
+                    f"No POTCAR for {symbol} in {directory}. "
+                    "Check the library pattern or override."
+                )
+            if len(matches) > 1:
+                warnings.warn(
+                    f"Multiple POTCARs for {symbol} in {directory}: "
+                    + ", ".join(str(path.relative_to(directory)) for path in matches)
+                    + f". Using {matches[0].relative_to(directory)} "
+                    "(first alphabetically). Set an element override to choose explicitly.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+            selected[symbol] = matches[0]
+        pseudos.append(selected[symbol])
+    return pseudos

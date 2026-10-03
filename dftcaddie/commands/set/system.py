@@ -111,14 +111,14 @@ def run(args=None):
         kpath=args.kpath,
     )
     if args.pseudo:
-        # Get default relativistic value for this calculation kind
+        # Get the default SOC mode for this calculation kind
         setting = ut.get_config(kind=kind, flavor=flavor, config_name="soc")
-        relativistic = setting.get("default", False)
+        soc = setting.get("default", False)
         apply_pseudos(
             kind_calc=kind,
             code=code,
             symbols=structure.symbols,
-            relativistic=relativistic,
+            soc=soc,
             configure=True,
         )
 

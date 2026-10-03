@@ -53,7 +53,7 @@ def add_arguments(parser):
 
 def run(args=None):
     """
-    Dispatch a calculation-setting command.
+    Dispatch a setting command and report successful file preparation.
 
     Parameters
     ----------
@@ -62,8 +62,9 @@ def run(args=None):
 
     Returns
     -------
-    object
-        Return value from the selected command handler.
+    int
+        Handler exit status, with None treated as success. Read-only library
+        listing omits the setup-completion message.
 
     Raises
     ------
@@ -79,4 +80,8 @@ def run(args=None):
         command = commands[args.set_action]
     except KeyError as exc:
         raise ValueError(f"Unknown set action: {args.set_action}") from exc
-    return command(args)
+    status = command(args) or 0
+    listing = args.set_action == "pseudo" and args.list
+    if status == 0 and not listing:
+        print("\n⛳ Setup complete. May your jobs converge.")
+    return status

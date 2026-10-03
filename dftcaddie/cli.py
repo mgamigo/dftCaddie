@@ -235,11 +235,9 @@ def main(argv: list[str] | None = None) -> int:
             if args.command == "calc":
                 calc.run(args)
             elif args.command == "set":
-                set_command.run(args)
+                return set_command.run(args)
             elif args.command == "config":
-                status = config.run(args)
-                if status:
-                    return status
+                return config.run(args)
             else:
                 parser.print_help()
                 return 0

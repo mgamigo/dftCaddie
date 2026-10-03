@@ -209,19 +209,109 @@ Python support.
 
 ### Pseudopotential Libraries
 
-Set the paths in your configuration:
+Configure named UPF and POTCAR libraries without renaming or moving their files:
 
 ```yaml
-qe_pslibrary: /path/to/pslibrary
-vasp_pseudopotentials: /path/to/vasp/potentials
+upf_pseudopotentials:
+  defaults:
+    scalar: pbesol-us-sr
+    soc: pbesol-us-fr
+  libraries:
+    pbesol-us-sr:
+      path: ~/Software/PSEUDOS/pslibrary/pbesol/PSEUDOPOTENTIALS
+      pattern: "{element}.pbesol-*rrkjus_psl.*.UPF"
+    pbesol-us-fr:
+      path: ~/Software/PSEUDOS/pslibrary/rel-pbesol/PSEUDOPOTENTIALS
+      pattern: "{element}.rel-pbesol-*rrkjus_psl.*.UPF"
+    oncv-pbe:
+      path: ~/Software/PSEUDOS/ONCVPSP/nc-sr-pbe
+      pattern: "{element}.upf"
+      # Optional exact filename preferences:
+      # overrides:
+      #   Si: Si.upf
+      # Optional fallbacks when UPF recommendations are missing:
+      # cutoff_defaults:
+      #   ecutwfc: "30 hartree"
+      #   ecutrho: 240  # Bare numbers mean Ry.
+
+suggested_potcar_pseudos:
+  Cs: Cs_sv/POTCAR
+
+potcar_pseudopotentials:
+  defaults:
+    scalar: paw-pbe
+    soc: paw-pbe
+  libraries:
+    paw-pbe:
+      path: ~/Software/VASP_pseudos/PAW_PBE
+      pattern: "{element}/POTCAR"
+      # Choose variants explicitly when needed:
+      # overrides:
+      #   Ti: Ti_pv/POTCAR
 ```
 
-QE uses `$PSLIBRARY` first, if set, and expects PSLibrary folders such as
-`pbe/PSEUDOPOTENTIALS/` or `rel-pbe/PSEUDOPOTENTIALS/`. The
-`suggested_upf_pseudos` mapping supplies preferred element-specific patterns.
+Library names are arbitrary labels. Paths expand `~`; relative paths are
+resolved against the configuration directory. Patterns are case-sensitive
+globs with `{element}` as the only placeholder. UPF patterns match filenames;
+POTCAR patterns match relative paths such as `{element}/POTCAR`. Libraries can
+share a directory and use different patterns. Potentials must already be installed.
 
-VASP expects library subfolders matching the requested exchange and kind,
-for example `potpaw_PBE/Si/POTCAR`. Potentials must already be installed.
+Exact per-element `overrides` take priority. Otherwise, the optional global
+`suggested_upf_pseudos` mapping prefers matching UPF filenames within the library's
+matches, including version suffixes. If a suggestion is absent, ordinary
+library matching applies. Multiple remaining matches issue a warning and use
+the first filename alphabetically. Missing files produce an error.
+
+`--library` selects a library in the format required by the calculation: UPF
+for QE or POTCAR for VASP. Otherwise, each format uses its `scalar` default
+without SOC or its `soc` default with SOC. Both defaults may name the same
+library; a VASP library can serve both modes. Names do not control SOC: `--soc`
+enables it and requires `has_so=True` for every selected UPF. Without it, the
+command sets collinear, non-SOC inputs. Automatic `calc --pseudo/--auto` and
+`set system --pseudo` use the calculation's SOC setting and corresponding
+default library.
+
+`--configure` reads UPF header cutoff recommendations. Missing recommendations
+require explicit library `cutoff_defaults`; numeric defaults mean Ry, and
+unit-bearing strings use the shared `ureg`. Defaults are used only for missing
+values, with a warning. Each cutoff takes its maximum across species, applies
+`--ratio` (or `default_cutoff_ratio`), and rounds upward in Ry. Recommendations
+and defaults still require convergence testing; header values are read as
+provided, without provider-specific corrections. `SYSTEM.INFO` records the
+selected `PSEUDO_DIR`, species, and cutoffs; it no longer uses `EXCHANGE`.
+
+```bash
+# These work outside a calculation directory, without a structure:
+caddie set pseudo --list
+caddie config check --pseudos
+caddie config check
+```
+
+`set pseudo --list` shows format, names, default roles, and path availability.
+`config check` validates the schema and paths without reading potential headers.
+Add `--pseudos` to inspect all configured UPF and POTCAR libraries, reporting
+file counts, metadata, missing overrides, ambiguities, and parsing problems.
+Inspection runs after configuration validation succeeds and returns a nonzero
+status if issues are found. None of these commands edits pseudopotentials.
+The optional `--workflows` check remains separate and uses synthetic potentials.
+
+POTCAR library paths point directly to a family directory, such as `PAW_PBE`.
+Patterns and exact relative-path overrides select variants; no automatic
+`_pv`/`_sv` fallback is applied. The optional `suggested_potcar_pseudos` mapping
+provides preferred relative paths or globs, such as `Cs: Cs_sv/POTCAR`.
+Selection priority is an exact library override, then an existing suggestion,
+then the library pattern. POTCAR suggestions can choose a variant outside the
+normal pattern (`Cs_sv/POTCAR` instead of `Cs/POTCAR`), but always within the
+selected library root. A missing suggestion falls back; a missing override
+fails. The concatenated POTCAR follows POSCAR's
+consecutive species groups, including repeated groups. VASP cutoff configuration
+continues to use ENMAX in eV and the safety factor; UPF cutoff defaults do not
+apply to POTCAR libraries. Both formats now use `--library`; `--exchange` and
+`--kind` are removed from `set pseudo`.
+
+Standalone listing spans both formats. If a name is shared by both,
+`--library NAME --list` lists both; applying it uses the calculation's code.
+Library inspection lives under `config check --pseudos`, not `set pseudo`.
 
 ### Numerical Defaults and Cluster Presets
 
@@ -268,9 +358,9 @@ caddie set system Si.cif --autokgrid --kppra 16000
 # Insert a stored high-symmetry path.
 caddie set system Si.cif --kpath
 
-# Select relativistic QE potentials and set cutoffs with an explicit factor.
-caddie set pseudo Si.cif --exchange pbe --kind paw \
-    --relativistic --configure --ratio 2.0
+# Select a QE library, enable SOC, and configure cutoffs.
+caddie set pseudo Si.cif --library pbesol-us-fr \
+    --soc --configure --ratio 2.0
 
 # Configure the cluster and choose a scheduler header interactively.
 caddie set cluster
@@ -280,10 +370,9 @@ caddie set cluster
 `--configure`. Without `--ratio`, cutoffs use `default_cutoff_ratio` from
 configuration.
 
-For `set pseudo`, `--kind` means the **pseudopotential type**. Exchange and kind
-are passed to both QE and VASP library lookup. `--relativistic` enables SOC and
-selects relativistic QE potentials; omitting it disables SOC when applying
-pseudopotentials.
+For VASP, select a POTCAR family with `--library paw-pbe`. For QE, select a
+named UPF library with `--library`. `--soc` controls spin-orbit coupling
+independently of library selection for both codes.
 
 `set cluster` updates the scheduler header and MPI launch commands by default,
 inferring the calculation kind and code to select its scripts. Header replacement

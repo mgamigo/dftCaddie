@@ -12,6 +12,8 @@ complete_calculation()
     Suggest calculation kinds, flavors, or codes from the active configuration.
 complete_header()
     Suggest clusters or headers for the selected or detected cluster.
+complete_pseudo_library()
+    Suggest configured UPF and POTCAR library names.
 """
 
 
@@ -97,3 +99,14 @@ def complete_header(prefix, parsed_args, action, **kwargs):
             header["name"] for header in clusters.get(cluster, {}).get("headers", [])
         ]
     return [value for value in dict.fromkeys(values) if value.startswith(prefix)]
+
+
+def complete_pseudo_library(prefix, **kwargs):
+    """Return matching configured UPF and POTCAR library names."""
+    from dftcaddie.config import load_config
+
+    settings = load_config()[0]
+    names = []
+    for key in ("upf_pseudopotentials", "potcar_pseudopotentials"):
+        names.extend(settings.get(key, {}).get("libraries", {}))
+    return [name for name in dict.fromkeys(names) if name.startswith(prefix)]

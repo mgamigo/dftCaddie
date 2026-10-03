@@ -54,6 +54,11 @@ def add_arguments(parser):
         "check", help="Validate active configuration and resources"
     )
     check_parser.add_argument(
+        "--pseudos",
+        action="store_true",
+        help="Also inspect configured UPF and POTCAR files and metadata.",
+    )
+    check_parser.add_argument(
         "-w",
         "--workflows",
         action="store_true",
@@ -81,13 +86,20 @@ def run(args=None):
     if args.config_action == "init":
         return apply_init(force=args.force)
     if args.config_action == "check":
-        return apply_check(workflows=args.workflows)
+        return apply_check(workflows=args.workflows, pseudos=args.pseudos)
     raise ValueError(f"Unknown configuration action: {args.config_action}")
 
 
-def apply_check(workflows: bool = False) -> int:
+def apply_check(workflows: bool = False, pseudos: bool = False) -> int:
     """
     Validate the active YAML file and resources without changing them.
+
+    Parameters
+    ----------
+    workflows : bool, optional
+        Exercise calculation preparation with synthetic potentials.
+    pseudos : bool, optional
+        Inspect actual pseudopotential libraries after configuration validation.
 
     Returns
     -------
@@ -113,6 +125,31 @@ def apply_check(workflows: bool = False) -> int:
     errors = sum(issue.level == "error" for issue in issues)
     warnings = sum(issue.level == "warning" for issue in issues)
     print(f"Configuration check: {errors} error(s), {warnings} warning(s).")
+    if pseudos:
+        if errors:
+            print("Pseudopotential inspection skipped: fix configuration errors first.")
+        else:
+            from dftcaddie.checks.pseudos import check_pseudos
+
+            reports = check_pseudos(data, source)
+            pseudo_errors = 0
+            for report in reports:
+                print(f"{report['format']}: {report['name']}: {report['path']}")
+                print(
+                    f"  {report['files']} file(s), "
+                    f"{len(report['species'])} species"
+                )
+                for field, values in report["metadata"].items():
+                    if values:
+                        print(f"  {field}: {', '.join(map(str, values))}")
+                for issue in report["issues"]:
+                    print(f"  ERROR: {issue}")
+                pseudo_errors += len(report["issues"])
+            print(
+                f"Pseudopotential inspection: {len(reports)} libraries, "
+                f"{pseudo_errors} issue(s)."
+            )
+            errors += pseudo_errors
     if workflows:
         from dftcaddie.checks.workflows import check_workflows
 

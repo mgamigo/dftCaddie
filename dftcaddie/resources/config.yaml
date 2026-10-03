@@ -226,8 +226,24 @@ mpi_executables:
 # ------------------------------------------------------------
 # Pseudopotential locations
 # ------------------------------------------------------------
-# VASP expects its exchange/kind subdirectories beneath this root.
-#vasp_pseudopotentials: /path/to/vasp/potentials
+# POTCAR libraries use relative paths beneath the selected root.
+# Both modes may share a library; --soc controls calculation settings.
+potcar_pseudopotentials:
+  defaults:
+    scalar: paw-pbe
+    soc: paw-pbe
+  libraries:
+    paw-pbe:
+      path: ~/Software/VASP/pseudos/PAW_PBE
+      pattern: "{element}/POTCAR"
+      # overrides:
+      #   Ti: Ti_pv/POTCAR
+
+# Optional preferred paths relative to each POTCAR library root.
+# Overrides take precedence. If a suggestion is missing, use the library pattern.
+# Suggestions can select variants outside the pattern (e.g. Cs_sv vs Cs).
+suggested_potcar_pseudos:
+  Cs: Cs_sv/POTCAR
 
 # QE names are arbitrary identifiers, not physical metadata.
 upf_pseudopotentials:
@@ -238,9 +254,23 @@ upf_pseudopotentials:
     pbesol-us-sr:
       path: ~/Software/PSEUDOS/pslibrary/pbesol/PSEUDOPOTENTIALS
       pattern: "{element}.pbesol-*rrkjus_psl.*.UPF"
+      # overrides:
+      #   Si: Si.pbesol-nl-rrkjus_psl.1.0.0.UPF
+      # Optional fallbacks for missing recommendations, not minimum thresholds.
+      # Values below are examples in Ry, before applying the safety factor.
+      # cutoff_defaults:
+      #   ecutwfc: 60
+      #   ecutrho: 480
     pbesol-us-fr:
       path: ~/Software/PSEUDOS/pslibrary/rel-pbesol/PSEUDOPOTENTIALS
       pattern: "{element}.rel-pbesol-*rrkjus_psl.*.UPF"
+      # overrides:
+      #   Si: Si.rel-pbesol-nl-rrkjus_psl.1.0.0.UPF
+      # Optional fallbacks for missing recommendations, not minimum thresholds.
+      # Values below are examples in Ry, before applying the safety factor.
+      # cutoff_defaults:
+      #   ecutwfc: 60
+      #   ecutrho: 480
 
 # Optional element preferences, applied only to files already matching the
 # selected library's pattern. These are filename globs: * covers provider

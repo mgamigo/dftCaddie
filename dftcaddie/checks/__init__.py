@@ -1,1 +1,1 @@
-"""Configuration validation and isolated workflow checks."""
+"""Configuration validation, pseudopotential inspection, and workflow checks."""

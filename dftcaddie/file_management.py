@@ -43,8 +43,6 @@ write_pseudos_to_system_info()
     Write ATOMIC_SPECIES and PSEUDO_DIR into ``SYSTEM.INFO`` (QE).
 configure_qe_cutoffs_from_pseudos()
     Read suggested cutoffs from pseudo headers and update ``SYSTEM.INFO`` (QE).
-get_potcar_paths()
-    Resolve VAPS POTCAR paths.
 write_potcar()
     Concatenate a list of POTCAR files into a single POTCAR.
 configure_vasp_cutoffs_from_potcar()
@@ -90,7 +88,6 @@ __all__ = [
     "write_pseudos_to_system_info",
     "configure_qe_cutoffs_from_pseudos",
     # Pseudopotentials (VASP)
-    "get_potcar_paths",
     "write_potcar",
     "configure_vasp_cutoffs_from_potcar",
 ]
@@ -988,92 +985,6 @@ def set_auto_kgrid(
         _insert_lines("KPOINTS.SCC", [kgrid_str + "\n"], "Gamma")
     else:
         warnings.warn("set_auto_kgrid skipped (code={code})", UserWarning)
-
-
-def get_potcar_paths(
-    symbols: Iterable[str],
-    exchange: str = "pbe",
-    kind: str = "paw",
-) -> list[str]:
-    """
-    Resolve VASP POTCAR paths in POSCAR species-group order.
-
-    This function locates the appropriate pseudopotential library directory
-    (matching the requested exchange–correlation functional and PAW type),
-    and selects one POTCAR file per consecutive species group following a priority
-    order: bare potential → `_pv` → `_sv`.
-
-    Parameters
-    ----------
-    symbols : Iterable[str]
-        Chemical symbols in atom order, matching the structure used for POSCAR.
-    exchange : str, optional
-        Exchange/correlation label used to locate pseudos (e.g., ``"pbe"``),
-        by default "pbe".
-    kind : str, optional
-        Pseudopotential kind/wildcard (e.g., ``"paw"``, ``"us"``),
-        by default "paw".
-
-    Returns
-    -------
-    list[str]
-        Paths to the selected POTCAR files, one per consecutive species group.
-        A species appearing in separate groups has its potential repeated,
-        matching ASE's unsorted POSCAR output.
-
-    Raises
-    ------
-    FileNotFoundError
-        If no subfolder in the POTCAR library matches the requested
-        exchange and kind.
-    FileNotFoundError
-        If no suitable POTCAR file is found for a given atomic symbol
-        (neither bare, `_pv`, nor `_sv` variants).
-    """
-    from dftcaddie.config import resolve_potcar_library
-    from pathlib import Path
-    from itertools import groupby
-
-    potcar_library = resolve_potcar_library()
-
-    log.info(
-        "Resolving POTCAR files (exchange=%s, kind=%s) from %s ...",
-        exchange,
-        kind,
-        potcar_library,
-    )
-
-    subfolders = [p.name for p in potcar_library.iterdir() if p.is_dir()]
-    for subfolder in subfolders:
-        if exchange in subfolder.lower() and kind in subfolder.lower():
-            source_path = os.path.join(potcar_library, subfolder)
-            log.debug("Resolved source_path as %s", source_path)
-            break
-    else:
-        raise FileNotFoundError(
-            f"Not subfolder fund in {potcar_library} that contains {kind} and {exchange}"
-        )
-
-    pseudos = []
-    for sym, _ in groupby(symbols):
-        candidates = [sym, f"{sym}_pv", f"{sym}_sv"]
-
-        for name in candidates:
-            pseudo = os.path.join(source_path, name, "POTCAR")
-            if os.path.exists(pseudo):
-                log.debug(
-                    "Selected POTCAR for %s: %s",
-                    sym,
-                    os.path.basename(os.path.dirname(pseudo)),
-                )
-                pseudos.append(pseudo)
-                break
-        else:
-            raise FileNotFoundError(
-                f"No POTCAR found for {sym!r} under {source_path!r} "
-                "for either bare, _pv or _sv."
-            )
-    return pseudos
 
 
 def write_potcar(pseudos: list[str], output: str = "POTCAR") -> None:

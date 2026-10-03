@@ -211,7 +211,7 @@ def run(args=None):
                 kind_calc=calculation.kind,
                 code=calculation.code,
                 symbols=structure.symbols,
-                relativistic=spec.soc,
+                soc=spec.soc,
                 configure=True,
                 files=editable_files,
             )
