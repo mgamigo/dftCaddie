@@ -84,34 +84,30 @@ def run(args=None):
         Zero on success, one on a listing or application error.
     """
     from dftcaddie import utils as ut
-    from dftcaddie.config import load_config, resolve_upf_library, resolve_potcar_library
+    from dftcaddie.config import load_config, resolve_pseudo_library
 
     try:
         if args.list:
-            settings = load_config()[0]
-            formats = (
-                ("UPF", "upf_pseudopotentials", resolve_upf_library),
-                ("POTCAR", "potcar_pseudopotentials", resolve_potcar_library),
-            )
-            found = False
-            for label, key, resolve in formats:
-                section = settings.get(key, {})
-                libraries = section.get("libraries", {})
-                names = [args.library] if args.library in libraries else libraries
-                if args.library is not None and args.library not in libraries:
-                    continue
-                for name in names:
-                    found = True
-                    library = resolve(name)
-                    roles = [
-                        role for role, value in section["defaults"].items()
-                        if value == name
-                    ]
-                    state = "available" if library["path"].is_dir() else "missing"
-                    role_label = ", ".join(roles) or "no default role"
-                    print(f"{label}: {name} [{role_label}] {state}: {library['path']}")
-            if args.library is not None and not found:
+            settings = load_config()[0]["pseudopotentials"]
+            libraries = settings["libraries"]
+            if args.library is not None and args.library not in libraries:
                 raise ValueError(f"Unknown pseudopotential library: {args.library}")
+            names = [args.library] if args.library is not None else libraries
+            for name in names:
+                library = resolve_pseudo_library(name)
+                roles = [
+                    f"{code}/{role}"
+                    for code, defaults in settings["defaults"].items()
+                    for role, value in defaults.items()
+                    if value == name
+                ]
+                state = "available" if library["path"].is_dir() else "missing"
+                role_label = ", ".join(roles) or "no default role"
+                codes = ", ".join(library["supported_codes"])
+                print(
+                    f"{library['format'].upper()}: {name} [{role_label}] "
+                    f"codes={codes} {state}: {library['path']}"
+                )
             return 0
         if args.structure is None:
             raise ValueError("Supply a structure FILE, or use --list.")
@@ -190,7 +186,7 @@ def apply_pseudos(
     """
 
     from dftcaddie import file_management as fm
-    from dftcaddie.config import load_config, resolve_upf_library, resolve_potcar_library
+    from dftcaddie.config import load_config, resolve_pseudo_library
     from dftcaddie import utils as ut
     import warnings
 
@@ -198,14 +194,18 @@ def apply_pseudos(
     system_info_name = Path(system_info_path).name
     if configure and ratio is None:
         ratio = load_config()[0]["default_cutoff_ratio"]
+    if "quantum_espresso" in code or "vasp" in code:
+        settings = load_config()[0]["pseudopotentials"]
+        mode = "soc" if soc else "scalar"
+        name = library if library is not None else settings["defaults"][code][mode]
+        selected_library = resolve_pseudo_library(name)
+        if code not in selected_library["supported_codes"]:
+            raise ValueError(f"Library {name!r} does not support code {code!r}.")
+        expected_format = "upf" if "quantum_espresso" in code else "potcar"
+        if selected_library["format"] != expected_format:
+            raise ValueError(f"Code {code!r} requires {expected_format} potentials.")
+        pseudos = ut.get_pseudo_paths(selected_library, symbols)
     if "quantum_espresso" in code:
-        settings = load_config()[0]
-        name = library
-        if name is None:
-            mode = "soc" if soc else "scalar"
-            name = settings["upf_pseudopotentials"]["defaults"][mode]
-        selected_library = resolve_upf_library(name)
-        pseudos = ut.get_upf_pseudo_paths(selected_library, symbols)
         if soc:
             for symbol, path in pseudos.items():
                 if ut.read_upf_pseudo_metadata(path)["has_so"] is not True:
@@ -221,12 +221,6 @@ def apply_pseudos(
             fm.write_pseudos_to_system_info(system_info_path, pseudos)
         fm.set_spin_orbit_coupling(soc, code, files=editable)
     elif "vasp" in code:
-        name = library
-        if name is None:
-            mode = "soc" if soc else "scalar"
-            name = load_config()[0]["potcar_pseudopotentials"]["defaults"][mode]
-        selected_library = resolve_potcar_library(name)
-        pseudos = ut.get_potcar_paths(selected_library, symbols)
         if editable is None or "POTCAR" in editable:
             fm.write_potcar(pseudos)
         fm.set_spin_orbit_coupling(soc, code, files=editable)

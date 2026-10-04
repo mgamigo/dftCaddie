@@ -373,7 +373,7 @@ def _check_pseudo_output(code, data, fixtures):
     if _has_code_family(code, "quantum_espresso"):
         text = Path("SYSTEM.INFO").read_text()
         _require(text.count(names["soc"]) == 1, "Incorrect QE species.")
-        directory = data["upf_pseudopotentials"]["libraries"]["soc"]["path"]
+        directory = data["pseudopotentials"]["libraries"]["soc"]["path"]
         _require(
             f"PSEUDO_DIR={quote(directory)}\n" in text,
             "Incorrect QE pseudo directory.",

@@ -11,8 +11,8 @@ Function names for new helpers are proposals.
 - Identify each configured library by name. Different providers, versions,
   semicore choices, or other preferences may share the same kind, exchange,
   and relativistic treatment.
-- Each library defines its path and filename pattern, with optional element
-  overrides and cutoff defaults. Exchange, kind, and relativity are not required
+- Each library defines its format, supported_codes, path, and pattern, with
+  optional element overrides and UPF cutoff defaults. Exchange, kind, and relativity are not required
   configuration fields: read physical metadata from UPF files when needed.
 - Library names are arbitrary identifiers, including descriptive names such as
   `pbesol-us-sr`. Never infer physical properties by parsing the name.
@@ -25,44 +25,61 @@ Function names for new helpers are proposals.
   silently between multiple matches or fall back to another library.
 - Keep the configuration resolver simple: lookup and path expansion only.
   Schema and directory validation belong to `caddie config check`.
-- Keep optional `suggested_upf_pseudos` as preferences within the selected
-  library. Missing suggestions do not prevent using that library.
+- Keep `suggested_pseudos` pattern groups targeting explicit library names.
+  Missing suggestions do not prevent using that library.
 - Put read-only resolution and parsing in `utils.py`; keep file editing in
   `file_management.py` and configuration resolution in `config.py`.
 - Defer test creation and updates until the final step.
 
 ## Accepted configuration schema
 
-Illustrative paths and patterns (verify against actual files before use):
-
 ```yaml
-upf_pseudopotentials:
+pseudopotentials:
   defaults:
-    scalar: pbesol-us-sr
-    soc: pbesol-us-fr
-
+    quantum_espresso:
+      scalar: pbesol-us-sr
+      soc: pbesol-us-fr
+    vasp:
+      scalar: paw-pbe
+      soc: paw-pbe
   libraries:
     pbesol-us-sr:
+      format: upf
+      supported_codes: [quantum_espresso]
       path: ~/Software/PSEUDOS/pslibrary/pbesol/PSEUDOPOTENTIALS
       pattern: "{element}.pbesol-*rrkjus_psl.*.UPF"
-
     pbesol-us-fr:
+      format: upf
+      supported_codes: [quantum_espresso]
       path: ~/Software/PSEUDOS/pslibrary/rel-pbesol/PSEUDOPOTENTIALS
       pattern: "{element}.rel-pbesol-*rrkjus_psl.*.UPF"
+    paw-pbe:
+      format: potcar
+      supported_codes: [vasp]
+      path: ~/Software/VASP/pseudos/PAW_PBE
+      pattern: "{element}/POTCAR"
+
+suggested_pseudos:
+  - libraries: [paw-pbe]
+    elements:
+      Cs: "Cs_sv/POTCAR"
+  - libraries: [pbesol-us-sr, pbesol-us-fr]
+    elements:
+      Si: "Si.*-nl-rrkjus_psl.1.0.0.UPF"
 ```
 
-Multiple libraries may share a directory and distinguish their files through
-patterns or element overrides. Optional cutoff defaults and overrides will be
-documented during implementation.
+Library names are globally unique. Each entry declares one format and its
+supported codes. Defaults are selected by exact code identifier and SOC mode.
+`resolve_pseudo_library(name)` replaces the two format-specific resolvers.
+Each library may appear in only one suggestion group; a group can target several
+libraries. Each element defines one relative glob pattern.
+Selection priority is mandatory override, suggestion matches, then the
+library pattern if no suggestion matches. UPF suggestions narrow the library pattern; POTCAR suggestions may select
+variants outside the pattern within the root.
 
-The `scalar` default means calculation without SOC, not a requirement to use a
-strictly nonrelativistic pseudopotential. Fully relativistic potentials can
-generally also be used without SOC. For ordinary collinear QE calculations,
-`noncolin=.false.` and `lspinorb=.false.`; SOC requires both `.true.`.
-Noncollinearity without SOC is also possible, so these remain distinct concepts.
-Disabling SOC does not guarantee identical results to a separately generated
-scalar-relativistic potential. Validate SOC support in the selected UPF files
-whenever SOC is requested, including with an explicit library selection.
+Both defaults may select the same library. Library names do not enable SOC;
+requesting SOC separately requires UPF spin-orbit support. Provider-specific
+assumptions are avoided; UPF and POTCAR remain the supported file formats.
 
 ## Implementation steps
 
@@ -110,7 +127,7 @@ whenever SOC is requested, including with an explicit library selection.
 
 ### 4. Cutoff resolution — Completed
 
-- [x] Completed: Add `get_qe_cutoffs(pseudos, *, defaults=None, ratio=1.5)`
+- [x] Completed: Add `get_upf_cutoffs(pseudos, *, defaults=None, ratio=1.5)`
   in `utils.py`, consuming the species-to-path mapping.
 - [x] Completed: Read UPF cutoff recommendations as declared; optionally use
   caller-supplied ecutwfc/ecutrho defaults only when recommendations are missing.
@@ -137,7 +154,7 @@ whenever SOC is requested, including with an explicit library selection.
 ### 6. Cutoff writing — Completed
 
 - [x] Completed: Make `configure_qe_cutoffs_from_pseudos()` a thin wrapper around
-  `get_qe_cutoffs()`, writing the resolved CUTOFF and ECUTRHO values in Ry.
+  `get_upf_cutoffs()`, writing the resolved CUTOFF and ECUTRHO values in Ry.
 - [x] Completed: Resolve and validate both cutoffs before editing SYSTEM.INFO.
 
 ### 7. Library inspection, configuration checks, and documentation — Completed
@@ -271,3 +288,28 @@ whenever SOC is requested, including with an explicit library selection.
   select variants outside the pattern but remain inside the library root.
   Missing suggestions fall back; missing overrides fail. Configuration
   validation and library inspection follow the same preferences.
+
+- Unified schema implemented: one `pseudopotentials` mapping with per-code
+  scalar/SOC defaults, format, supported_codes, and a single cached
+  `resolve_pseudo_library(name)`. Ordered `suggested_pseudos` groups replace
+  both old suggestion mappings. Selection and inspection share matching rules;
+  configuration validation checks compatibility, group membership and paths.
+  Completion filters by supported_codes when the calculation is recognized.
+- Earlier progress notes describe the intermediate schemas; the accepted
+  schema above and README describe the current interface. Step 10 stays deferred.
+- Unified schema verification completed: all 28 production workflow combinations
+  passed. Smoke checks with real scalar/full-relativistic PSLibrary and VASP
+  files confirmed ordered suggestions, mandatory overrides, species ordering,
+  schema validation, and code-aware completion (including `-C` and `--list`).
+  Compilation and CLI help checks passed. No test files were changed.
+
+- [x] Completed: Simplified suggestions to one glob per element. Scalar and
+  full-relativistic PSLibrary libraries share one group. Multiple matches warn
+  and select alphabetically; missing suggestions fall back to the library pattern.
+
+- [x] Completed: Restored all 94 original PSLibrary suggestion globs and version
+  suffixes. UPF suggestions filter library matches to preserve the selected type.
+
+- [x] Completed: Unified file selection as `get_pseudo_paths(library, symbols)`.
+  The library format controls output: UPF species mapping or POTCAR paths in
+  consecutive species-group order. Removed both format-specific selectors.

@@ -20,16 +20,19 @@ validate_config()
 Private functions
 -----------------
 _validate_defaults(), _validate_clusters()
-    Check global defaults, pseudo preferences, and scheduler resources.
+    Check global defaults, executable names, and scheduler resources.
 _validate_calculations(), _validate_recipe_settings()
     Check recipe questions, template files, and calculation distinguishability.
 _validate_kpaths()
     Check k-path resources for the backends referenced by recipes.
-_validate_libraries(), _validate_library()
-    Check named defaults and each library's directory and selection settings.
+_validate_libraries(), _validate_library_defaults(), _validate_suggestions()
+    Check per-code defaults, named libraries, and grouped suggestion patterns.
+_validate_library()
+    Check each library's directory and selection settings.
 _validate_library_pattern(), _validate_library_overrides(), _validate_library_cutoffs()
     Check filename rules, exact files, and optional UPF cutoff defaults.
-_error(), _check_mapping(), _check_string(), _check_string_list(), _check_file()
+_check_pseudo_filename(), _error(), _check_mapping(), _check_string()
+_check_string_list(), _check_file()
     Collect issues and perform shared value and file checks.
 """
 
@@ -64,8 +67,7 @@ def validate_config(data, source_dir: Path) -> list[ConfigIssue]:
     Returns
     -------
     list of ConfigIssue
-        All detected errors and warnings. Missing optional pseudo libraries are
-        warnings; invalid configured locations are errors.
+        All detected errors and warnings, including invalid configured locations.
 
     Notes
     -----
@@ -89,7 +91,7 @@ def validate_config(data, source_dir: Path) -> list[ConfigIssue]:
 
 
 def _validate_defaults(data, issues):
-    """Check numeric defaults, executables, and optional pseudo preferences."""
+    """Check numeric defaults and executable names."""
     # Scalar defaults -------------------------------------------------------
     # Exact numeric types exclude bool, which Python treats as an integer.
     for key in ("default_kppra", "nscf_kppra_ratio", "default_cutoff_ratio"):
@@ -97,29 +99,8 @@ def _validate_defaults(data, issues):
         if type(value) not in (int, float) or not math.isfinite(value) or value <= 0:
             _error(issues, key, "Expected a finite positive number.")
 
-    # Global executables and pseudo filename patterns -----------------------
+    # Global executables ---------------------------------------------------
     _check_string_list(issues, data.get("mpi_executables"), "mpi_executables")
-    # Suggestions are optional. Check syntax, not file existence: a missing
-    # suggestion is allowed to fall back to the library pattern.
-    for key in ("suggested_upf_pseudos", "suggested_potcar_pseudos"):
-        pseudos = data.get(key, {})
-        if pseudos == {} or not _check_mapping(issues, pseudos, key):
-            continue
-        for symbol, pattern in pseudos.items():
-            location = f"{key}.{symbol}"
-            if symbol not in atomic_numbers or symbol == "X":
-                _error(issues, location, "Expected an element symbol.")
-            if not _check_string(issues, pattern, location):
-                continue
-            path = Path(pattern)
-            if key == "suggested_upf_pseudos" and path.name != pattern:
-                _error(issues, location, "Expected a filename glob, not a path.")
-            elif path.is_absolute() or ".." in path.parts:
-                _error(
-                    issues,
-                    location,
-                    "Expected a relative glob within the library directory.",
-                )
 
 
 def _validate_clusters(data, source_dir, issues):
@@ -303,40 +284,93 @@ def _validate_kpaths(codes_used, source_dir, issues):
 
 
 def _validate_libraries(data, source_dir, issues):
-    """Check named library settings without inspecting pseudo headers."""
-    # Named pseudopotential libraries --------------------------------------
-    # Both formats share named defaults and library settings. Header inspection
-    # is deliberately separate and only runs with config check --pseudos.
-    for key in ("upf_pseudopotentials", "potcar_pseudopotentials"):
-        settings = data.get(key)
-        if key == "potcar_pseudopotentials" and not settings:
-            issues.append(
-                ConfigIssue("warning", key, "Optional libraries not configured.")
-            )
+    """Check named libraries, per-code defaults, and grouped suggestions."""
+    # Header inspection stays separate and only runs with config check --pseudos.
+    settings = data.get("pseudopotentials")
+    if not _check_mapping(issues, settings, "pseudopotentials"):
+        return
+    libraries = settings.get("libraries")
+    if not _check_mapping(issues, libraries, "pseudopotentials.libraries"):
+        return
+    _validate_library_defaults(settings.get("defaults"), libraries, issues)
+    # Validate libraries independently; sharing their root is allowed.
+    for name, library in libraries.items():
+        location = f"pseudopotentials.libraries.{name}"
+        if not _check_mapping(issues, library, location):
             continue
-        if not _check_mapping(issues, settings, key):
-            continue
-        libraries = settings.get("libraries")
-        valid_libraries = _check_mapping(issues, libraries, key + ".libraries")
-        defaults = settings.get("defaults")
-        if _check_mapping(issues, defaults, key + ".defaults"):
-            # Both roles must resolve; they may deliberately share one library.
-            for mode in ("scalar", "soc"):
-                location = f"{key}.defaults.{mode}"
-                name = defaults.get(mode)
-                if _check_string(issues, name, location) and valid_libraries:
-                    if name not in libraries:
-                        _error(issues, location, f"Unknown library: {name}")
-        if valid_libraries:
-            # Validate libraries independently; sharing their root is allowed.
-            for name, library in libraries.items():
-                location = f"{key}.libraries.{name}"
-                if not _check_mapping(issues, library, location):
-                    continue
-                _validate_library(library, key, location, source_dir, issues)
+        pseudo_format = library.get("format")
+        if pseudo_format not in ("upf", "potcar"):
+            _error(issues, location + ".format", "Expected upf or potcar.")
+        codes = library.get("supported_codes")
+        if _check_string_list(issues, codes, location + ".supported_codes"):
+            for code in codes:
+                expected = {"quantum_espresso": "upf", "vasp": "potcar"}.get(code)
+                if expected is not None and pseudo_format != expected:
+                    _error(issues, location + ".format", f"{code} requires {expected}.")
+        _validate_library(library, pseudo_format, location, source_dir, issues)
+    _validate_suggestions(data.get("suggested_pseudos", []), libraries, issues)
 
 
-def _validate_library(library, key, location, source_dir, issues):
+def _validate_library_defaults(defaults, libraries, issues):
+    """Check scalar and SOC defaults for each configured calculation code."""
+    if not _check_mapping(issues, defaults, "pseudopotentials.defaults"):
+        return
+    for code, roles in defaults.items():
+        location = f"pseudopotentials.defaults.{code}"
+        if not _check_mapping(issues, roles, location):
+            continue
+        # Both roles must resolve; they may deliberately share one library.
+        for mode in ("scalar", "soc"):
+            entry = f"{location}.{mode}"
+            name = roles.get(mode)
+            if not _check_string(issues, name, entry):
+                continue
+            if name not in libraries:
+                _error(issues, entry, f"Unknown library: {name}")
+                continue
+            library = libraries[name]
+            if isinstance(library, dict):
+                supported = library.get("supported_codes")
+                if isinstance(supported, list) and code not in supported:
+                    _error(issues, entry, f"Library {name} does not support {code}.")
+
+
+def _validate_suggestions(groups, libraries, issues):
+    """Check suggestion globs assigned to nonoverlapping library groups."""
+    if not isinstance(groups, list):
+        _error(issues, "suggested_pseudos", "Expected a list of suggestion groups.")
+        return
+    assigned = set()
+    for i, group in enumerate(groups):
+        location = f"suggested_pseudos[{i}]"
+        if not _check_mapping(issues, group, location):
+            continue
+        names = group.get("libraries")
+        formats = set()
+        if _check_string_list(issues, names, location + ".libraries"):
+            for name in names:
+                if name not in libraries:
+                    _error(issues, location + ".libraries", f"Unknown library: {name}")
+                elif isinstance(libraries[name], dict):
+                    pseudo_format = libraries[name].get("format")
+                    if isinstance(pseudo_format, str):
+                        formats.add(pseudo_format)
+                if name in assigned:
+                    _error(issues, location + ".libraries", f"Repeated library: {name}")
+                assigned.add(name)
+        elements = group.get("elements")
+        if not _check_mapping(issues, elements, location + ".elements"):
+            continue
+        for symbol, pattern in elements.items():
+            entry = f"{location}.elements.{symbol}"
+            if symbol not in atomic_numbers or symbol == "X":
+                _error(issues, entry, "Expected an element symbol.")
+            # Missing matches are allowed: selection falls back to the library pattern.
+            pseudo_format = "upf" if "upf" in formats else "potcar"
+            _check_pseudo_filename(issues, pattern, pseudo_format, entry, allow_glob=True)
+
+
+def _validate_library(library, pseudo_format, location, source_dir, issues):
     """Check one library's root, selection rules, and cutoff defaults."""
     # An unusable root must not be reused when checking overrides.
     path = None
@@ -351,12 +385,12 @@ def _validate_library(library, key, location, source_dir, issues):
         except (OSError, ValueError, RuntimeError) as exc:
             _error(issues, location + ".path", f"Cannot inspect directory: {exc}")
             path = None
-    _validate_library_pattern(library.get("pattern"), key, location, issues)
-    _validate_library_overrides(library, key, location, path, issues)
-    _validate_library_cutoffs(library, key, location, issues)
+    _validate_library_pattern(library.get("pattern"), pseudo_format, location, issues)
+    _validate_library_overrides(library, pseudo_format, location, path, issues)
+    _validate_library_cutoffs(library, pseudo_format, location, issues)
 
 
-def _validate_library_pattern(pattern, key, location, issues):
+def _validate_library_pattern(pattern, pseudo_format, location, issues):
     """Check the element placeholder and paths allowed for this pseudo format."""
     if _check_string(issues, pattern, location + ".pattern"):
         try:
@@ -374,13 +408,13 @@ def _validate_library_pattern(pattern, key, location, issues):
             relative = Path(filename)
             if relative.is_absolute() or ".." in relative.parts:
                 raise ValueError("Pattern must stay within the library directory.")
-            if key == "upf_pseudopotentials" and relative.name != filename:
+            if pseudo_format == "upf" and relative.name != filename:
                 raise ValueError("UPF patterns must match filenames, not paths.")
         except (ValueError, KeyError, IndexError) as exc:
             _error(issues, location + ".pattern", str(exc))
 
 
-def _validate_library_overrides(library, key, location, path, issues):
+def _validate_library_overrides(library, pseudo_format, location, path, issues):
     """Check exact per-element filenames and the referenced files."""
     # Overrides promise an exact file, unlike optional suggestions.
     # Check that file as well as the path convention for this format.
@@ -390,25 +424,14 @@ def _validate_library_overrides(library, key, location, path, issues):
             entry = f"{location}.overrides.{symbol}"
             if symbol not in atomic_numbers or symbol == "X":
                 _error(issues, entry, "Expected an element symbol.")
-            if not _check_string(issues, filename, entry):
-                continue
-            relative = Path(filename)
-            invalid_path = relative.is_absolute() or ".." in relative.parts
-            if key == "upf_pseudopotentials":
-                invalid_path |= relative.name != filename
-            if invalid_path or any(c in filename for c in "*?[]{}"):
-                _error(
-                    issues,
-                    entry,
-                    "Expected an exact file within the library directory.",
-                )
-            elif path is not None:
-                _check_file(issues, path / filename, entry)
+            if _check_pseudo_filename(issues, filename, pseudo_format, entry):
+                if path is not None:
+                    _check_file(issues, path / filename, entry)
 
 
-def _validate_library_cutoffs(library, key, location, issues):
+def _validate_library_cutoffs(library, pseudo_format, location, issues):
     """Check optional UPF fallback energies; POTCAR recommendations use ENMAX."""
-    if key == "potcar_pseudopotentials":
+    if pseudo_format == "potcar":
         if "cutoff_defaults" in library:
             _error(issues, location + ".cutoff_defaults", "POTCAR cutoffs use ENMAX.")
         return
@@ -438,6 +461,22 @@ def _validate_library_cutoffs(library, key, location, issues):
                     raise ValueError("Expected a finite positive energy.")
             except (PintError, ValueError, TypeError) as exc:
                 _error(issues, entry, f"Invalid cutoff: {exc}")
+
+
+def _check_pseudo_filename(issues, filename, pseudo_format, location, *, allow_glob=False):
+    """Check a relative file or suggestion glob; UPF stays in one directory."""
+    if not _check_string(issues, filename, location):
+        return False
+    relative = Path(filename)
+    invalid = relative.is_absolute() or ".." in relative.parts
+    if pseudo_format == "upf":
+        invalid |= relative.name != filename
+    forbidden = "{}" if allow_glob else "*?[]{}"
+    if invalid or any(c in filename for c in forbidden):
+        kind = "glob" if allow_glob else "exact file"
+        _error(issues, location, f"Expected a relative {kind} within the library directory.")
+        return False
+    return True
 
 
 def _error(issues, location, message):

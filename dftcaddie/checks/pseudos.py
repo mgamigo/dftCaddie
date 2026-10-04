@@ -13,7 +13,7 @@ inspect_potcar_library()
 
 from pathlib import Path
 
-from dftcaddie.utils import _potcar_candidates, read_upf_pseudo_metadata
+from dftcaddie.utils import _pseudo_candidates, read_upf_pseudo_metadata
 
 __all__ = ["check_pseudos", "inspect_upf_library", "inspect_potcar_library"]
 
@@ -25,7 +25,7 @@ def check_pseudos(data: dict, source_dir: Path) -> list[dict]:
     Parameters
     ----------
     data : dict
-        Validated configuration, including optional suggested_upf_pseudos.
+        Validated unified pseudopotential configuration and suggested_pseudos groups.
     source_dir : pathlib.Path
         Active configuration directory used to resolve relative library paths.
 
@@ -35,38 +35,34 @@ def check_pseudos(data: dict, source_dir: Path) -> list[dict]:
         Inspection reports with library name and format (UPF or POTCAR).
     """
     reports = []
-    for label, key in (
-        ("UPF", "upf_pseudopotentials"),
-        ("POTCAR", "potcar_pseudopotentials"),
-    ):
-        for name, settings in data.get(key, {}).get("libraries", {}).items():
-            path = Path(settings["path"]).expanduser()
-            if not path.is_absolute():
-                path = Path(source_dir) / path
-            library = dict(settings, path=path.absolute())
-            if label == "UPF":
-                report = inspect_upf_library(
-                    library, suggestions=data.get("suggested_upf_pseudos", {})
-                )
-            else:
-                report = inspect_potcar_library(
-                    library, suggestions=data.get("suggested_potcar_pseudos", {})
-                )
-            reports.append(dict(report, name=name, format=label))
+    for name, settings in data["pseudopotentials"]["libraries"].items():
+        path = Path(settings["path"]).expanduser()
+        if not path.is_absolute():
+            path = Path(source_dir) / path
+        suggestions = next(
+            (
+                group["elements"]
+                for group in data.get("suggested_pseudos", [])
+                if name in group["libraries"]
+            ),
+            {},
+        )
+        library = dict(settings, name=name, path=path.absolute(), suggestions=suggestions)
+        label = library["format"].upper()
+        inspector = inspect_upf_library if label == "UPF" else inspect_potcar_library
+        reports.append(dict(inspector(library), name=name, format=label))
     return reports
 
 
-def inspect_upf_library(library: dict, *, suggestions: dict | None = None) -> dict:
+def inspect_upf_library(library: dict) -> dict:
     """
     Inspect a resolved UPF library without changing its configuration or files.
 
     Parameters
     ----------
     library : dict
-        Resolved library with path, filename pattern, and optional overrides.
+        Resolved path, format, pattern, optional overrides, and suggestions.
         Schema validation belongs to the configuration checker.
-    suggestions : dict, optional
-        Element-to-filename preferences from the configuration being checked.
 
     Returns
     -------
@@ -79,12 +75,11 @@ def inspect_upf_library(library: dict, *, suggestions: dict | None = None) -> di
 
     Notes
     -----
-    Only pattern matches and overrides are inspected, allowing libraries to
-    share directories. Suggestions and overrides resolve selection ambiguities
-    as in get_upf_pseudo_paths(); all candidates remain visible in the report.
+    Candidates follow the same override, suggestion glob, and library pattern
+    precedence as get_pseudo_paths(). Only the remaining candidates are
+    inspected, allowing multiple libraries to share a directory.
     Missing cutoff recommendations are allowed and values are read as declared.
     """
-    from fnmatch import fnmatchcase
     from ase.data import chemical_symbols
 
     directory = Path(library["path"]).absolute()
@@ -100,40 +95,25 @@ def inspect_upf_library(library: dict, *, suggestions: dict | None = None) -> di
     if not report["available"]:
         issues.append(f"Library directory does not exist: {directory}")
         return report
-    try:
-        files = sorted(path for path in directory.iterdir() if path.is_file())
-    except OSError as exc:
-        issues.append(f"Cannot read library directory: {exc}")
-        return report
-
     overrides = library.get("overrides", {})
-    suggestions = suggestions or {}
     selected_files = {}
     for symbol in dict.fromkeys([*chemical_symbols[1:], *overrides]):
-        pattern = library["pattern"].format(element=symbol)
-        matches = [path for path in files if fnmatchcase(path.name, pattern)]
-        if symbol in overrides:
-            override = overrides[symbol]
-            preferred = [path for path in files if path.name == override]
-            if not preferred:
-                issues.append(f"Missing override for {symbol}: {override!r}")
-            matches = sorted(set(matches + preferred))
-        else:
-            suggestion = suggestions.get(symbol)
-            preferred = (
-                [path for path in matches if fnmatchcase(path.name, suggestion)]
-                if suggestion
-                else []
-            ) or matches
+        try:
+            matches = _pseudo_candidates(library, symbol)
+        except (OSError, ValueError) as exc:
+            issues.append(f"Cannot inspect {symbol}: {exc}")
+            continue
         if not matches:
+            if symbol in overrides:
+                issues.append(f"Missing override for {symbol}: {overrides[symbol]!r}")
             continue
         report["species"][symbol] = [path.name for path in matches]
         for path in matches:
             selected_files.setdefault(path, []).append(symbol)
-        if len(preferred) > 1:
+        if len(matches) > 1:
             issues.append(
                 f"Ambiguous selection for {symbol}: "
-                + ", ".join(path.name for path in preferred)
+                + ", ".join(path.name for path in matches)
             )
 
     report["files"] = len(selected_files)
@@ -160,7 +140,7 @@ def inspect_upf_library(library: dict, *, suggestions: dict | None = None) -> di
     return report
 
 
-def inspect_potcar_library(library: dict, *, suggestions: dict | None = None) -> dict:
+def inspect_potcar_library(library: dict) -> dict:
     """
     Inspect a POTCAR library without modifying files or displaying their contents.
 
@@ -168,8 +148,6 @@ def inspect_potcar_library(library: dict, *, suggestions: dict | None = None) ->
     ----------
     library : dict
         Resolved library path, relative pattern, and optional element overrides.
-    suggestions : dict, optional
-        Element-to-relative-path preferences from the configuration being checked.
 
     Returns
     -------
@@ -200,7 +178,7 @@ def inspect_potcar_library(library: dict, *, suggestions: dict | None = None) ->
     overrides = library.get("overrides", {})
     for symbol in dict.fromkeys([*chemical_symbols[1:], *overrides]):
         try:
-            matches = _potcar_candidates(library, symbol, suggestions=suggestions)
+            matches = _pseudo_candidates(library, symbol)
         except (OSError, ValueError) as exc:
             issues.append(f"Cannot inspect {symbol}: {exc}")
             continue

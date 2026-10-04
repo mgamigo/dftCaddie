@@ -209,109 +209,111 @@ Python support.
 
 ### Pseudopotential Libraries
 
-Configure named UPF and POTCAR libraries without renaming or moving their files:
+All libraries share one configuration structure. Library names are arbitrary;
+`format` chooses the file reader and `supported_codes` declares compatibility.
+Defaults select a library separately for each calculation code and SOC mode.
 
 ```yaml
-upf_pseudopotentials:
+pseudopotentials:
   defaults:
-    scalar: pbesol-us-sr
-    soc: pbesol-us-fr
+    quantum_espresso:
+      scalar: pbesol-us-sr
+      soc: pbesol-us-fr
+    vasp:
+      scalar: paw-pbe
+      soc: paw-pbe
   libraries:
     pbesol-us-sr:
+      format: upf
+      supported_codes: [quantum_espresso]
       path: ~/Software/PSEUDOS/pslibrary/pbesol/PSEUDOPOTENTIALS
       pattern: "{element}.pbesol-*rrkjus_psl.*.UPF"
     pbesol-us-fr:
+      format: upf
+      supported_codes: [quantum_espresso]
       path: ~/Software/PSEUDOS/pslibrary/rel-pbesol/PSEUDOPOTENTIALS
       pattern: "{element}.rel-pbesol-*rrkjus_psl.*.UPF"
-    oncv-pbe:
-      path: ~/Software/PSEUDOS/ONCVPSP/nc-sr-pbe
-      pattern: "{element}.upf"
-      # Optional exact filename preferences:
+      # Optional mandatory exact selection:
       # overrides:
-      #   Si: Si.upf
-      # Optional fallbacks when UPF recommendations are missing:
+      #   Si: Si.rel-pbesol-nl-rrkjus_psl.1.0.0.UPF
+      # Optional fallbacks for missing cutoff recommendations:
       # cutoff_defaults:
       #   ecutwfc: "30 hartree"
-      #   ecutrho: 240  # Bare numbers mean Ry.
-
-suggested_potcar_pseudos:
-  Cs: Cs_sv/POTCAR
-
-potcar_pseudopotentials:
-  defaults:
-    scalar: paw-pbe
-    soc: paw-pbe
-  libraries:
+      #   ecutrho: 240  # Bare numbers mean Ry, before the safety factor.
     paw-pbe:
-      path: ~/Software/VASP_pseudos/PAW_PBE
+      format: potcar
+      supported_codes: [vasp]
+      path: ~/Software/VASP/pseudos/PAW_PBE
       pattern: "{element}/POTCAR"
-      # Choose variants explicitly when needed:
       # overrides:
       #   Ti: Ti_pv/POTCAR
+
+suggested_pseudos:
+  - libraries: [paw-pbe]
+    elements:
+      Cs: "Cs_sv/POTCAR"
+      Ti: "Ti_pv/POTCAR"
+  - libraries: [pbesol-us-sr, pbesol-us-fr]
+    elements:
+      Si: "Si.*-nl-rrkjus_psl.1.0.0.UPF"
 ```
 
-Library names are arbitrary labels. Paths expand `~`; relative paths are
-resolved against the configuration directory. Patterns are case-sensitive
-globs with `{element}` as the only placeholder. UPF patterns match filenames;
-POTCAR patterns match relative paths such as `{element}/POTCAR`. Libraries can
-share a directory and use different patterns. Potentials must already be installed.
+Paths expand `~`; relative library paths are resolved against the configuration
+directory. Patterns are case-sensitive globs with `{element}` as the only
+placeholder. UPF files live directly in the library directory; POTCAR patterns
+can contain subdirectories. Multiple libraries may share one directory.
 
-Exact per-element `overrides` take priority. Otherwise, the optional global
-`suggested_upf_pseudos` mapping prefers matching UPF filenames within the library's
-matches, including version suffixes. If a suggestion is absent, ordinary
-library matching applies. Multiple remaining matches issue a warning and use
-the first filename alphabetically. Missing files produce an error.
+Each suggestion group targets explicitly named libraries; a library may belong
+to at most one group. Each element has one **relative glob pattern** (an exact
+filename also works). For each element, selection uses:
 
-`--library` selects a library in the format required by the calculation: UPF
-for QE or POTCAR for VASP. Otherwise, each format uses its `scalar` default
-without SOC or its `soc` default with SOC. Both defaults may name the same
-library; a VASP library can serve both modes. Names do not control SOC: `--soc`
-enables it and requires `has_so=True` for every selected UPF. Without it, the
-command sets collinear, non-SOC inputs. Automatic `calc --pseudo/--auto` and
-`set system --pseudo` use the calculation's SOC setting and corresponding
-default library.
+1. An exact library override, which must exist.
+2. Files matching the element’s suggestion pattern.
+3. The library pattern if the suggestion has no matches.
+
+UPF suggestions narrow the library pattern’s matches. POTCAR suggestions may
+select variants outside the pattern, within the library directory. If multiple suggestion or library pattern matches remain, caddie warns and chooses
+the first alphabetically. A missing match is an error. There are no implicit
+provider-specific or bare/`_pv`/`_sv` preferences.
+
+`--library` (`-l`) overrides the default and must support the detected code.
+Library completion filters by that code (including `-C DIR`); outside a
+recognized calculation or with `--list`, it shows all names. `--soc` controls
+SOC independently of library selection. Both defaults may name the same
+library; QE SOC requires `has_so=True` for every selected UPF. Automatic
+`calc --pseudo/--auto` and `set system --pseudo` use the calculation's SOC
+setting and that code's default. Code identifiers in defaults and
+`supported_codes` must match those in the calculation recipes.
+
+This supports arbitrary providers with UPF or POTCAR files. Declaring another
+code in `supported_codes` does not itself implement that code's input editing;
+currently those preparation operations support QE and VASP families.
 
 `--configure` reads UPF header cutoff recommendations. Missing recommendations
-require explicit library `cutoff_defaults`; numeric defaults mean Ry, and
-unit-bearing strings use the shared `ureg`. Defaults are used only for missing
-values, with a warning. Each cutoff takes its maximum across species, applies
-`--ratio` (or `default_cutoff_ratio`), and rounds upward in Ry. Recommendations
-and defaults still require convergence testing; header values are read as
-provided, without provider-specific corrections. `SYSTEM.INFO` records the
-selected `PSEUDO_DIR`, species, and cutoffs; it no longer uses `EXCHANGE`.
+require explicit `cutoff_defaults`; defaults are used only for missing values,
+with a warning. Each cutoff takes its maximum across species, applies `--ratio`
+(or `default_cutoff_ratio`), and rounds upward in Ry. Header values are read as
+provided, without provider-specific corrections. VASP retains ENMAX-based
+cutoffs in eV; UPF cutoff defaults do not apply to POTCAR libraries. Numerical
+values still require convergence checks.
+
+`SYSTEM.INFO` records `PSEUDO_DIR`, species, and cutoffs, without `EXCHANGE`.
+Concatenated POTCARs follow POSCAR's consecutive species groups, including
+separated repetitions of the same element.
 
 ```bash
 # These work outside a calculation directory, without a structure:
 caddie set pseudo --list
-caddie config check --pseudos
 caddie config check
+caddie config check --pseudos
 ```
 
-`set pseudo --list` shows format, names, default roles, and path availability.
-`config check` validates the schema and paths without reading potential headers.
-Add `--pseudos` to inspect all configured UPF and POTCAR libraries, reporting
-file counts, metadata, missing overrides, ambiguities, and parsing problems.
-Inspection runs after configuration validation succeeds and returns a nonzero
-status if issues are found. None of these commands edits pseudopotentials.
-The optional `--workflows` check remains separate and uses synthetic potentials.
-
-POTCAR library paths point directly to a family directory, such as `PAW_PBE`.
-Patterns and exact relative-path overrides select variants; no automatic
-`_pv`/`_sv` fallback is applied. The optional `suggested_potcar_pseudos` mapping
-provides preferred relative paths or globs, such as `Cs: Cs_sv/POTCAR`.
-Selection priority is an exact library override, then an existing suggestion,
-then the library pattern. POTCAR suggestions can choose a variant outside the
-normal pattern (`Cs_sv/POTCAR` instead of `Cs/POTCAR`), but always within the
-selected library root. A missing suggestion falls back; a missing override
-fails. The concatenated POTCAR follows POSCAR's
-consecutive species groups, including repeated groups. VASP cutoff configuration
-continues to use ENMAX in eV and the safety factor; UPF cutoff defaults do not
-apply to POTCAR libraries. Both formats now use `--library`; `--exchange` and
-`--kind` are removed from `set pseudo`.
-
-Standalone listing spans both formats. If a name is shared by both,
-`--library NAME --list` lists both; applying it uses the calculation's code.
-Library inspection lives under `config check --pseudos`, not `set pseudo`.
+`--list` shows format, supported codes, default roles, and directory availability.
+Ordinary `config check` validates declarations and paths. `--pseudos` additionally
+inspects matching files and reports metadata, missing overrides, ambiguities,
+and parsing problems. Inspection starts after configuration validation succeeds
+and returns a nonzero status for issues. `--workflows` separately exercises
+preparation using synthetic potentials. These checks do not modify your libraries.
 
 ### Numerical Defaults and Cluster Presets
 

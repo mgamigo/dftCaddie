@@ -209,9 +209,13 @@ def _prepare_fixtures(payload, root):
     # Filenames are kept for assertions; library definitions go into worker YAML.
     names = {}
     libraries = {}
-    if any(
-        _has_code_family(case[2], "quantum_espresso") for case, _ in payload["checks"]
-    ):
+    defaults = {}
+    codes = {case[2] for case, _ in payload["checks"]}
+    qe_codes = sorted(
+        code for code in codes if _has_code_family(code, "quantum_espresso")
+    )
+    vasp_codes = sorted(code for code in codes if _has_code_family(code, "vasp"))
+    if qe_codes:
         # Distinct scalar/SOC headers exercise selection and cutoff extraction.
         # They are preparation fixtures, not usable inputs for a DFT calculation.
         for selection, relativity in (("scalar", "scalar"), ("soc", "full")):
@@ -228,27 +232,30 @@ def _prepare_fixtures(payload, root):
             )
             names[selection] = name
             libraries[selection] = {
+                "format": "upf",
+                "supported_codes": qe_codes,
                 "path": str(directory),
                 "pattern": "{element}.*.UPF",
             }
-        data["upf_pseudopotentials"] = {
-            "defaults": {"scalar": "scalar", "soc": "soc"},
-            "libraries": libraries,
-        }
+        for code in qe_codes:
+            defaults[code] = {"scalar": "scalar", "soc": "soc"}
     # Real potential preferences must not affect these synthetic selections.
-    data["suggested_upf_pseudos"] = {}
-    data["suggested_potcar_pseudos"] = {}
+    data["suggested_pseudos"] = []
     vasp = root / "vasp/PAW_PBE/Si"
     vasp.mkdir(parents=True)
     # VASP checks need only an ENMAX value and known bytes to concatenate.
     potcar = "Synthetic Si potential for testing only\n ENMAX = 200.0; ENMIN = 150.0\n"
     (vasp / "POTCAR").write_text(potcar)
-    data["potcar_pseudopotentials"] = {
-        "defaults": {"scalar": "pbe", "soc": "pbe"},
-        "libraries": {
-            "pbe": {"path": str(vasp.parent), "pattern": "{element}/POTCAR"}
-        },
-    }
+    if vasp_codes:
+        libraries["pbe"] = {
+            "format": "potcar",
+            "supported_codes": vasp_codes,
+            "path": str(vasp.parent),
+            "pattern": "{element}/POTCAR",
+        }
+        for code in vasp_codes:
+            defaults[code] = {"scalar": "pbe", "soc": "pbe"}
+    data["pseudopotentials"] = {"defaults": defaults, "libraries": libraries}
 
     # Install editable resources once for the active worker configuration.
     user_config = Path.home() / ".config" / "dftcaddie"

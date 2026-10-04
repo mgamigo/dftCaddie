@@ -9,10 +9,8 @@ Functions
 ---------
 load_config()
     Read the active or bundled configuration on first use and cache it.
-resolve_upf_library(name)
-    Look up a named UPF library and resolve its path.
-resolve_potcar_library(name)
-    Look up a named POTCAR library and resolve its path.
+resolve_pseudo_library(name)
+    Look up a named library, resolve its path, and attach its suggestions.
 clear_config_cache()
     Clear cached configuration and pseudopotential library paths.
 
@@ -92,69 +90,45 @@ def load_config(default_config: bool = False) -> tuple[dict, Path]:
 
 
 @lru_cache(maxsize=1)
-def resolve_upf_library(name: str) -> dict:
+def resolve_pseudo_library(name: str) -> dict:
     """
-    Look up a UPF library and resolve its configured path.
+    Resolve a named pseudopotential library and its suggestion patterns.
 
     Parameters
     ----------
     name : str
-        Key in ``upf_pseudopotentials.libraries``.
+        Globally unique key in ``pseudopotentials.libraries``.
 
     Returns
     -------
     dict
-        Library settings with the name and an absolute Path. The filename
-        pattern is preserved for later species selection. Relative paths use
+        Library settings with name, absolute Path, and a suggestions mapping
+        from element to relative glob patterns. Relative library paths use
         the active configuration directory; ``~`` expands to the user's home.
 
     Notes
     -----
-    This only resolves settings. Schema validation and directory checks belong
-    to ``caddie config check``; pseudopotential selection happens separately.
-    The most recent library is cached. Treat returned settings as read-only
-    and call clear_config_cache() after changing configuration.
+    Configuration checks validate formats, supported codes, and suggestion
+    groups. This function only looks up settings and expands paths. The most
+    recent library is cached; treat returned settings as read-only and call
+    clear_config_cache() after changing configuration.
     """
     from copy import deepcopy
 
     data, source = load_config()
-    library = deepcopy(data["upf_pseudopotentials"]["libraries"][name])
+    library = deepcopy(data["pseudopotentials"]["libraries"][name])
     path = Path(library["path"]).expanduser()
     if not path.is_absolute():
         path = source / path
-    library.update(name=name, path=path.absolute())
-    return library
-
-
-@lru_cache(maxsize=1)
-def resolve_potcar_library(name: str) -> dict:
-    """
-    Look up a POTCAR library and resolve its configured path.
-
-    Parameters
-    ----------
-    name : str
-        Key in ``potcar_pseudopotentials.libraries``.
-
-    Returns
-    -------
-    dict
-        Library settings with the name and an absolute Path. Relative paths
-        use the active configuration directory; ``~`` expands to the home.
-
-    Notes
-    -----
-    The most recent library is cached. Treat returned settings as read-only.
-    Schema and directory validation belong to ``caddie config check``.
-    """
-    from copy import deepcopy
-
-    data, source = load_config()
-    library = deepcopy(data["potcar_pseudopotentials"]["libraries"][name])
-    path = Path(library["path"]).expanduser()
-    if not path.is_absolute():
-        path = source / path
-    library.update(name=name, path=path.absolute())
+    suggestions = next(
+        (
+            group["elements"]
+            for group in data.get("suggested_pseudos", [])
+            if name in group["libraries"]
+        ),
+        {},
+    )
+    library.update(name=name, path=path.absolute(), suggestions=deepcopy(suggestions))
     return library
 
 
@@ -172,5 +146,4 @@ def clear_config_cache() -> None:
         The cache is cleared in-place.
     """
     load_config.cache_clear()
-    resolve_upf_library.cache_clear()
-    resolve_potcar_library.cache_clear()
+    resolve_pseudo_library.cache_clear()

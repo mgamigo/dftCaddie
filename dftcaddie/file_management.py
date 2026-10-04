@@ -897,11 +897,11 @@ def configure_qe_cutoffs_from_pseudos(
     system_info_path : str
         File containing CUTOFF and ECUTRHO settings, in Ry.
     pseudos : dict[str, Path]
-        Species-to-path mapping returned by get_upf_pseudo_paths().
+        Species-to-path mapping returned by get_pseudo_paths().
     ratio : float, optional
         Safety factor applied to the maximum cutoffs, by default 1.5.
     defaults : dict, optional
-        Optional ecutwfc/ecutrho fallbacks accepted by utils.get_qe_cutoffs().
+        Optional ecutwfc/ecutrho fallbacks accepted by utils.get_upf_cutoffs().
 
     Returns
     -------
@@ -912,9 +912,9 @@ def configure_qe_cutoffs_from_pseudos(
     -----
     Both cutoffs are resolved and validated before the file is edited.
     """
-    from dftcaddie.utils import get_qe_cutoffs
+    from dftcaddie.utils import get_upf_cutoffs
 
-    cutoff, ecutrho = get_qe_cutoffs(pseudos, defaults=defaults, ratio=ratio)
+    cutoff, ecutrho = get_upf_cutoffs(pseudos, defaults=defaults, ratio=ratio)
     log.info(
         "Setting CUTOFF=%d and ECUTRHO=%d in %s", cutoff, ecutrho, system_info_path
     )

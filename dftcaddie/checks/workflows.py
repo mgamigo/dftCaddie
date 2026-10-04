@@ -130,16 +130,26 @@ def check_workflows(
         # External libraries are replaced by generated fixtures in the worker.
         # These declarations only satisfy preflight checks. The worker replaces
         # them with real temporary paths containing synthetic potential files.
-        for section, pattern in (
-            ("upf_pseudopotentials", "{element}.UPF"),
-            ("potcar_pseudopotentials", "{element}/POTCAR"),
-        ):
-            clean[section] = {
-                "defaults": {"scalar": "synthetic", "soc": "synthetic"},
-                "libraries": {
-                    "synthetic": {"path": str(source), "pattern": pattern}
-                },
-            }
+        clean["pseudopotentials"] = {
+            "defaults": {
+                "quantum_espresso": {"scalar": "scalar", "soc": "soc"},
+                "vasp": {"scalar": "pbe", "soc": "pbe"},
+            },
+            "libraries": {
+                name: {
+                    "format": file_format,
+                    "supported_codes": [code],
+                    "path": str(source),
+                    "pattern": pattern,
+                }
+                for name, file_format, code, pattern in (
+                    ("scalar", "upf", "quantum_espresso", "{element}.UPF"),
+                    ("soc", "upf", "quantum_espresso", "{element}.UPF"),
+                    ("pbe", "potcar", "vasp", "{element}/POTCAR"),
+                )
+            },
+        }
+        clean["suggested_pseudos"] = []
     issues = validate_config(clean, source)
     errors = [issue for issue in issues if issue.level == "error"]
     if errors:

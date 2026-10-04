@@ -27,17 +27,15 @@ get_config()
     Retrieve a config entry by name for a given calculation kind.
 read_upf_pseudo_metadata()
     Read physical metadata and available cutoff recommendations from UPF 2.
-get_upf_pseudo_paths()
-    Select QE pseudopotential files from a configured library.
-get_qe_cutoffs()
+get_pseudo_paths()
+    Select UPF or POTCAR files from a configured library.
+get_upf_cutoffs()
     Resolve wavefunction and charge-density cutoffs in Ry.
-get_potcar_paths()
-    Select POTCAR files from a configured library in POSCAR group order.
 
 Private functions
 -----------------
-_potcar_candidates()
-    Find matching POTCAR files using overrides, suggestions, and library patterns.
+_pseudo_candidates()
+    Find files using exact overrides, suggestion patterns, and library patterns.
 """
 
 import logging
@@ -57,9 +55,8 @@ __all__ = [
     "get_structure",
     "get_config",
     "read_upf_pseudo_metadata",
-    "get_upf_pseudo_paths",
-    "get_qe_cutoffs",
-    "get_potcar_paths",
+    "get_pseudo_paths",
+    "get_upf_cutoffs",
 ]
 
 
@@ -404,28 +401,85 @@ def read_upf_pseudo_metadata(path: str | Path) -> dict:
     }
 
 
-def get_upf_pseudo_paths(library: dict, symbols: Iterable[str]) -> dict[str, Path]:
+def _pseudo_candidates(library: dict, symbol: str) -> list[Path]:
     """
-    Select one pseudopotential per species from a resolved QE library.
+    Find candidates using an override, suggestion patterns, then the pattern.
 
     Parameters
     ----------
     library : dict
-        Settings returned by resolve_upf_library(), including path, pattern,
-        and optional overrides mapping elements to exact filenames.
-    symbols : iterable of str
-        Atomic species in structure order. Repeated elements are selected once.
+        Resolved library path, format, pattern, optional overrides, and optional
+        suggestions mapping elements to relative glob patterns.
+    symbol : str
+        Element used to format the library pattern.
 
     Returns
     -------
-    dict[str, Path]
-        Species-to-path mapping in first-occurrence order. All selected files
-        are direct children of the library directory.
+    list[pathlib.Path]
+        One existing override, otherwise alphabetical suggestion or pattern
+        matches. A missing override returns no candidates without fallback.
+
+    Raises
+    ------
+    ValueError
+        A selection leaves the library directory, or UPF uses a subdirectory.
+    """
+    directory = Path(library["path"]).absolute()
+
+    def relative_path(target):
+        relative = Path(target)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError(f"Pseudopotential selection must stay inside {directory}.")
+        if library["format"].lower() == "upf" and len(relative.parts) != 1:
+            raise ValueError("UPF selections must be filenames directly in the library.")
+        return relative
+
+    overrides = library.get("overrides", {})
+    if symbol in overrides:
+        path = directory / relative_path(overrides[symbol])
+        return [path] if path.is_file() else []
+    target = library["pattern"].format(element=symbol)
+    relative_path(target)
+    suggestion = library.get("suggestions", {}).get(symbol)
+    if suggestion:
+        relative_path(suggestion)
+        matches = sorted(path for path in directory.glob(suggestion) if path.is_file())
+        # UPF libraries may share a directory containing different pseudo types.
+        # Suggestions narrow that library; POTCAR suggestions can select variants.
+        if library["format"] == "upf":
+            matches = [path for path in matches if path.match(target)]
+        if matches:
+            return matches
+    return sorted(path for path in directory.glob(target) if path.is_file())
+
+
+def get_pseudo_paths(
+    library: dict, symbols: Iterable[str]
+) -> dict[str, Path] | list[Path]:
+    """
+    Select pseudopotentials from a resolved library according to its format.
+
+    Parameters
+    ----------
+    library : dict
+        Settings returned by resolve_pseudo_library(), including path, format,
+        pattern, optional overrides, and suggestion patterns.
+    symbols : iterable of str
+        Atomic species in structure order, matching the unsorted POSCAR for VASP.
+
+    Returns
+    -------
+    dict[str, Path] or list[Path]
+        UPF: species-to-path mapping in first-occurrence order.
+        POTCAR: one path per consecutive species group, retaining separated
+        repeats to match the unsorted POSCAR. Each species is resolved once.
 
     Raises
     ------
     FileNotFoundError
         The library directory or a species' matching file is missing.
+    ValueError
+        The format is unsupported or a selection leaves the allowed directory.
 
     Warns
     -----
@@ -434,61 +488,57 @@ def get_upf_pseudo_paths(library: dict, symbols: Iterable[str]) -> dict[str, Pat
 
     Notes
     -----
-    Exact library overrides take precedence. Otherwise, format the library
-    glob with the element and prefer matches of its optional global
-    suggested_upf_pseudos glob. An absent suggestion leaves the original matches
-    intact. Matching is case-sensitive and preserves version suffixes. This
-    function does not read UPF metadata or validate physical compatibility.
+    Exact library overrides take precedence and are mandatory when configured.
+    Otherwise use matching suggestions, then the library pattern.
+    UPF suggestions narrow the library pattern's matches. POTCAR suggestions
+    may select variants outside the pattern, within the library directory.
+    This function does not read metadata or validate physical compatibility.
     """
-    from fnmatch import fnmatchcase
     import warnings
+    from itertools import groupby
+
+    pseudo_format = library["format"]
+    if pseudo_format not in ("upf", "potcar"):
+        raise ValueError(f"Unsupported pseudopotential format: {pseudo_format}")
+    # Retain consecutive groups for POTCAR output, even with iterator inputs.
+    groups = [symbol for symbol, _ in groupby(symbols)]
 
     directory = Path(library["path"]).absolute()
-    files = sorted(path for path in directory.iterdir() if path.is_file())
-    suggestions = config.load_config()[0].get("suggested_upf_pseudos", {})
-    overrides = library.get("overrides", {})
+    if not directory.is_dir():
+        raise FileNotFoundError(f"Pseudopotential library directory does not exist: {directory}")
     pseudos = {}
-    for symbol in dict.fromkeys(symbols):
-        if symbol in overrides:
-            target = overrides[symbol]
-            matches = [path for path in files if path.name == target]
-        else:
-            target = library["pattern"].format(element=symbol)
-            matches = [path for path in files if fnmatchcase(path.name, target)]
-            suggestion = suggestions.get(symbol)
-            if suggestion:
-                preferred = [
-                    path for path in matches if fnmatchcase(path.name, suggestion)
-                ]
-                matches = preferred or matches
+    for symbol in dict.fromkeys(groups):
+        matches = _pseudo_candidates(library, symbol)
         if not matches:
             raise FileNotFoundError(
                 f"No pseudopotential for {symbol} in {directory} "
-                f"matching {target!r}. Check the library pattern or override."
+                "matching its selection settings. Check the library pattern or override."
             )
         if len(matches) > 1:
             warnings.warn(
                 f"Multiple pseudopotentials for {symbol} in {directory}: "
-                f"{', '.join(path.name for path in matches)}. "
-                f"Using {matches[0].name} (first alphabetically). "
+                f"{', '.join(str(path.relative_to(directory)) for path in matches)}. "
+                f"Using {matches[0].relative_to(directory)} (first alphabetically). "
                 "Set an element override to choose explicitly.",
                 UserWarning,
                 stacklevel=2,
             )
         pseudos[symbol] = matches[0]
+    if pseudo_format == "potcar":
+        return [pseudos[symbol] for symbol in groups]
     return pseudos
 
 
-def get_qe_cutoffs(
+def get_upf_cutoffs(
     pseudos: dict[str, Path], *, defaults: dict | None = None, ratio: float = 1.5
 ) -> tuple[int, int]:
     """
-    Resolve QE cutoffs from UPF recommendations and optional defaults.
+    Resolve cutoffs from UPF recommendations and optional defaults.
 
     Parameters
     ----------
     pseudos : dict[str, Path]
-        Species-to-path mapping returned by get_upf_pseudo_paths().
+        Species-to-path mapping returned by get_pseudo_paths().
     defaults : dict, optional
         Fallback ecutwfc and/or ecutrho for missing recommendations. Numbers
         mean Ry; unit-bearing strings (e.g. "30 hartree") and quantities from
@@ -555,126 +605,3 @@ def get_qe_cutoffs(
                 )
             maxima[key] = max(maxima[key], value)
     return tuple(math.ceil(value * ratio) for value in maxima.values())
-
-
-def _potcar_candidates(
-    library: dict, symbol: str, *, suggestions: dict | None = None
-) -> list[Path]:
-    """
-    Find POTCAR candidates for one element using configured preferences.
-
-    Parameters
-    ----------
-    library : dict
-        Resolved library path, relative filename pattern, and optional exact
-        relative-path overrides per element.
-    symbol : str
-        Chemical element symbol used to format the library pattern.
-    suggestions : dict, optional
-        Element-to-relative-path globs from suggested_potcar_pseudos.
-
-    Returns
-    -------
-    list[pathlib.Path]
-        Absolute matching file paths in alphabetical order, or an empty list
-        when no file matches. Ambiguity is left for the caller to handle.
-
-    Raises
-    ------
-    ValueError
-        A selection path is absolute or contains a parent-directory component.
-
-    Notes
-    -----
-    An explicit override is mandatory and prevents fallback. Otherwise, an
-    existing suggestion takes precedence over the library pattern. Used by
-    both POTCAR selection and library inspection to keep their rules aligned.
-    """
-    directory = Path(library["path"]).absolute()
-    overrides = library.get("overrides", {})
-    if symbol in overrides:
-        targets = [overrides[symbol]]
-    else:
-        targets = []
-        if suggestions and symbol in suggestions:
-            targets.append(suggestions[symbol])
-        targets.append(library["pattern"].format(element=symbol))
-    for target in targets:
-        relative = Path(target)
-        if relative.is_absolute() or ".." in relative.parts:
-            raise ValueError(f"POTCAR selection must stay inside {directory}.")
-        candidates = (
-            [directory / relative] if symbol in overrides else directory.glob(target)
-        )
-        matches = sorted(path for path in candidates if path.is_file())
-        if matches:
-            return matches
-    return []
-
-
-def get_potcar_paths(library: dict, symbols: Iterable[str]) -> list[Path]:
-    """
-    Select POTCARs from a named library in consecutive species-group order.
-
-    Parameters
-    ----------
-    library : dict
-        Resolved path, relative glob pattern such as ``{element}/POTCAR``,
-        and optional exact relative-path overrides per element.
-    symbols : iterable of str
-        Chemical symbols in atom order, matching the unsorted POSCAR.
-
-    Returns
-    -------
-    list[pathlib.Path]
-        One absolute path per consecutive species group. Nonconsecutive
-        repetitions are retained to match ASE's unsorted POSCAR output.
-
-    Raises
-    ------
-    FileNotFoundError
-        The directory or a requested species' POTCAR is missing.
-    ValueError
-        A configured pattern or override leaves the library directory.
-
-    Warns
-    -----
-    UserWarning
-        Multiple files match; the first path alphabetically is selected.
-
-    Notes
-    -----
-    Overrides take precedence over suggested_potcar_pseudos relative-path
-    preferences. If no suggested file exists, use the library pattern.
-    No implicit bare, pv, or sv preference is used.
-    Selection does not inspect the physical metadata in POTCAR files.
-    """
-    from itertools import groupby
-    import warnings
-
-    directory = Path(library["path"]).absolute()
-    if not directory.is_dir():
-        raise FileNotFoundError(f"POTCAR library directory does not exist: {directory}")
-    suggestions = config.load_config()[0].get("suggested_potcar_pseudos", {})
-    selected = {}
-    pseudos = []
-    for symbol, _ in groupby(symbols):
-        if symbol not in selected:
-            matches = _potcar_candidates(library, symbol, suggestions=suggestions)
-            if not matches:
-                raise FileNotFoundError(
-                    f"No POTCAR for {symbol} in {directory}. "
-                    "Check the library pattern or override."
-                )
-            if len(matches) > 1:
-                warnings.warn(
-                    f"Multiple POTCARs for {symbol} in {directory}: "
-                    + ", ".join(str(path.relative_to(directory)) for path in matches)
-                    + f". Using {matches[0].relative_to(directory)} "
-                    "(first alphabetically). Set an element override to choose explicitly.",
-                    UserWarning,
-                    stacklevel=2,
-                )
-            selected[symbol] = matches[0]
-        pseudos.append(selected[symbol])
-    return pseudos

@@ -101,12 +101,28 @@ def complete_header(prefix, parsed_args, action, **kwargs):
     return [value for value in dict.fromkeys(values) if value.startswith(prefix)]
 
 
-def complete_pseudo_library(prefix, **kwargs):
-    """Return matching configured UPF and POTCAR library names."""
-    from dftcaddie.config import load_config
+def complete_pseudo_library(prefix, parsed_args=None, **kwargs):
+    """
+    Suggest libraries compatible with the detected calculation code.
 
-    settings = load_config()[0]
-    names = []
-    for key in ("upf_pseudopotentials", "potcar_pseudopotentials"):
-        names.extend(settings.get(key, {}).get("libraries", {}))
-    return [name for name in dict.fromkeys(names) if name.startswith(prefix)]
+    Outside a recognized calculation, or when listing libraries, suggest all
+    names. Respect the global -C directory without changing the process cwd.
+    """
+    from pathlib import Path
+    from dftcaddie.config import load_config
+    from dftcaddie.utils import resolve_calculation_directory
+
+    libraries = load_config()[0].get("pseudopotentials", {}).get("libraries", {})
+    code = None
+    if not getattr(parsed_args, "list", False):
+        directory = getattr(parsed_args, "directory", None) or Path.cwd()
+        try:
+            _, _, code = resolve_calculation_directory(Path(directory))
+        except (OSError, RuntimeError, ValueError, KeyError):
+            pass
+    return [
+        name
+        for name, library in libraries.items()
+        if name.startswith(prefix)
+        and (code is None or code in library.get("supported_codes", []))
+    ]
