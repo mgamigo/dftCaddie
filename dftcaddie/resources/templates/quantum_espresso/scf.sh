@@ -32,6 +32,7 @@ cat >$NAME.scf.pwi <<EOF
   occupations='smearing',
   smearing='mp',
   degauss=$SMEAR,
+  $SPIN
  /
 &ELECTRONS
   conv_thr =  1d-10
@@ -45,6 +46,7 @@ K_POINTS {automatic}
   $KGRID  0 0 0
 CELL_PARAMETERS {angstrom}
 $LATTICE
+$HUBBARD_CARD
 EOF
 
 echo "running the scf calculation"

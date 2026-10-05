@@ -30,6 +30,7 @@ cat >$NAME.bands.pwi <<EOF
   occupations='smearing',
   smearing='mp',
   degauss=$SMEAR,
+  $SPIN
  /
 &ELECTRONS
   conv_thr =  1d-10
@@ -43,6 +44,7 @@ K_POINTS { crystal_b }
  $QE_CRYST_PATH
 CELL_PARAMETERS {angstrom}
 $LATTICE
+$HUBBARD_CARD
 EOF
 
 echo "running the bands calculation"

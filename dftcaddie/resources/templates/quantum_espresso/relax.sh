@@ -33,6 +33,7 @@ cat >$NAME.relax.pwi <<EOF
   occupations='smearing',
   smearing='mp',
   degauss=$SMEAR,
+  $SPIN
 !  vdw_corr='DFT-D' !van der waals correction (works with phonons)
  /
 &ELECTRONS
@@ -56,6 +57,7 @@ K_POINTS {automatic}
   $KGRID  0 0 0
 CELL_PARAMETERS {angstrom}
 $LATTICE
+$HUBBARD_CARD
 EOF
 
 echo "running the relax calculation"
