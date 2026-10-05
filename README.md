@@ -39,9 +39,8 @@ cd Si-bands
 caddie calc
 ```
 
-Choose a calculation, code, and any required workflow variant by typing a name
-or a matching part of it. Settings with defaults are applied automatically;
-add `--details` to choose them interactively too.
+Choose a calculation, code, and any required workflow variant by typing a name or a matching part of it.
+Settings with defaults are applied automatically; add `--details` to choose them interactively too.
 
 - `caddie calc`: Choose interactively.
 - `caddie calc --structure Si.cif`: Include your structure.
@@ -56,9 +55,8 @@ add `--details` to choose them interactively too.
 - `caddie set pseudo Si.cif --configure`: Set pseudopotentials and cutoffs.
 - `caddie set cluster`: Configure the cluster header and MPI commands.
 
-The bundled recipes cover **bands, relaxation, and phonons**, using Quantum
-ESPRESSO or VASP where configured. All interaction stays in the terminal,
-including on a cluster without a graphical session.
+The bundled recipes cover **bands, relaxation, and phonons**, using Quantum ESPRESSO or VASP where configured.
+All interaction stays in the terminal, including on a cluster without a graphical session.
 
 ### From Templates to a Job
 
@@ -66,10 +64,9 @@ including on a cluster without a graphical session.
   <img src="/../assets/docs/assets/workflow.svg?raw=true" alt="Templates, configuration and cluster settings, and an optional structure feed caddie calc. It prepares a calculation folder with input files and master.sh, which calls the workflow scripts in order." width="928" />
 </p>
 
-**`master.sh` orchestrates the workflow.** Caddie adds the selected scheduler
-header and calls the calculation scripts in their configured order. Submit
-it through your usual cluster workflow; caddie prepares the files but does
-not submit or execute the calculation.
+**`master.sh` orchestrates the workflow**.
+Caddie adds the selected scheduler header and calls the calculation scripts in their configured order.
+Submit it through your usual cluster workflow; caddie prepares the files but does not submit or execute the calculation.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -167,11 +164,7 @@ This creates your editable resource tree:
 ```
 
 When your user `config.yaml` exists, caddie uses this resource tree instead of
-the bundled one. Check your changes with:
-
-```bash
-caddie config check --workflows
-```
+the bundled one.
 
 ### Define a Recipe
 
@@ -209,9 +202,13 @@ Python support.
 
 ### Pseudopotential Libraries
 
-All libraries share one configuration structure. Library names are arbitrary;
-`format` chooses the file reader and `supported_codes` declares compatibility.
-Defaults select a library separately for each calculation code and SOC mode.
+Edit `pseudopotentials` in your `config.yaml`. Give each library a name, set its
+`format` (`upf` or `potcar`), and specify its `path` and filename `pattern`.
+Use `{element}` for the chemical symbol and `*` for wildcard matching.
+`supported_codes` must use the same code names as your calculation recipes.
+
+Choose a default library for each code: `scalar` without SOC, `soc` with SOC.
+Both defaults may refer to the same library.
 
 ```yaml
 pseudopotentials:
@@ -233,93 +230,52 @@ pseudopotentials:
       supported_codes: [quantum_espresso]
       path: ~/Software/PSEUDOS/pslibrary/rel-pbesol/PSEUDOPOTENTIALS
       pattern: "{element}.rel-pbesol-*rrkjus_psl.*.UPF"
-      # Optional mandatory exact selection:
-      # overrides:
-      #   Si: Si.rel-pbesol-nl-rrkjus_psl.1.0.0.UPF
-      # Optional fallbacks for missing cutoff recommendations:
-      # cutoff_defaults:
-      #   ecutwfc: "30 hartree"
-      #   ecutrho: 240  # Bare numbers mean Ry, before the safety factor.
     paw-pbe:
       format: potcar
       supported_codes: [vasp]
       path: ~/Software/VASP/pseudos/PAW_PBE
       pattern: "{element}/POTCAR"
-      # overrides:
-      #   Ti: Ti_pv/POTCAR
 
 suggested_pseudos:
+  - libraries: [pbesol-us-sr, pbesol-us-fr]
+    elements:
+      Si: "Si.*-nl-*_psl.1.0.0.UPF"
   - libraries: [paw-pbe]
     elements:
       Cs: "Cs_sv/POTCAR"
-      Ti: "Ti_pv/POTCAR"
-  - libraries: [pbesol-us-sr, pbesol-us-fr]
-    elements:
-      Si: "Si.*-nl-rrkjus_psl.1.0.0.UPF"
 ```
 
-Paths expand `~`; relative library paths are resolved against the configuration
-directory. Patterns are case-sensitive globs with `{element}` as the only
-placeholder. UPF files live directly in the library directory; POTCAR patterns
-can contain subdirectories. Multiple libraries may share one directory.
+Paths can use `~`; relative paths start from the configuration directory.
+Currently, caddie expects UPF files directly inside the library directory;
+POTCAR patterns can include subdirectories.
 
-Each suggestion group targets explicitly named libraries; a library may belong
-to at most one group. Each element has one **relative glob pattern** (an exact
-filename also works). For each element, selection uses:
+Use `suggested_pseudos` to prefer one pattern per element across the listed
+libraries. Assign each library to at most one group. UPF suggestions filter the
+library's matches; POTCAR suggestions can select variants such as `Cs_sv`.
+If no suggestion matches, caddie uses the library pattern. To require a specific
+file instead, add `overrides: {Si: "chosen.UPF"}` inside that library's entry.
 
-1. An exact library override, which must exist.
-2. Files matching the element’s suggestion pattern.
-3. The library pattern if the suggestion has no matches.
-
-UPF suggestions narrow the library pattern’s matches. POTCAR suggestions may
-select variants outside the pattern, within the library directory. If multiple suggestion or library pattern matches remain, caddie warns and chooses
-the first alphabetically. A missing match is an error. There are no implicit
-provider-specific or bare/`_pv`/`_sv` preferences.
-
-`--library` (`-l`) overrides the default and must support the detected code.
-Library completion filters by that code (including `-C DIR`); outside a
-recognized calculation or with `--list`, it shows all names. `--soc` controls
-SOC independently of library selection. Both defaults may name the same
-library; QE SOC requires `has_so=True` for every selected UPF. Automatic
-`calc --pseudo/--auto` and `set system --pseudo` use the calculation's SOC
-setting and that code's default. Code identifiers in defaults and
-`supported_codes` must match those in the calculation recipes.
-
-This supports arbitrary providers with UPF or POTCAR files. Declaring another
-code in `supported_codes` does not itself implement that code's input editing;
-currently those preparation operations support QE and VASP families.
-
-`--configure` reads UPF header cutoff recommendations. Missing recommendations
-require explicit `cutoff_defaults`; defaults are used only for missing values,
-with a warning. Each cutoff takes its maximum across species, applies `--ratio`
-(or `default_cutoff_ratio`), and rounds upward in Ry. Header values are read as
-provided, without provider-specific corrections. VASP retains ENMAX-based
-cutoffs in eV; UPF cutoff defaults do not apply to POTCAR libraries. Numerical
-values still require convergence checks.
-
-`SYSTEM.INFO` records `PSEUDO_DIR`, species, and cutoffs, without `EXCHANGE`.
-Concatenated POTCARs follow POSCAR's consecutive species groups, including
-separated repetitions of the same element.
+Use `--configure` to set cutoffs from UPF recommendations or POTCAR ENMAX,
+multiplied by `default_cutoff_ratio` (or `--ratio`). For missing UPF recommendations,
+add `cutoff_defaults: {ecutwfc: 60, ecutrho: 480}` to the library. These are
+fallbacks in Ry, not minimum thresholds; energy strings such as `"30 hartree"`
+are also accepted.
 
 ```bash
-# These work outside a calculation directory, without a structure:
 caddie set pseudo --list
-caddie config check
-caddie config check --pseudos
+caddie set pseudo Si.cif --configure
+caddie set pseudo Si.cif -l pbesol-us-fr --soc --configure
 ```
 
-`--list` shows format, supported codes, default roles, and directory availability.
-Ordinary `config check` validates declarations and paths. `--pseudos` additionally
-inspects matching files and reports metadata, missing overrides, ambiguities,
-and parsing problems. Inspection starts after configuration validation succeeds
-and returns a nonzero status for issues. `--workflows` separately exercises
-preparation using synthetic potentials. These checks do not modify your libraries.
+`-l` selects a library instead of the default. `--soc` enables SOC separately
+and requires suitable pseudopotentials.
 
 ### Numerical Defaults and Cluster Presets
 
 ```yaml
 default_kppra: 12000
 nscf_kppra_ratio: 4
+ph_kppra_ratio: 0.01
 default_cutoff_ratio: 1.5
 ```
 
@@ -329,6 +285,26 @@ multipliers. Other numerical parameters live in the input templates.
 Cluster entries define a hostname match, MPI launch command, and named header
 presets. During `calc`, caddie applies the detected cluster's MPI command and
 first header preset. Edit the bundled placeholder entries for your machines.
+
+### Check Your Config
+
+After editing your configuration, run:
+
+```bash
+caddie config check
+```
+
+This checks the active `config.yaml`, resource paths, and library declarations.
+For additional checks:
+
+```bash
+caddie config check --pseudos    # Inspect pseudopotential files and metadata.
+caddie config check --workflows # Prepare workflows with synthetic potentials.
+```
+
+You can combine both flags. The checks report problems without changing your
+libraries or calculation folders. Workflow checks use temporary directories
+and do not run DFT calculations.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
