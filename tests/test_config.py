@@ -1,86 +1,7 @@
 import os
-import re
 import pytest
 
 from dftcaddie import config
-
-
-@pytest.mark.parametrize(
-    ("key", "resolver"),
-    [
-        ("qe_pslibrary", config.resolve_pslibrary),
-        ("vasp_pseudopotentials", config.resolve_potcar_library),
-    ],
-)
-def test_pseudo_library_configured(tmp_path, monkeypatch, key, resolver):
-    library = tmp_path / "pseudo-library"
-    library.mkdir()
-
-    monkeypatch.setitem(config.load_config()[0], key, str(library))
-    monkeypatch.delenv("PSLIBRARY", raising=False)
-    resolver.cache_clear()
-
-    try:
-        assert resolver() == library
-    finally:
-        resolver.cache_clear()
-
-
-@pytest.mark.parametrize(
-    ("key", "resolver", "missing_message"),
-    [
-        (
-            "qe_pslibrary",
-            config.resolve_pslibrary,
-            "QE PSLibrary not defined. Set the $PSLIBRARY environment variable or "
-            "define 'qe_pslibrary' in config.yaml.",
-        ),
-        (
-            "vasp_pseudopotentials",
-            config.resolve_potcar_library,
-            "VASP POTCAR library not defined. Set 'vasp_pseudopotentials' in "
-            "config.yaml.",
-        ),
-    ],
-)
-def test_pseudo_library_missing(monkeypatch, key, resolver, missing_message):
-    monkeypatch.delitem(config.load_config()[0], key, raising=False)
-    monkeypatch.delenv("PSLIBRARY", raising=False)
-    resolver.cache_clear()
-
-    try:
-        with pytest.raises(RuntimeError, match=re.escape(missing_message)):
-            resolver()
-    finally:
-        resolver.cache_clear()
-
-
-@pytest.mark.parametrize(
-    ("key", "resolver", "message"),
-    [
-        (
-            "qe_pslibrary",
-            config.resolve_pslibrary,
-            "QE PSLibrary not found at",
-        ),
-        (
-            "vasp_pseudopotentials",
-            config.resolve_potcar_library,
-            "VASP POTCAR library not found at",
-        ),
-    ],
-)
-def test_pseudo_library_path_missing(tmp_path, monkeypatch, key, resolver, message):
-    library = tmp_path / "missing-pseudo-library"
-    monkeypatch.setitem(config.load_config()[0], key, str(library))
-    monkeypatch.delenv("PSLIBRARY", raising=False)
-    resolver.cache_clear()
-
-    try:
-        with pytest.raises(RuntimeError, match=re.escape(f"{message} '{library}'")):
-            resolver()
-    finally:
-        resolver.cache_clear()
 
 
 @pytest.fixture(autouse=True)
@@ -88,18 +9,17 @@ def isolated_config(monkeypatch, tmp_path):
     from pathlib import Path
 
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.delenv("PSLIBRARY", raising=False)
     for resolver in (
         config.load_config,
-        config.resolve_pslibrary,
-        config.resolve_potcar_library,
+        config.resolve_pseudo_library,
     ):
         resolver.cache_clear()
     yield
     for resolver in (
         config.load_config,
-        config.resolve_pslibrary,
-        config.resolve_potcar_library,
+        config.resolve_pseudo_library,
     ):
         resolver.cache_clear()
 
@@ -143,48 +63,6 @@ def test_load_config_can_force_bundled_defaults(tmp_path, monkeypatch):
         assert data == yaml.safe_load(stream)
 
 
-def test_pslibrary_environment_takes_precedence(tmp_path, monkeypatch):
-    library = tmp_path / "environment-library"
-    library.mkdir()
-    monkeypatch.setenv("PSLIBRARY", str(library))
-    monkeypatch.setitem(
-        config.load_config()[0], "qe_pslibrary", str(tmp_path / "missing")
-    )
-    assert config.resolve_pslibrary() == library
-
-
-def test_pslibrary_invalid_environment_does_not_fall_back(tmp_path, monkeypatch):
-    library = tmp_path / "missing"
-    monkeypatch.setenv("PSLIBRARY", str(library))
-    monkeypatch.setitem(config.load_config()[0], "qe_pslibrary", str(tmp_path))
-    with pytest.raises(RuntimeError) as error:
-        config.resolve_pslibrary()
-    assert str(error.value) == (
-        f"$PSLIBRARY is set but directory does not exist: '{library}'"
-    )
-
-
-def test_config_is_cached_until_explicitly_cleared(tmp_path, monkeypatch):
-    import yaml
-
-    first = tmp_path / "first"
-    second = tmp_path / "second"
-    first.mkdir()
-    second.mkdir()
-    user_dir = tmp_path / ".config" / "dftcaddie"
-    user_dir.mkdir(parents=True)
-    path = user_dir / "config.yaml"
-    path.write_text(yaml.safe_dump({"qe_pslibrary": str(first)}))
-    initial = config.load_config()
-    assert config.resolve_pslibrary() == first
-    path.write_text(yaml.safe_dump({"qe_pslibrary": str(second)}))
-    assert config.load_config() is initial
-    assert config.resolve_pslibrary() == first
-    config.clear_config_cache()
-    assert config.load_config()[0]["qe_pslibrary"] == str(second)
-    assert config.resolve_pslibrary() == second
-
-
 def test_private_config_paths_use_user_config_when_present(tmp_path):
     source = tmp_path / ".config" / "dftcaddie"
     source.mkdir(parents=True)
@@ -225,3 +103,51 @@ def test_invalid_yaml_does_not_break_imports_or_help(tmp_path, monkeypatch, cont
         )
         assert result.returncode == expected, result.stdout + result.stderr
         assert "Traceback" not in result.stderr
+
+
+@pytest.mark.parametrize("path", ["relative/library", "~/library"])
+def test_library_resolution_is_simple_and_code_independent(tmp_path, monkeypatch, path):
+    from pathlib import Path
+
+    data = {
+        "pseudopotentials": {
+            "libraries": {
+                "custom": {
+                    "path": path,
+                    "format": "upf",
+                    "pattern": "{element}.*",
+                    "supported_codes": ["new_code"],
+                }
+            }
+        },
+        "suggested_pseudos": [{"libraries": ["custom"], "elements": {"Si": "Si.v2*"}}],
+    }
+    # No directory needs to exist; config check owns that validation.
+    with monkeypatch.context() as patch:
+        patch.setattr(config, "load_config", lambda: (data, tmp_path))
+        library = config.resolve_pseudo_library("custom")
+        assert library["path"] == (
+            tmp_path / "library" if path.startswith("~") else tmp_path / path
+        )
+        assert library["suggestions"] == {"Si": "Si.v2*"}
+        library["suggestions"]["Si"] = "changed"
+        library["supported_codes"].append("another")
+        assert data["suggested_pseudos"][0]["elements"]["Si"] == "Si.v2*"
+        assert data["pseudopotentials"]["libraries"]["custom"]["supported_codes"] == [
+            "new_code"
+        ]
+
+
+def test_config_and_library_cache_are_cleared_together(tmp_path, pseudo_settings):
+    import yaml
+
+    user_dir = tmp_path / ".config/dftcaddie"
+    user_dir.mkdir(parents=True)
+    path = user_dir / "config.yaml"
+    path.write_text(yaml.safe_dump(pseudo_settings))
+    first = config.resolve_pseudo_library("scalar")
+    pseudo_settings["pseudopotentials"]["libraries"]["scalar"]["path"] = "new-root"
+    path.write_text(yaml.safe_dump(pseudo_settings))
+    assert config.resolve_pseudo_library("scalar") is first
+    config.clear_config_cache()
+    assert config.resolve_pseudo_library("scalar")["path"] == user_dir / "new-root"

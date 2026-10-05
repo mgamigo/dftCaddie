@@ -449,19 +449,17 @@ def test_configure_qe_cutoffs_from_pseudos_reads_headers_and_sets_values(
     p1 = tmp_path / "Si.pbe.UPF"
     p2 = tmp_path / "O.pbe.UPF"
     p1.write_text(
-        "Suggested minimum cutoff for wavefunctions: 50 Ry\n"
-        "Suggested minimum cutoff for charge density: 400 Ry\n",
+        '<PP_HEADER element="Si" wfc_cutoff="50" rho_cutoff="400"/>',
         encoding="utf-8",
     )
     p2.write_text(
-        "Suggested minimum cutoff for wavefunctions: 60 Ry\n"
-        "Suggested minimum cutoff for charge density: 500 Ry\n",
+        '<PP_HEADER element="O" wfc_cutoff="60" rho_cutoff="500"/>',
         encoding="utf-8",
     )
 
     cutoff, ecutrho = fm.configure_qe_cutoffs_from_pseudos(
         str(system),
-        [str(p1), str(p2)],
+        {"Si": p1, "O": p2},
         ratio=1.5,
     )
 
@@ -484,46 +482,11 @@ def test_configure_qe_cutoffs_from_pseudos_raises_if_missing_values(
     system.write_text("CUTOFF=\nECUTRHO=\n", encoding="utf-8")
 
     p1 = tmp_path / "Si.pbe.UPF"
-    p1.write_text(
-        "Suggested minimum cutoff for wavefunctions: 50 Ry\n", encoding="utf-8"
-    )
+    p1.write_text('<PP_HEADER element="Si" wfc_cutoff="50"/>', encoding="utf-8")
 
     with pytest.raises(RuntimeError):
-        fm.configure_qe_cutoffs_from_pseudos(str(system), [str(p1)], ratio=1.0)
-
-
-# -------------------------
-# get_upf_pseudo_paths (mocked)
-# -------------------------
-
-
-def test_get_upf_pseudo_paths_uses_resolve_pslibrary_and_glob(
-    tmp_path: Path, monkeypatch, config_data
-):
-    root = tmp_path / "pslib"
-    pseudo_dir = root / "pbe" / "PSEUDOPOTENTIALS"
-    pseudo_dir.mkdir(parents=True)
-
-    # Make the template realistic (no "XXXXXX" hacks)
-    monkeypatch.setitem(
-        config_data,
-        "suggested_upf_pseudos",
-        {"Si": "Si.$fct-*.UPF"},
-    )
-
-    monkeypatch.setattr(
-        "dftcaddie.config.resolve_pslibrary",
-        lambda: str(root),
-    )
-
-    match = pseudo_dir / "Si.pbe-kjpaw.UPF"
-    match.write_text("pseudo", encoding="utf-8")
-
-    paths = fm.get_upf_pseudo_paths(
-        symbols=["Si"], exchange="pbe", kind="kjpaw", relativistic=False
-    )
-
-    assert paths == [str(match)]
+        fm.configure_qe_cutoffs_from_pseudos(str(system), {"Si": p1}, ratio=1.0)
+    assert system.read_text() == "CUTOFF=\nECUTRHO=\n"
 
 
 @pytest.mark.parametrize(
@@ -546,7 +509,6 @@ def test_potcar_matches_generated_poscar_groups(
         folder = library / "paw_pbe" / variant
         folder.mkdir(parents=True)
         (folder / "POTCAR").write_text(f"Potential for {symbol}\n")
-    monkeypatch.setattr(fm.config, "resolve_potcar_library", lambda: library)
     monkeypatch.chdir(tmp_path)
 
     atoms = Atoms(
@@ -556,7 +518,17 @@ def test_potcar_matches_generated_poscar_groups(
         pbc=True,
     )
     fm.set_crystal_structure(SimpleNamespace(atoms=atoms), "vasp")
-    paths = fm.get_potcar_paths(iter(atoms.get_chemical_symbols()))
+    from dftcaddie.utils import get_pseudo_paths
+
+    paths = get_pseudo_paths(
+        {
+            "format": "potcar",
+            "path": library / "paw_pbe",
+            "pattern": "{element}/POTCAR",
+            "suggestions": {"Si": "Si_pv/POTCAR"},
+        },
+        iter(atoms.get_chemical_symbols()),
+    )
     fm.write_potcar(paths)
 
     poscar = (tmp_path / "POSCAR").read_text().splitlines()
@@ -568,3 +540,38 @@ def test_potcar_matches_generated_poscar_groups(
     restored = read("POSCAR", format="vasp")
     assert restored.get_chemical_symbols() == symbols
     assert restored.positions == pytest.approx(atoms.positions)
+
+
+def test_write_pseudos_uses_species_keys_and_shell_quotes_directory(tmp_path):
+    import shlex
+    from ase.data import atomic_masses, atomic_numbers
+
+    directory = tmp_path / "library's files"
+    directory.mkdir()
+    system = tmp_path / "SYSTEM.INFO"
+    system.write_text("ATOMIC_SPECIES=\nold\nEOL\nPSEUDO_DIR=old\nUNCHANGED=1\n")
+    pseudos = {"O": directory / "oxygen.UPF", "Si": directory / "arbitrary.UPF"}
+    fm.write_pseudos_to_system_info(str(system), pseudos)
+    expected = (
+        "ATOMIC_SPECIES=\n"
+        + "".join(
+            f"{symbol:<2} {atomic_masses[atomic_numbers[symbol]]:11.6f}   {path.name}\n"
+            for symbol, path in pseudos.items()
+        )
+        + f"EOL\nPSEUDO_DIR={shlex.quote(str(directory))}\nUNCHANGED=1\n"
+    )
+    assert system.read_text() == expected
+
+
+def test_write_pseudos_rejects_mixed_directories_before_editing(tmp_path):
+    system = tmp_path / "SYSTEM.INFO"
+    system.write_text("unchanged\n")
+    with pytest.raises(ValueError, match="share"):
+        fm.write_pseudos_to_system_info(
+            str(system),
+            {
+                "Si": tmp_path / "one/Si.UPF",
+                "O": tmp_path / "two/O.UPF",
+            },
+        )
+    assert system.read_text() == "unchanged\n"

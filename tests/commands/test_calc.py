@@ -10,7 +10,9 @@ from dftcaddie.commands.set import pseudo, system
 
 
 @pytest.mark.parametrize("flag", ["--pseudo", "--auto"])
-def test_supplied_structure_controls_generated_vasp_inputs(parse_args, monkeypatch, flag):
+def test_supplied_structure_controls_generated_vasp_inputs(
+    parse_args, monkeypatch, flag
+):
     from ase.build import bulk
     from ase.io import write
     from dftcaddie import file_management as fm
@@ -22,7 +24,7 @@ def test_supplied_structure_controls_generated_vasp_inputs(parse_args, monkeypat
     potential.write_text("Germanium potential\n ENMAX = 200;\n")
     finder = Mock(return_value=[str(potential)])
     grid = Mock(wraps=fm.set_auto_kgrid)
-    monkeypatch.setattr(fm, "get_potcar_paths", finder)
+    monkeypatch.setattr(utils, "get_pseudo_paths", finder)
     monkeypatch.setattr(fm, "set_auto_kgrid", grid)
 
     calc.run(
@@ -39,7 +41,10 @@ def test_supplied_structure_controls_generated_vasp_inputs(parse_args, monkeypat
     )
 
     assert Path("POSCAR").read_bytes() == original
-    finder.assert_called_once_with(symbols=["Ge", "Ge"], exchange="pbe", kind="paw")
+    assert finder.call_count == 1
+    library, symbols = finder.call_args.args
+    assert library["format"] == "potcar"
+    assert list(symbols) == ["Ge", "Ge"]
     assert Path("POTCAR").read_bytes() == potential.read_bytes()
     if flag == "--auto":
         assert grid.call_args.args[0].symbols == ["Ge", "Ge"]
@@ -143,7 +148,13 @@ def test_calc_structure_without_pseudo(parse_args, monkeypatch):
         structure=structure,
         autokgrid=False,
         kpath=False,
-        files={"scf.sh", "bands.sh", "project_kresolved.sh", "SYSTEM.INFO", "master.sh"},
+        files={
+            "scf.sh",
+            "bands.sh",
+            "project_kresolved.sh",
+            "SYSTEM.INFO",
+            "master.sh",
+        },
     )
     pseudo_step.assert_not_called()
 
@@ -175,13 +186,25 @@ def test_calc_auto_runs_full_setup(parse_args, monkeypatch, flag):
         structure=structure,
         autokgrid=True,
         kpath=True,
-        files={"scf.sh", "bands.sh", "project_kresolved.sh", "SYSTEM.INFO", "master.sh"},
+        files={
+            "scf.sh",
+            "bands.sh",
+            "project_kresolved.sh",
+            "SYSTEM.INFO",
+            "master.sh",
+        },
     )
     pseudo_step.assert_called_once_with(
         kind_calc="bands",
         code="quantum_espresso",
         symbols=structure.symbols,
-        relativistic=True,
+        soc=True,
         configure=True,
-        files={"scf.sh", "bands.sh", "project_kresolved.sh", "SYSTEM.INFO", "master.sh"},
+        files={
+            "scf.sh",
+            "bands.sh",
+            "project_kresolved.sh",
+            "SYSTEM.INFO",
+            "master.sh",
+        },
     )

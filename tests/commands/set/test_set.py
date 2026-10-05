@@ -15,7 +15,7 @@ def test_set_dispatch(monkeypatch, name):
     for key, handler in handlers.items():
         monkeypatch.setattr(getattr(set_command, key), "run", handler)
 
-    args = Namespace(set_action=name)
+    args = Namespace(set_action=name, list=False)
     assert set_command.run(args) == name
     handlers[name].assert_called_once_with(args)
 

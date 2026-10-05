@@ -122,3 +122,23 @@ def test_commands_and_flags_follow_parser(monkeypatch):
     parser.add_argument("--new-option", action="store_true")
     finder = CompletionFinder(parser, always_complete_options=False)
     assert finder.rl_complete("caddie --new", 0).strip() == "caddie --new-option"
+
+
+@pytest.mark.parametrize(
+    "code,expected",
+    [
+        ("quantum_espresso", {"pbesol-us-sr", "pbesol-us-fr"}),
+        ("vasp", {"paw-pbe"}),
+    ],
+)
+def test_library_completion_respects_code_and_directory(complete, code, expected):
+    run, config_path, working = complete
+    data = yaml.safe_load(config_path.read_text())
+    target = working / "target"
+    target.mkdir()
+    for filename in data["calculations"]["bands"]["files"][code]:
+        (target / Path(filename).name).touch()
+    all_names = set(data["pseudopotentials"]["libraries"])
+    assert set(run("caddie set pseudo -l ")) == all_names
+    assert set(run("caddie -C target set pseudo -l ")) == expected
+    assert set(run("caddie -C target set pseudo --list -l ")) == all_names

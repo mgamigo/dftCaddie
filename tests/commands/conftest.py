@@ -18,7 +18,7 @@ def isolated_command_environment(
     monkeypatch.setattr(socket, "gethostname", lambda: "test-host")
     monkeypatch.setattr(config, "load_config", lambda: (data, resources))
     monkeypatch.delenv("PSLIBRARY", raising=False)
-    for resolver in (config.resolve_pslibrary, config.resolve_potcar_library):
+    for resolver in (config.resolve_pseudo_library,):
         resolver.cache_clear()
 
     def unexpected_input(prompt):
@@ -26,7 +26,7 @@ def isolated_command_environment(
 
     monkeypatch.setattr("builtins.input", unexpected_input)
     yield resources
-    for resolver in (config.resolve_pslibrary, config.resolve_potcar_library):
+    for resolver in (config.resolve_pseudo_library,):
         resolver.cache_clear()
 
 

@@ -241,9 +241,7 @@ def _validate_recipe_settings(settings, entry, issues):
             _check_string(issues, setting.get("prompt"), setting_path + ".prompt")
             options = setting.get("options")
             if not isinstance(options, list) or not options:
-                _error(
-                    issues, setting_path + ".options", "Expected a nonempty list."
-                )
+                _error(issues, setting_path + ".options", "Expected a nonempty list.")
                 continue
             if not (
                 all(isinstance(option, str) and option for option in options)
@@ -304,7 +302,13 @@ def _validate_libraries(data, source_dir, issues):
         codes = library.get("supported_codes")
         if _check_string_list(issues, codes, location + ".supported_codes"):
             for code in codes:
-                expected = {"quantum_espresso": "upf", "vasp": "potcar"}.get(code)
+                # Match the backend families used by the command, including
+                # combined codes such as quantum_espresso/wannier90.
+                expected = None
+                if "quantum_espresso" in code:
+                    expected = "upf"
+                elif "vasp" in code:
+                    expected = "potcar"
                 if expected is not None and pseudo_format != expected:
                     _error(issues, location + ".format", f"{code} requires {expected}.")
         _validate_library(library, pseudo_format, location, source_dir, issues)
@@ -367,7 +371,9 @@ def _validate_suggestions(groups, libraries, issues):
                 _error(issues, entry, "Expected an element symbol.")
             # Missing matches are allowed: selection falls back to the library pattern.
             pseudo_format = "upf" if "upf" in formats else "potcar"
-            _check_pseudo_filename(issues, pattern, pseudo_format, entry, allow_glob=True)
+            _check_pseudo_filename(
+                issues, pattern, pseudo_format, entry, allow_glob=True
+            )
 
 
 def _validate_library(library, pseudo_format, location, source_dir, issues):
@@ -463,7 +469,9 @@ def _validate_library_cutoffs(library, pseudo_format, location, issues):
                 _error(issues, entry, f"Invalid cutoff: {exc}")
 
 
-def _check_pseudo_filename(issues, filename, pseudo_format, location, *, allow_glob=False):
+def _check_pseudo_filename(
+    issues, filename, pseudo_format, location, *, allow_glob=False
+):
     """Check a relative file or suggestion glob; UPF stays in one directory."""
     if not _check_string(issues, filename, location):
         return False
@@ -474,7 +482,11 @@ def _check_pseudo_filename(issues, filename, pseudo_format, location, *, allow_g
     forbidden = "{}" if allow_glob else "*?[]{}"
     if invalid or any(c in filename for c in forbidden):
         kind = "glob" if allow_glob else "exact file"
-        _error(issues, location, f"Expected a relative {kind} within the library directory.")
+        _error(
+            issues,
+            location,
+            f"Expected a relative {kind} within the library directory.",
+        )
         return False
     return True
 

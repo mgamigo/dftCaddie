@@ -68,7 +68,7 @@ def test_system_pseudo_uses_flavor_default(parse_args, monkeypatch):
         kind_calc="relax",
         code="vasp",
         symbols=["Si"],
-        relativistic=False,
+        soc=False,
         configure=True,
     )
 

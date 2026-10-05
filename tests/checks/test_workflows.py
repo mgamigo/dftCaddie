@@ -7,6 +7,7 @@ import shutil
 import pytest
 
 from dftcaddie.checks import workflows as checker
+from dftcaddie.checks import workflow_worker
 from dftcaddie.checks.workflows import check_workflows
 from dftcaddie.config import load_config
 
@@ -17,11 +18,7 @@ SCENARIOS = ("staged", "automatic", "auto", "reconfiguration")
 def workflow_requests():
     """Select the calculation/scenario combinations covered by this module."""
     cases = list(checker.calculation_cases(load_config(default_config=True)[0]))
-    return [(case, "staged") for case in cases] + [
-        (("bands", None, code), scenario)
-        for scenario in SCENARIOS[1:]
-        for code in ("quantum_espresso", "vasp")
-    ]
+    return [(case, scenario) for case in cases for scenario in SCENARIOS]
 
 
 @pytest.fixture(scope="module")
@@ -29,7 +26,7 @@ def workflow_batch(bundled_resources, workflow_requests):
     """Run all bundled scenarios in one worker, as a single shared batch."""
     workers = []
     seen = []
-    popen = checker.subprocess.Popen
+    popen = workflow_worker.subprocess.Popen
 
     def start_worker(*args, **kwargs):
         process = popen(*args, **kwargs)
@@ -40,12 +37,12 @@ def workflow_batch(bundled_resources, workflow_requests):
         seen.append((result, workers[0].poll()))
 
     with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(checker.subprocess, "Popen", start_worker)
+        patch.setattr(workflow_worker.subprocess, "Popen", start_worker)
         results = check_workflows(
             load_config(default_config=True)[0],
             bundled_resources,
             checks=workflow_requests,
-            structure_path=Path(__file__).resolve().parent / "data/Si.cif",
+            structure_path=Path(__file__).resolve().parents[1] / "data/Si.cif",
             progress=record,
         )
     return results, seen, workers
@@ -154,13 +151,13 @@ def test_invalid_schema_is_reported_without_running(monkeypatch, bundled_resourc
     def unexpected_run(*args, **kwargs):
         raise AssertionError("Invalid configuration should not start a worker")
 
-    monkeypatch.setattr(checker.subprocess, "Popen", unexpected_run)
+    monkeypatch.setattr(workflow_worker.subprocess, "Popen", unexpected_run)
     results = checker.check_workflows([], bundled_resources)
     assert results and all(not result.success for result in results)
 
 
 def test_packaged_cif_matches_test_fixture():
-    fixture = Path(__file__).resolve().parent / "data/Si.cif"
+    fixture = Path(__file__).resolve().parents[1] / "data/Si.cif"
     assert (
         Path(checker.__file__).parent / "data/Si.cif"
     ).read_bytes() == fixture.read_bytes()

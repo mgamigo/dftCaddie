@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 
 import dftcaddie.utils as ut
-from dftcaddie.checks.config import validate_config
 
 
 @pytest.fixture(autouse=True)
@@ -20,22 +19,12 @@ def test_resources_folder_exists(bundled_resources):
     assert bundled_resources.exists()
 
 
-def test_bundled_config_resources_are_valid(bundled_config, bundled_resources):
-    data = dict(bundled_config)
-    data.pop("qe_pslibrary", None)
-    data.pop("vasp_pseudopotentials", None)
-
-    issues = validate_config(data, bundled_resources, environ={})
-
-    assert not [issue for issue in issues if issue.level == "error"]
-    assert {issue.location for issue in issues} == {
-        "qe_pslibrary",
-        "vasp_pseudopotentials",
-    }
-
-
 def test_suggested_pseudos_cover_known_elements(bundled_config):
-    assert len(bundled_config["suggested_upf_pseudos"]) == 94
+    groups = bundled_config["suggested_pseudos"]
+    psl = next(group for group in groups if "pbesol-us-sr" in group["libraries"])
+    assert len(psl["elements"]) == 94
+    assert psl["elements"]["Si"] == "Si.*-nl-*_psl.1.0.0.UPF"
+    assert "pbesol-us-fr" in psl["libraries"]
 
 
 def test_resolve_calculation_directory(calculation_case, bundled_config, tmp_path):
