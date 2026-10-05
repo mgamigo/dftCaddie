@@ -232,32 +232,32 @@ mpi_executables:
 pseudopotentials:
   defaults:
     quantum_espresso:
-      scalar: pbesol-us-sr
-      soc: pbesol-us-fr
+      scalar: pbesol-paw-sr
+      soc: pbesol-paw-fr
     vasp:
       scalar: paw-pbe
       soc: paw-pbe
   libraries:
-    pbesol-us-sr:
+    pbesol-paw-sr:
       format: upf
       supported_codes:
       - quantum_espresso
       path: ~/Software/PSEUDOS/pslibrary/pbesol/PSEUDOPOTENTIALS
-      pattern: '{element}.pbesol-*rrkjus_psl.*.UPF'
+      pattern: '{element}.pbesol-*kjpaw_psl.*.UPF'
       # overrides:
-      #   Si: Si.pbesol-nl-rrkjus_psl.1.0.0.UPF
+      #   Si: Si.pbesol-nl-kjpaw_psl.1.0.0.UPF
       # Optional fallback values in Ry, before the safety factor (not minimums).
       # cutoff_defaults:
       #   ecutwfc: 60
       #   ecutrho: 480
-    pbesol-us-fr:
+    pbesol-paw-fr:
       format: upf
       supported_codes:
       - quantum_espresso
       path: ~/Software/PSEUDOS/pslibrary/rel-pbesol/PSEUDOPOTENTIALS
-      pattern: '{element}.rel-pbesol-*rrkjus_psl.*.UPF'
+      pattern: '{element}.rel-pbesol-*kjpaw_psl.*.UPF'
       # overrides:
-      #   Si: Si.rel-pbesol-nl-rrkjus_psl.1.0.0.UPF
+      #   Si: Si.rel-pbesol-nl-kjpaw_psl.1.0.0.UPF
       # Optional fallback values in Ry, before the safety factor (not minimums).
       # cutoff_defaults:
       #   ecutwfc: 60
@@ -273,102 +273,102 @@ pseudopotentials:
 # One relative glob per element; groups may apply to several libraries.
 # Missing suggestions use the library pattern; exact overrides take precedence.
 suggested_pseudos:
-  - libraries: [pbesol-us-sr, pbesol-us-fr]
+  - libraries: [pbesol-paw-sr, pbesol-paw-fr]
     elements:
-      H: "H.*-*_psl.1.0.0.UPF"
-      He: "He.*-*_psl.1.0.0.UPF"
-      Li: "Li.*-sl-*_psl.1.0.0.UPF"
-      Be: "Be.*-sl-*_psl.1.0.0.UPF"
-      B: "B.*-n-*_psl.1.0.0.UPF"
-      C: "C.*-n-*_psl.1.0.0.UPF"
-      N: "N.*-n-*_psl.1.0.0.UPF"
-      O: "O.*-n-*_psl.1.0.0.UPF"
-      F: "F.*-n-*_psl.1.0.0.UPF"
-      Ne: "Ne.*-n-*_psl.1.0.0.UPF"
-      Na: "Na.*-spnl-*_psl.1.0.0.UPF"
-      Mg: "Mg.*-spnl-*_psl.1.0.0.UPF"
-      Al: "Al.*-nl-*_psl.1.0.0.UPF"
-      Si: "Si.*-nl-*_psl.1.0.0.UPF"
-      P: "P.*-nl-*_psl.1.0.0.UPF"
-      S: "S.*-nl-*_psl.1.0.0.UPF"
-      Cl: "Cl.*-nl-*_psl.1.0.0.UPF"
-      Ar: "Ar.*-nl-*_psl.1.0.0.UPF"
-      K: "K.*-spn-*_psl.1.0.0.UPF"
-      Ca: "Ca.*-spn-*_psl.1.0.0.UPF"
-      Sc: "Sc.*-spn-*_psl.1.0.0.UPF"
-      Ti: "Ti.*-spn-*_psl.1.0.0.UPF"
-      V: "V.*-spnl-*_psl.1.0.0.UPF"
-      Cr: "Cr.*-spn-*_psl.1.0.0.UPF"
-      Mn: "Mn.*-spn-*_psl.0.3.1.UPF"
-      Fe: "Fe.*-n-*_psl.1.0.0.UPF"
-      Co: "Co.*-n-*_psl.0.3.1.UPF"
-      Ni: "Ni.*-n-*_psl.1.0.0.UPF"
-      Cu: "Cu.*-dn-*_psl.1.0.0.UPF"
-      Zn: "Zn.*-dn-*_psl.1.0.0.UPF"
-      Ga: "Ga.*-dnl-*_psl.1.0.0.UPF"
-      Ge: "Ge.*-n-*_psl.1.0.0.UPF"
-      As: "As.*-n-*_psl.1.0.0.UPF"
-      Se: "Se.*-n-*_psl.1.0.0.UPF"
-      Br: "Br.*-n-*_psl.1.0.0.UPF"
-      Kr: "Kr.*-dn-*_psl.1.0.0.UPF"
-      Rb: "Rb.*-spn-*_psl.1.0.0.UPF"
-      Sr: "Sr.*-spn-*_psl.1.0.0.UPF"
-      Y: "Y.*-spn-*_psl.1.0.0.UPF"
-      Zr: "Zr.*-spn-*_psl.1.0.0.UPF"
-      Nb: "Nb.*-spn-*_psl.1.0.0.UPF"
-      Mo: "Mo.*-spn-*_psl.1.0.0.UPF"
-      Tc: "Tc.*-spn-*_psl.0.3.0.UPF"
-      Ru: "Ru.*-spn-*_psl.1.0.0.UPF"
-      Rh: "Rh.*-spn-*_psl.1.0.0.UPF"
-      Pd: "Pd.*-n-*_psl.1.0.0.UPF"
-      Ag: "Ag.*-n-*_psl.1.0.0.UPF"
-      Cd: "Cd.*-n-*_psl.1.0.0.UPF"
-      In: "In.*-dn-*_psl.1.0.0.UPF"
-      Sn: "Sn.*-dn-*_psl.1.0.0.UPF"
-      Sb: "Sb.*-n-*_psl.1.0.0.UPF"
-      Te: "Te.*-n-*_psl.1.0.0.UPF"
-      I: "I.*-n-*_psl.1.0.0.UPF"
-      Xe: "Xe.*-dn-*_psl.1.0.0.UPF"
-      Cs: "Cs.*-spnl-*_psl.1.0.0.UPF"
-      Ba: "Ba.*-spn-*_psl.1.0.0.UPF"
-      La: "La.*-spfn-*_psl.1.0.0.UPF"
-      Ce: "Ce.*-spdn-*_psl.1.0.0.UPF"
-      Pr: "Pr.*-spdn-*_psl.1.0.0.UPF"
-      Nd: "Nd.*-spdn-*_psl.1.0.0.UPF"
-      Pm: "Pm.*-spdn-*_psl.1.0.0.UPF"
-      Sm: "Sm.*-spdn-*_psl.1.0.0.UPF"
-      Eu: "Eu.*-spn-*_psl.1.0.0.UPF"
-      Gd: "Gd.*-spdn-*_psl.1.0.0.UPF"
-      Tb: "Tb.*-spdn-*_psl.1.0.0.UPF"
-      Dy: "Dy.*-spdn-*_psl.1.0.0.UPF"
-      Ho: "Ho.*-spdn-*_psl.1.0.0.UPF"
-      Er: "Er.*-spdn-*_psl.1.0.0.UPF"
-      Tm: "Tm.*-spdn-*_psl.1.0.0.UPF"
-      Yb: "Yb.*-spn-*_psl.1.0.0.UPF"
-      Lu: "Lu.*-spdn-*_psl.1.0.0.UPF"
-      Hf: "Hf.*-spn-*_psl.1.0.0.UPF"
-      Ta: "Ta.*-spn-*_psl.1.0.0.UPF"
-      W: "W.*-spn-*_psl.1.0.1.UPF"
-      Re: "Re.*-spn-*_psl.1.0.0.UPF"
-      Os: "Os.*-spn-*_psl.1.0.0.UPF"
-      Ir: "Ir.*-n-*_psl.0.2.3.UPF"
-      Pt: "Pt.*-n-*_psl.1.0.0.UPF"
-      Au: "Au.*-n-*_psl.1.0.1.UPF"
-      Hg: "Hg.*-n-*_psl.1.0.0.UPF"
-      Tl: "Tl.*-dn-*_psl.1.0.0.UPF"
-      Pb: "Pb.*-dn-*_psl.1.0.0.UPF"
-      Bi: "Bi.*-dn-*_psl.1.0.0.UPF"
-      Po: "Po.*-dn-*_psl.1.0.0.UPF"
-      At: "At.*-dn-*_psl.1.0.0.UPF"
-      Rn: "Rn.*-dn-*_psl.1.0.0.UPF"
-      Fr: "Fr.*-spdn-*_psl.1.0.0.UPF"
-      Ra: "Ra.*-spdn-*_psl.1.0.0.UPF"
-      Ac: "Ac.*-spfn-*_psl.1.0.0.UPF"
-      Th: "Th.*-spfn-*_psl.1.0.0.UPF"
-      Pa: "Pa.*-spfn-*_psl.1.0.0.UPF"
-      U: "U.*-spfn-*_psl.1.0.0.UPF"
-      Np: "Np.*-spfn-*_psl.1.0.0.UPF"
-      Pu: "Pu.*-spfn-*_psl.1.0.0.UPF"
+      H: "H.*-*_psl.*.UPF"
+      He: "He.*-*_psl.*.UPF"
+      Li: "Li.*-sl-*_psl.*.UPF"
+      Be: "Be.*-sl-*_psl.*.UPF"
+      B: "B.*-n-*_psl.*.UPF"
+      C: "C.*-n-*_psl.*.UPF"
+      N: "N.*-n-*_psl.*.UPF"
+      O: "O.*-n-*_psl.*.UPF"
+      F: "F.*-n-*_psl.*.UPF"
+      Ne: "Ne.*-n-*_psl.*.UPF"
+      Na: "Na.*-spnl-*_psl.*.UPF"
+      Mg: "Mg.*-spnl-*_psl.*.UPF"
+      Al: "Al.*-nl-*_psl.*.UPF"
+      Si: "Si.*-nl-*_psl.*.UPF"
+      P: "P.*-nl-*_psl.*.UPF"
+      S: "S.*-nl-*_psl.*.UPF"
+      Cl: "Cl.*-nl-*_psl.*.UPF"
+      Ar: "Ar.*-nl-*_psl.*.UPF"
+      K: "K.*-spn-*_psl.*.UPF"
+      Ca: "Ca.*-spn-*_psl.*.UPF"
+      Sc: "Sc.*-spn-*_psl.*.UPF"
+      Ti: "Ti.*-spn-*_psl.*.UPF"
+      V: "V.*-spnl-*_psl.*.UPF"
+      Cr: "Cr.*-spn-*_psl.*.UPF"
+      Mn: "Mn.*-spn-*_psl.*.UPF"
+      Fe: "Fe.*-n-*_psl.*.UPF"
+      Co: "Co.*-n-*_psl.*.UPF"
+      Ni: "Ni.*-n-*_psl.*.UPF"
+      Cu: "Cu.*-dn-*_psl.*.UPF"
+      Zn: "Zn.*-dn-*_psl.*.UPF"
+      Ga: "Ga.*-dnl-*_psl.*.UPF"
+      Ge: "Ge.*-n-*_psl.*.UPF"
+      As: "As.*-n-*_psl.*.UPF"
+      Se: "Se.*-n-*_psl.*.UPF"
+      Br: "Br.*-n-*_psl.*.UPF"
+      Kr: "Kr.*-dn-*_psl.*.UPF"
+      Rb: "Rb.*-spn-*_psl.*.UPF"
+      Sr: "Sr.*-spn-*_psl.*.UPF"
+      Y: "Y.*-spn-*_psl.*.UPF"
+      Zr: "Zr.*-spn-*_psl.*.UPF"
+      Nb: "Nb.*-spn-*_psl.*.UPF"
+      Mo: "Mo.*-spn-*_psl.*.UPF"
+      Tc: "Tc.*-spn-*_psl.*.UPF"
+      Ru: "Ru.*-spn-*_psl.*.UPF"
+      Rh: "Rh.*-spn-*_psl.*.UPF"
+      Pd: "Pd.*-n-*_psl.*.UPF"
+      Ag: "Ag.*-n-*_psl.*.UPF"
+      Cd: "Cd.*-n-*_psl.*.UPF"
+      In: "In.*-dn-*_psl.*.UPF"
+      Sn: "Sn.*-dn-*_psl.*.UPF"
+      Sb: "Sb.*-n-*_psl.*.UPF"
+      Te: "Te.*-n-*_psl.*.UPF"
+      I: "I.*-n-*_psl.*.UPF"
+      Xe: "Xe.*-dn-*_psl.*.UPF"
+      Cs: "Cs.*-spnl-*_psl.*.UPF"
+      Ba: "Ba.*-spn-*_psl.*.UPF"
+      La: "La.*-spfn-*_psl.*.UPF"
+      Ce: "Ce.*-spdn-*_psl.*.UPF"
+      Pr: "Pr.*-spdn-*_psl.*.UPF"
+      Nd: "Nd.*-spdn-*_psl.*.UPF"
+      Pm: "Pm.*-spdn-*_psl.*.UPF"
+      Sm: "Sm.*-spdn-*_psl.*.UPF"
+      Eu: "Eu.*-spn-*_psl.*.UPF"
+      Gd: "Gd.*-spdn-*_psl.*.UPF"
+      Tb: "Tb.*-spdn-*_psl.*.UPF"
+      Dy: "Dy.*-spdn-*_psl.*.UPF"
+      Ho: "Ho.*-spdn-*_psl.*.UPF"
+      Er: "Er.*-spdn-*_psl.*.UPF"
+      Tm: "Tm.*-spdn-*_psl.*.UPF"
+      Yb: "Yb.*-spn-*_psl.*.UPF"
+      Lu: "Lu.*-spdn-*_psl.*.UPF"
+      Hf: "Hf.*-spn-*_psl.*.UPF"
+      Ta: "Ta.*-spn-*_psl.*.UPF"
+      W: "W.*-spn-*_psl.1.0.0.UPF"
+      Re: "Re.*-spn-*_psl.*.UPF"
+      Os: "Os.*-spn-*_psl.*.UPF"
+      Ir: "Ir.*-n-*_psl.*.UPF"
+      Pt: "Pt.*-n-*_psl.*.UPF"
+      Au: "Au.*-n-*_psl.*.UPF"
+      Hg: "Hg.*-n-*_psl.*.UPF"
+      Tl: "Tl.*-dn-*_psl.*.UPF"
+      Pb: "Pb.*-dn-*_psl.*.UPF"
+      Bi: "Bi.*-dn-*_psl.*.UPF"
+      Po: "Po.*-dn-*_psl.*.UPF"
+      At: "At.*-dn-*_psl.*.UPF"
+      Rn: "Rn.*-dn-*_psl.*.UPF"
+      Fr: "Fr.*-spdn-*_psl.*.UPF"
+      Ra: "Ra.*-spdn-*_psl.*.UPF"
+      Ac: "Ac.*-spfn-*_psl.*.UPF"
+      Th: "Th.*-spfn-*_psl.*.UPF"
+      Pa: "Pa.*-spfn-*_psl.*.UPF"
+      U: "U.*-spfn-*_psl.*.UPF"
+      Np: "Np.*-spfn-*_psl.*.UPF"
+      Pu: "Pu.*-spfn-*_psl.*.UPF"
   - libraries: [paw-pbe]
     elements:
       Cs: "Cs_sv/POTCAR"

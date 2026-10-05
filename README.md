@@ -239,7 +239,7 @@ pseudopotentials:
 suggested_pseudos:
   - libraries: [pbesol-us-sr, pbesol-us-fr]
     elements:
-      Si: "Si.*-nl-*_psl.1.0.0.UPF"
+      Si: "Si.*-nl-*_psl.*.UPF"
   - libraries: [paw-pbe]
     elements:
       Cs: "Cs_sv/POTCAR"

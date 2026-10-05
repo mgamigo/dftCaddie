@@ -23,7 +23,7 @@ def test_suggested_pseudos_cover_known_elements(bundled_config):
     groups = bundled_config["suggested_pseudos"]
     psl = next(group for group in groups if "pbesol-us-sr" in group["libraries"])
     assert len(psl["elements"]) == 94
-    assert psl["elements"]["Si"] == "Si.*-nl-*_psl.1.0.0.UPF"
+    assert psl["elements"]["Si"] == "Si.*-nl-*_psl.*.UPF"
     assert "pbesol-us-fr" in psl["libraries"]
 
 
